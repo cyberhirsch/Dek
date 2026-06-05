@@ -360,6 +360,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         v-model="current"
         :deck="deck"
         :editable="editMode"
+        :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
         @patch="patchSlide"
         @upload="onUpload"
       />

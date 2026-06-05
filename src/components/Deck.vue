@@ -4,7 +4,12 @@ import type { Deck, Slide } from '../core/types'
 import { themeVars as buildThemeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
 
-const props = defineProps<{ deck: Deck; modelValue: number; editable?: boolean }>()
+const props = defineProps<{
+  deck: Deck
+  modelValue: number
+  editable?: boolean
+  navEnabled?: boolean
+}>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   patch: [p: Partial<Slide>]
@@ -31,6 +36,8 @@ function go(n: number) {
 }
 
 function onKey(e: KeyboardEvent) {
+  // Suspended while an overlay (overview / presenter / export) owns the keyboard.
+  if (props.navEnabled === false) return
   // Don't hijack arrows/space while typing in a contenteditable field.
   const ae = document.activeElement as HTMLElement | null
   if (ae && ae.isContentEditable) {

@@ -1,18 +1,64 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
 
-defineProps<{ deck: Deck; current: number }>()
+const props = defineProps<{ deck: Deck; current: number }>()
 const emit = defineEmits<{ jump: [i: number]; close: [] }>()
 
+const grid = ref<HTMLElement | null>(null)
+const focus = ref(props.current)
+
+function columns(): number {
+  const g = grid.value
+  if (!g) return 1
+  const first = g.querySelector('.cell') as HTMLElement | null
+  if (!first) return 1
+  const gap = 16
+  return Math.max(1, Math.round((g.clientWidth + gap) / (first.offsetWidth + gap)))
+}
+
+function move(delta: number) {
+  const max = props.deck.slides.length - 1
+  focus.value = Math.max(0, Math.min(max, focus.value + delta))
+  nextTick(() => {
+    grid.value?.querySelectorAll('.cell')[focus.value]?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' || e.key.toLowerCase() === 'o') {
+  const k = e.key
+  if (k === 'Escape' || k.toLowerCase() === 'o') {
     e.preventDefault()
+    emit('close')
+  } else if (k === 'ArrowRight') {
+    e.preventDefault()
+    move(1)
+  } else if (k === 'ArrowLeft') {
+    e.preventDefault()
+    move(-1)
+  } else if (k === 'ArrowDown') {
+    e.preventDefault()
+    move(columns())
+  } else if (k === 'ArrowUp') {
+    e.preventDefault()
+    move(-columns())
+  } else if (k === 'Home') {
+    e.preventDefault()
+    move(-1e9)
+  } else if (k === 'End') {
+    e.preventDefault()
+    move(1e9)
+  } else if (k === 'Enter') {
+    e.preventDefault()
+    emit('jump', focus.value)
     emit('close')
   }
 }
-onMounted(() => window.addEventListener('keydown', onKey))
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  nextTick(() => grid.value?.querySelectorAll('.cell')[focus.value]?.scrollIntoView({ block: 'center' }))
+})
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
 
@@ -22,13 +68,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <span>Overview — {{ deck.slides.length }} slides</span>
       <button @click="emit('close')">Close (Esc)</button>
     </div>
-    <div class="ov-grid">
+    <div ref="grid" class="ov-grid">
       <button
         v-for="(s, i) in deck.slides"
         :key="i"
         class="cell"
-        :class="{ active: i === current }"
+        :class="{ active: i === current, focused: i === focus }"
         @click="emit('jump', i); emit('close')"
+        @mouseenter="focus = i"
       >
         <span class="n">{{ i + 1 }}</span>
         <span v-if="s.group" class="g">{{ s.group }}</span>
@@ -87,7 +134,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   display: flex;
 }
 .cell:hover { border-color: rgba(127, 199, 255, 0.5); }
-.cell.active { border-color: #7fc7ff; }
+.cell.focused { border-color: rgba(127, 199, 255, 0.7); }
+.cell.active { border-color: #7fc7ff; box-shadow: 0 0 0 2px rgba(127, 199, 255, 0.4); }
 .cell .n {
   position: absolute;
   top: 4px;
