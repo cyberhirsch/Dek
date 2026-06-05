@@ -336,8 +336,29 @@
   transform: translate(-50%, -50%) scale(1.08);
   background: rgba(127, 199, 255, 0.3);
 }
-.l-video-embed .play.ghost {
-  opacity: 0.55;
+.l-video-embed .play:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.l-video-embed .vid-stop {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(7, 8, 9, 0.7);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.l-video-embed .vid-stop:hover {
+  background: rgba(248, 113, 113, 0.8);
 }
 .l-video-embed .play .tri {
   width: 0;

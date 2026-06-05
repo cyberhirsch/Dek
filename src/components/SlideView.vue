@@ -70,8 +70,10 @@ const posterSrc = computed(() => props.slide.poster || props.slide.image || pv.v
 const playing = ref(false)
 const playSrc = computed(() => (pv.value ? autoplaySrc(pv.value) : ''))
 function playVideo() {
-  if (props.editable) return // editing: don't autoplay
   if (pv.value) playing.value = true
+}
+function stopVideo() {
+  playing.value = false
 }
 // reset playback when the slide changes
 watch(
@@ -190,14 +192,18 @@ watch(
     <!-- video-embed -->
     <div v-else-if="slide.layout === 'video-embed'" class="dek-pad l-video-embed">
       <div class="vid-frame">
-        <!-- player (present mode, after click) -->
-        <iframe
-          v-if="playing && pv && pv.provider !== 'file'"
-          :src="playSrc"
-          allow="autoplay; encrypted-media; fullscreen"
-          allowfullscreen
-        />
-        <video v-else-if="playing && pv && pv.provider === 'file'" :src="pv.embedUrl" controls autoplay />
+        <!-- player (after clicking play) -->
+        <template v-if="playing && pv">
+          <iframe
+            v-if="pv.provider !== 'file'"
+            :src="playSrc"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowfullscreen
+          />
+          <video v-else :src="pv.embedUrl" controls autoplay />
+          <!-- in the editor, let the user stop and return to the poster/fields -->
+          <button v-if="editable" class="vid-stop" title="Stop / back to editing" @click="stopVideo">✕</button>
+        </template>
 
         <!-- poster + play button -->
         <template v-else>
@@ -207,7 +213,7 @@ watch(
             :editable="editable"
             @file="emit('upload', { field: 'poster', file: $event })"
           />
-          <button class="play" :class="{ ghost: editable }" @click="playVideo">
+          <button class="play" :disabled="!pv" :title="pv ? 'Play' : 'Add a video URL first'" @click="playVideo">
             <span class="tri" />
           </button>
           <div v-if="editable" class="vid-url">
