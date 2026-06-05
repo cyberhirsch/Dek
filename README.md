@@ -23,6 +23,8 @@ npm install
 npm run dev        # http://localhost:5173  — edits deck.md, hot-reloads
 ```
 Arrow keys / Space / PageUp-Down / Home / End navigate. Press **Ctrl+E** (or ✎) to edit.
+In present mode: **F** fullscreen · **O** overview grid · **P** presenter view (notes + next
+slide + timer). Add speaker notes per slide from the notes strip under the editor.
 
 On first run, `deck.md` is seeded from `deck.example.md`. **Your slide content stays local:**
 `deck.md` and `public/Assets/` are gitignored — this repo ships the *tool*, not anyone's
@@ -52,11 +54,14 @@ src/api.ts            client over the dev API
   Backspace); image pan, scroll-zoom & drag-&-drop replace; **undo/redo** (`Ctrl+Z` /
   `Ctrl+Shift+Z`, coalesces typing); debounced autosave + manual save. Groups persist as a
   `group:` field per slide; all edits round-trip straight to `deck.md`.
+- **Done — presenting:** fullscreen (F), an **overview grid** (O) with click-to-jump and
+  group labels, and a **presenter view** (P) showing the current slide, next slide, speaker
+  notes, and an elapsed timer. Notes are editable per slide (the strip below the editor) and
+  persist as a `notes:` field.
 - **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
   LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
-- **Next (in order):** presenting essentials (fullscreen, speaker notes, overview grid) →
-  harden foundation (parser tests, prod build, hygiene) → export PDF/HTML → PDF import of
-  the 350-page M7 source.
+- **Next (in order):** harden foundation (parser tests, prod build, hygiene) → export
+  PDF/HTML → PDF import of the 350-page M7 source.
 
 ## Read these first
 - **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three

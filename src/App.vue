@@ -6,6 +6,9 @@ import { fetchDeck, saveSlide, saveDeck, uploadImage } from './api'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
+import Overview from './components/Overview.vue'
+import Presenter from './components/Presenter.vue'
+import EditableText from './components/EditableText.vue'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -14,6 +17,14 @@ const error = ref<string | null>(null)
 const editMode = ref(false)
 const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
+
+// present-mode views
+const overviewOpen = ref(false)
+const presenterOpen = ref(false)
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
+  else document.exitFullscreen?.()
+}
 
 const selected = ref<number[]>([])
 let anchor = 0
@@ -106,6 +117,19 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape' && editMode.value) {
     if (ae?.isContentEditable) ae.blur()
     else editMode.value = false
+  } else if (!mod && !editMode.value && !ae?.isContentEditable && !overviewOpen.value && !presenterOpen.value) {
+    // present-mode single-key shortcuts
+    const k = e.key.toLowerCase()
+    if (k === 'f') {
+      e.preventDefault()
+      toggleFullscreen()
+    } else if (k === 'o') {
+      e.preventDefault()
+      overviewOpen.value = true
+    } else if (k === 'p' || k === 's') {
+      e.preventDefault()
+      presenterOpen.value = true
+    }
   }
 }
 
@@ -341,13 +365,45 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <div v-else class="msg">loading…</div>
     </div>
 
+    <!-- edit-mode speaker-notes strip -->
+    <div v-if="deck && editMode" class="notes-bar">
+      <span class="notes-label">Notes</span>
+      <EditableText
+        class="notes-input"
+        multiline
+        :model-value="deck.slides[current]?.notes"
+        placeholder="Speaker notes for this slide (shown in Presenter view)…"
+        @update:model-value="patchSlide({ notes: $event })"
+      />
+    </div>
+
     <!-- present-mode chrome -->
     <button v-if="deck && !editMode" class="edit-fab" title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     <div v-if="deck && !editMode" class="hud">
-      <button @click="current = Math.max(0, current - 1)">←</button>
+      <button @click="current = Math.max(0, current - 1)" title="Previous">←</button>
       <span>{{ current + 1 }} / {{ deck.slides.length }}</span>
-      <button @click="current = Math.min(deck.slides.length - 1, current + 1)">→</button>
+      <button @click="current = Math.min(deck.slides.length - 1, current + 1)" title="Next">→</button>
+      <span class="hud-sep" />
+      <button title="Overview (O)" @click="overviewOpen = true">▦</button>
+      <button title="Presenter view (P)" @click="presenterOpen = true">◉</button>
+      <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
     </div>
+
+    <!-- overlays -->
+    <Overview
+      v-if="deck && overviewOpen"
+      :deck="deck"
+      :current="current"
+      @jump="current = $event"
+      @close="overviewOpen = false"
+    />
+    <Presenter
+      v-if="deck && presenterOpen"
+      :deck="deck"
+      :current="current"
+      @update:current="current = $event"
+      @close="presenterOpen = false"
+    />
   </div>
 </template>
 
@@ -374,6 +430,38 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
 }
 .msg.err {
   color: #f87171;
+}
+.notes-bar {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 16px;
+  max-height: 92px;
+  overflow-y: auto;
+  background: #101216;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: 'JetBrains Mono', monospace;
+}
+.notes-label {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  color: rgba(230, 236, 242, 0.4);
+  padding-top: 4px;
+}
+.notes-input {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e6ecf2;
+  min-height: 20px;
+}
+.hud-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
 }
 .edit-fab {
   position: fixed;
