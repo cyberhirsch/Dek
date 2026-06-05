@@ -1,0 +1,71 @@
+# Dek
+
+A minimal, single-file presentation editor. One Markdown file is the source of truth,
+and you edit it three interchangeable ways: **in code**, **by handing the `.md` to any
+LLM** (no in-app prompt box — the clean named-field format is LLM-native), and
+**visually (WYSIWYG) in the browser**. Built to re-author the 350-slide M7
+*Film- und Postproduktion* PDF into a clean, maintainable, exportable deck.
+
+Borrows the best of **Marp** (portable Markdown + CSS themes + export) and **Slidev**
+(named layouts + components + the in-browser editor we prototyped), while dropping
+their pain points.
+
+## Status
+**v0.1 — running.** Vite + Vue 3 + TS app that renders a `deck.md` through 10 named
+layouts with the cinematic house theme, keyboard navigation, and a dev-server API that
+round-trips edits back to the Markdown file (the shared write path for code / LLM /
+WYSIWYG). Verified: parse ⇄ serialize is lossless, all layouts render, save API works,
+typecheck clean.
+
+### Run
+```bash
+npm install
+npm run dev        # http://localhost:5173  — edits deck.md, hot-reloads
+```
+Arrow keys / Space / PageUp-Down / Home / End navigate. Press **Ctrl+E** (or ✎) to edit.
+
+On first run, `deck.md` is seeded from `deck.example.md`. **Your slide content stays local:**
+`deck.md` and `public/Assets/` are gitignored — this repo ships the *tool*, not anyone's
+lectures. The committed `deck.example.md` is the runnable starting point.
+
+### Project structure
+```
+deck.md              active deck (source of truth, edited by all 3 paths)
+template.md          layout reference library (one slide per layout)
+vite.config.ts       dev-server API: GET/PUT /api/deck, PUT /api/slide, POST /api/upload
+src/core/            types.ts (schema) + deck.ts (parser/serializer)
+src/components/       Deck.vue (stage+nav), SlideView.vue (layout dispatcher), FramedImage.vue
+src/styles/           base.css (tokens) + slide.css (per-layout styles)
+src/api.ts            client over the dev API
+```
+
+### Built vs. next
+- **Done:** format + parser/serializer; 10 layout renderers; theme tokens; scaled 16:9
+  stage; keyboard nav; running header/footer/pagination; save API + image upload.
+- **Done — WYSIWYG editor (`Ctrl+E` or ✎):** Keynote-style chrome — a **top bar**
+  (layout picker, per-layout controls [image side, caption position, gallery columns],
+  add/duplicate/delete, group, autosave + save status, Done) and a **left sidebar slide
+  navigator** with live thumbnails, click/shift-select, **drag-to-reorder**, and
+  **collapsible groups** (select → Group, drag a slide onto a header to join, rename via
+  double-click, ungroup). In-place `contenteditable` text on every layout; bullet list
+  add/remove (Enter / Backspace); image pan, scroll-zoom & drag-&-drop replace; debounced
+  autosave + manual save. Groups persist as a `group:` field per slide; all edits
+  round-trip straight to `deck.md`.
+- **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
+  LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
+- **Next (see FEATURES.md):** PDF import of the 350-page M7 source → export to PDF/PPTX.
+
+## Read these first
+- **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three
+  editing paths, the layout catalog (grounded in a 350-page classification of the M7
+  PDF), and the conversion plan.
+- **[FEATURES.md](./FEATURES.md)** — prioritized desirable-features list (P0/P1/P2).
+- **[template.md](./template.md)** — the canonical layout library: one live, filled-in
+  example per default layout. This file is the schema contract shared by code, LLM, and
+  WYSIWYG.
+
+## The default layouts
+`cover` · `section` · `statement` · `speaker` · `bullets` · `bullets-image` ·
+`image-full` · `image-caption` · `video-embed` · `gallery` · `freeform`
+
+(See `template.md` for each one's fields.)

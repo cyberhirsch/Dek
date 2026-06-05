@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.DS_Store
+.vite
+*.tsbuildinfo
+.claude/
+
+# Slide content stays local / private — the repo ships the *tool*, not the lectures.
+/deck.md
+/public/Assets/
+# (deck.example.md is committed as a runnable starting point)
