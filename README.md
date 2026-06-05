@@ -20,9 +20,11 @@ npm run dev        # http://localhost:5173  — edits deck.md, hot-reloads
 ```
 
 ### Hosting (static, e.g. GitHub Pages)
-Dek also runs with **no server**. `npm run build` produces a static `dist/` deployed by
-the GitHub Actions workflow in `.github/workflows/deploy.yml` (enable Pages → Source:
-*GitHub Actions*). Persistence is pluggable (`src/storage/`): the dev server backend
+**Live: https://cyberhirsch.github.io/Dek/**
+
+Dek also runs with **no server**. `npm run build` produces a static `dist/` deployed on
+every push to `main` by the GitHub Actions workflow in `.github/workflows/deploy.yml`
+(Pages source: *GitHub Actions*). Persistence is pluggable (`src/storage/`): the dev server backend
 writes real files during `npm run dev`; the **browser backend** (IndexedDB) powers the
 hosted build, seeded from `deck.example.md`, with edits autosaved in-browser. Works in
 Chromium browsers including Brave. A cloud-drive backend is planned, behind the same
