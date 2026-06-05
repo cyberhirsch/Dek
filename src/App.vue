@@ -9,10 +9,8 @@ import {
   uploadImage,
   openDeck,
   newDeck,
-  saveAs,
   openLocalFile,
   saveLocalFileAs,
-  supportsFS,
 } from './api'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
@@ -139,13 +137,7 @@ async function onSaveAs() {
   if (!deck.value) return
   const name = deck.value.config.deck ?? 'deck'
   try {
-    if (supportsFS()) {
-      await saveLocalFileAs(name, deck.value.config, deck.value.slides)
-    } else {
-      const n = window.prompt('Save deck as:', name)
-      if (!n) return
-      await saveAs(n, deck.value.config, deck.value.slides)
-    }
+    await saveLocalFileAs(name, deck.value.config, deck.value.slides)
     saveStatus.value = 'saved'
   } catch (e) {
     if (!isAbort(e)) error.value = (e as Error).message

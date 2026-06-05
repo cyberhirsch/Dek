@@ -55,14 +55,16 @@ function pick(file: string) {
       <div class="dm-menu">
         <div class="dm-grp">
           <button v-if="fs" @click="openFile">📂 Open file…</button>
-          <button @click="saveAs">⤓ Save As…</button>
+          <button v-if="fs" @click="saveAs">⤓ Save As…</button>
           <button @click="newDeck">＋ New deck…</button>
         </div>
         <div v-if="decks.length" class="dm-grp">
           <div class="dm-lbl">Decks</div>
           <button v-for="d in decks" :key="d.file" class="dm-deck" @click="pick(d.file)">{{ d.name }}</button>
         </div>
-        <div v-if="!fs" class="dm-note">Open from disk needs Chrome/Edge/Brave.</div>
+        <div v-if="!fs" class="dm-note">
+          Open / Save As need the File System Access API (a Chromium browser with it enabled).
+        </div>
       </div>
     </template>
   </div>
