@@ -67,6 +67,17 @@ function onDrop(e: DragEvent) {
   const file = e.dataTransfer?.files?.[0]
   if (file && file.type.startsWith('image/')) emit('file', file)
 }
+
+// ── click to browse ──
+const fileEl = ref<HTMLInputElement | null>(null)
+function pick() {
+  fileEl.value?.click()
+}
+function onPick(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  if (f && f.type.startsWith('image/')) emit('file', f)
+  ;(e.target as HTMLInputElement).value = ''
+}
 </script>
 
 <template>
@@ -80,10 +91,17 @@ function onDrop(e: DragEvent) {
     @drop.prevent="editable && onDrop($event)"
   >
     <img v-if="src" :src="src" :style="style" alt="" draggable="false" />
-    <div v-else class="img-empty">{{ editable ? 'drop image here' : 'no image' }}</div>
+    <div v-else class="img-empty" :class="{ clickable: editable }" @click="editable && pick()">
+      {{ editable ? '＋ click or drop an image' : 'no image' }}
+    </div>
+
+    <!-- replace button for an existing image (editable) -->
+    <button v-if="editable && src" class="fi-upload" title="Replace image" @click.stop="pick">⤓</button>
+
+    <input ref="fileEl" type="file" accept="image/*" class="fi-input" @change="onPick" />
 
     <div v-if="over" class="fi-drop">drop to replace</div>
-    <div v-if="editable && pannable && src" class="fi-hint">drag to pan · scroll to zoom · drop to replace</div>
+    <div v-if="editable && pannable && src" class="fi-hint">drag to pan · scroll to zoom · click ⤓ or drop to replace</div>
   </div>
 </template>
 
@@ -130,5 +148,36 @@ function onDrop(e: DragEvent) {
 }
 .fi:hover .fi-hint {
   opacity: 1;
+}
+.fi-input {
+  display: none;
+}
+.img-empty.clickable {
+  cursor: pointer;
+}
+.img-empty.clickable:hover {
+  color: rgba(127, 199, 255, 0.85);
+}
+.fi-upload {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(7, 8, 9, 0.65);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.fi:hover .fi-upload {
+  opacity: 1;
+}
+.fi-upload:hover {
+  background: rgba(127, 199, 255, 0.4);
 }
 </style>

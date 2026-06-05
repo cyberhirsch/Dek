@@ -60,6 +60,12 @@ function setGalleryLabel(i: number, label: string) {
   const items = galleryItems.value.map((g, j) => (j === i ? { ...g, label } : g))
   patch({ items })
 }
+function addGalleryItem() {
+  patch({ items: [...galleryItems.value, { image: '' }] })
+}
+function removeGalleryItem(i: number) {
+  patch({ items: galleryItems.value.filter((_, j) => j !== i) })
+}
 function setFocus(f: Focus) {
   patch({ focus: f })
 }
@@ -229,14 +235,16 @@ watch(
     <div v-else-if="slide.layout === 'gallery'" class="dek-pad l-gallery">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Title (optional)" @update:model-value="patch({ title: $event })" />
       <h1 v-else-if="slide.title">{{ slide.title }}</h1>
-      <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
+      <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${editable ? Math.min(Math.max(galleryItems.length + 1, 1), 4) : galleryCols}, 1fr)` }">
         <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
           <div class="frame">
             <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
+            <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
           </div>
           <EditableText v-if="editable" class="label" :model-value="it.label" placeholder="label" @update:model-value="setGalleryLabel(i, $event)" />
           <div v-else-if="it.label" class="label">{{ it.label }}</div>
         </div>
+        <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋<br />add image</button>
       </div>
     </div>
 
