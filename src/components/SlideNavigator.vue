@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
 
 const props = defineProps<{ deck: Deck; current: number; selected: number[] }>()
+
+const nav = ref<HTMLElement | null>(null)
+function scrollActiveIntoView() {
+  nextTick(() => nav.value?.querySelector('.row.active')?.scrollIntoView({ block: 'nearest' }))
+}
+watch(() => props.current, scrollActiveIntoView)
+onMounted(scrollActiveIntoView)
 const emit = defineEmits<{
   'update:current': [i: number]
   select: [e: { index: number; shift: boolean; meta: boolean }]
@@ -110,7 +117,7 @@ const selSet = computed(() => new Set(props.selected))
 </script>
 
 <template>
-  <div class="nav" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
+  <div ref="nav" class="nav" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
     <template v-for="(e, ri) in entries" :key="ri">
       <!-- group header -->
       <div

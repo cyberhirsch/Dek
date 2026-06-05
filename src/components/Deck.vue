@@ -45,10 +45,10 @@ function onKey(e: KeyboardEvent) {
     if (e.key === 'PageUp') go(props.modelValue - 1)
     return
   }
-  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
     e.preventDefault()
     go(props.modelValue + 1)
-  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
     e.preventDefault()
     go(props.modelValue - 1)
   } else if (e.key === 'Home') {
