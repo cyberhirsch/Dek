@@ -26,6 +26,7 @@ const emit = defineEmits<{
   save: []
   close: []
   'open-file': []
+  'open-folder': []
   'save-as': []
   'new-deck': []
   'open-deck': [file: string]
@@ -50,6 +51,7 @@ const statusText = computed(() =>
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         @open-file="emit('open-file')"
+        @open-folder="emit('open-folder')"
         @save-as="emit('save-as')"
         @new="emit('new-deck')"
         @open="emit('open-deck', $event)"

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { listDecks, supportsFS } from '../api'
+import { listDecks, supportsFS, supportsDir } from '../api'
 import type { DeckRef } from '../storage/types'
 
 defineProps<{ currentName: string }>()
 const emit = defineEmits<{
   'open-file': []
+  'open-folder': []
   'save-as': []
   new: []
   open: [file: string]
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 const open = ref(false)
 const decks = ref<DeckRef[]>([])
 const fs = supportsFS()
+const dir = supportsDir()
 
 async function toggle() {
   open.value = !open.value
@@ -28,6 +30,10 @@ async function toggle() {
 function openFile() {
   open.value = false
   emit('open-file')
+}
+function openFolder() {
+  open.value = false
+  emit('open-folder')
 }
 function saveAs() {
   open.value = false
@@ -54,7 +60,8 @@ function pick(file: string) {
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
-          <button v-if="fs" @click="openFile">📂 Open file…</button>
+          <button v-if="dir" @click="openFolder">📁 Open folder…</button>
+          <button v-if="fs" @click="openFile">📄 Open file…</button>
           <button v-if="fs" @click="saveAs">⤓ Save As…</button>
           <button @click="newDeck">＋ New deck…</button>
         </div>

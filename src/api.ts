@@ -6,8 +6,9 @@ import type { DeckRef, StorageBackend } from './storage/types'
 import { serverBackend } from './storage/server'
 import { browserBackend } from './storage/browser'
 import { fsBackend, pickOpen, pickSave, supportsFS } from './storage/fs'
+import { fsDirBackend, pickDir, supportsDir } from './storage/fsdir'
 
-export { supportsFS }
+export { supportsFS, supportsDir }
 
 const LS_FILE = 'dek:file'
 
@@ -113,6 +114,15 @@ export async function openLocalFile(): Promise<Deck> {
   override = fsBackend(handle)
   const deck = await override.loadDeck()
   setCurrent(handle.name)
+  return deck
+}
+
+/** Open a local folder (deck.md + Assets) so images resolve and display. */
+export async function openLocalFolder(): Promise<Deck> {
+  const dir = await pickDir()
+  override = fsDirBackend(dir)
+  const deck = await override.loadDeck()
+  setCurrent(dir.name)
   return deck
 }
 

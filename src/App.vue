@@ -10,6 +10,7 @@ import {
   openDeck,
   newDeck,
   openLocalFile,
+  openLocalFolder,
   saveLocalFileAs,
 } from './api'
 import DeckView from './components/Deck.vue'
@@ -122,6 +123,13 @@ function isAbort(e: unknown) {
 async function onOpenFile() {
   try {
     applyDeck(await openLocalFile())
+  } catch (e) {
+    if (!isAbort(e)) error.value = (e as Error).message
+  }
+}
+async function onOpenFolder() {
+  try {
+    applyDeck(await openLocalFolder())
   } catch (e) {
     if (!isAbort(e)) error.value = (e as Error).message
   }
@@ -398,6 +406,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @save="saveCurrentSlide"
       @close="editMode = false"
       @open-file="onOpenFile"
+      @open-folder="onOpenFolder"
       @save-as="onSaveAs"
       @new-deck="onNewDeck"
       @open-deck="onOpenDeck"
@@ -447,6 +456,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         @open-file="onOpenFile"
+        @open-folder="onOpenFolder"
         @save-as="onSaveAs"
         @new="onNewDeck"
         @open="onOpenDeck"
