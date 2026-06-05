@@ -18,6 +18,15 @@ typecheck clean.
 npm install
 npm run dev        # http://localhost:5173  — edits deck.md, hot-reloads
 ```
+
+### Hosting (static, e.g. GitHub Pages)
+Dek also runs with **no server**. `npm run build` produces a static `dist/` deployed by
+the GitHub Actions workflow in `.github/workflows/deploy.yml` (enable Pages → Source:
+*GitHub Actions*). Persistence is pluggable (`src/storage/`): the dev server backend
+writes real files during `npm run dev`; the **browser backend** (IndexedDB) powers the
+hosted build, seeded from `deck.example.md`, with edits autosaved in-browser. Works in
+Chromium browsers including Brave. Real local-file open/save (File System Access API) and
+a cloud-drive backend are planned, behind the same interface.
 Arrow keys / Space / PageUp-Down / Home / End navigate. Press **Ctrl+E** (or ✎) to edit.
 In present mode: **F** fullscreen · **O** overview grid · **P** presenter view (notes + next
 slide + timer). Add speaker notes per slide from the notes strip under the editor.
