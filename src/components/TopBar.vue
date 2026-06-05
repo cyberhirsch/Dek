@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Deck, LayoutId, Slide } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
+import DeckMenu from './DeckMenu.vue'
 
 const props = defineProps<{
   deck: Deck
@@ -24,6 +25,10 @@ const emit = defineEmits<{
   'toggle-autosave': []
   save: []
   close: []
+  'open-file': []
+  'save-as': []
+  'new-deck': []
+  'open-deck': [file: string]
 }>()
 
 function onAdd(ev: Event) {
@@ -42,7 +47,13 @@ const statusText = computed(() =>
   <div class="bar">
     <div class="left">
       <span class="brand">Dek</span>
-      <span class="deck-title">{{ deck.config.deck }}</span>
+      <DeckMenu
+        :current-name="deck.config.deck ?? 'deck'"
+        @open-file="emit('open-file')"
+        @save-as="emit('save-as')"
+        @new="emit('new-deck')"
+        @open="emit('open-deck', $event)"
+      />
     </div>
 
     <div class="center">

@@ -2,7 +2,18 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide } from './core/types'
 import { blankSlide } from './core/deck'
-import { fetchDeck, saveSlide, saveDeck, uploadImage } from './api'
+import {
+  fetchDeck,
+  saveSlide,
+  saveDeck,
+  uploadImage,
+  openDeck,
+  newDeck,
+  saveAs,
+  openLocalFile,
+  saveLocalFileAs,
+  supportsFS,
+} from './api'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
@@ -10,6 +21,7 @@ import Overview from './components/Overview.vue'
 import Presenter from './components/Presenter.vue'
 import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
+import DeckMenu from './components/DeckMenu.vue'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -95,6 +107,60 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+// ── deck files: open / save-as / new / switch ──
+function applyDeck(d: Deck) {
+  deck.value = d
+  current.value = 0
+  selected.value = [0]
+  anchor = 0
+  past.value = []
+  future.value = []
+  saveStatus.value = 'saved'
+}
+function isAbort(e: unknown) {
+  return (e as { name?: string })?.name === 'AbortError'
+}
+async function onOpenFile() {
+  try {
+    applyDeck(await openLocalFile())
+  } catch (e) {
+    if (!isAbort(e)) error.value = (e as Error).message
+  }
+}
+async function onOpenDeck(file: string) {
+  try {
+    applyDeck(await openDeck(file))
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+async function onSaveAs() {
+  if (!deck.value) return
+  const name = deck.value.config.deck ?? 'deck'
+  try {
+    if (supportsFS()) {
+      await saveLocalFileAs(name, deck.value.config, deck.value.slides)
+    } else {
+      const n = window.prompt('Save deck as:', name)
+      if (!n) return
+      await saveAs(n, deck.value.config, deck.value.slides)
+    }
+    saveStatus.value = 'saved'
+  } catch (e) {
+    if (!isAbort(e)) error.value = (e as Error).message
+  }
+}
+async function onNewDeck() {
+  const n = window.prompt('New deck name:', 'Untitled')
+  if (!n) return
+  try {
+    await newDeck(n)
+    applyDeck(await fetchDeck())
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
 
 function enterEdit() {
   editMode.value = true
@@ -339,6 +405,10 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
       @close="editMode = false"
+      @open-file="onOpenFile"
+      @save-as="onSaveAs"
+      @new-deck="onNewDeck"
+      @open-deck="onOpenDeck"
     />
 
     <div class="body">
@@ -381,6 +451,15 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     </div>
 
     <!-- present-mode chrome -->
+    <div v-if="deck && !editMode" class="deck-menu-present">
+      <DeckMenu
+        :current-name="deck.config.deck ?? 'deck'"
+        @open-file="onOpenFile"
+        @save-as="onSaveAs"
+        @new="onNewDeck"
+        @open="onOpenDeck"
+      />
+    </div>
     <button v-if="deck && !editMode" class="edit-fab" title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     <div v-if="deck && !editMode" class="hud">
       <button @click="current = Math.max(0, current - 1)" title="Previous">←</button>
@@ -467,6 +546,12 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   width: 1px;
   height: 16px;
   background: rgba(255, 255, 255, 0.15);
+}
+.deck-menu-present {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 50;
 }
 .edit-fab {
   position: fixed;

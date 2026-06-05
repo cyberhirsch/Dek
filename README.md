@@ -25,8 +25,16 @@ the GitHub Actions workflow in `.github/workflows/deploy.yml` (enable Pages → 
 *GitHub Actions*). Persistence is pluggable (`src/storage/`): the dev server backend
 writes real files during `npm run dev`; the **browser backend** (IndexedDB) powers the
 hosted build, seeded from `deck.example.md`, with edits autosaved in-browser. Works in
-Chromium browsers including Brave. Real local-file open/save (File System Access API) and
-a cloud-drive backend are planned, behind the same interface.
+Chromium browsers including Brave. A cloud-drive backend is planned, behind the same
+interface.
+
+**Open / Save As / New** live in the deck menu (the deck-name dropdown, top-left in
+present mode and in the editor top bar):
+- **Open file…** — pick a real local `.md` via the OS dialog (File System Access API,
+  Chrome/Edge/Brave); edits autosave straight back to that file.
+- **Save As…** — write the current deck to a new local file (or, where FS isn't
+  available, a named copy in browser storage).
+- **New deck…** and a list of in-app decks to switch between.
 Arrow keys / Space / PageUp-Down / Home / End navigate. Press **Ctrl+E** (or ✎) to edit.
 In present mode: **F** fullscreen · **O** overview grid · **P** presenter view (notes + next
 slide + timer). Add speaker notes per slide from the notes strip under the editor.
