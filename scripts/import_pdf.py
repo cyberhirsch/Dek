@@ -44,11 +44,43 @@ CONFIG = {
 }
 
 
-def page_image_files(assets, prefix, P):
-    """Existing image files for 1-based page P, ordered by their img index."""
+def _covers(outer, inner, tol=2.0):
+    ox0, oy0, ox1, oy1 = outer
+    ix0, iy0, ix1, iy1 = inner
+    return ox0 <= ix0 + tol and oy0 <= iy0 + tol and ox1 >= ix1 - tol and oy1 >= iy1 - tol
+
+
+def visible_images(page, assets, prefix, P):
+    """
+    Visible images for 1-based page P as [{"bbox", "file"}] in draw order.
+
+    PDFs sometimes stack a hidden/duplicate image *behind* the visible one; the
+    extractor dumped both, so the page looked like a 2-image gallery. We drop any
+    image fully occluded by a later-drawn (on-top) image — but only when the on-disk
+    file count matches the PDF's image count 1:1, so the index→file pairing is
+    reliable. Otherwise we keep every file (safe fallback, no filtering).
+    """
     files = glob.glob(os.path.join(assets, f"M7_p{P:03d}_img*.jpeg"))
     files.sort(key=lambda f: int(re.search(r"img(\d+)", f).group(1)))
-    return [f"{prefix}/{os.path.basename(f)}" for f in files]
+    infos = page.get_image_info()  # content-stream (draw) order
+
+    if len(infos) != len(files) or len(files) <= 1:
+        return [
+            {"bbox": infos[i]["bbox"] if i < len(infos) else None,
+             "file": f"{prefix}/{os.path.basename(f)}"}
+            for i, f in enumerate(files)
+        ]
+
+    items = [
+        {"bbox": infos[i]["bbox"], "file": f"{prefix}/{os.path.basename(f)}", "z": i}
+        for i, f in enumerate(files)
+    ]
+    visible = []
+    for a in items:
+        hidden = any(b["z"] > a["z"] and _covers(b["bbox"], a["bbox"]) for b in items)
+        if not hidden:
+            visible.append({"bbox": a["bbox"], "file": a["file"]})
+    return visible
 
 
 def body_blocks(page):
@@ -86,13 +118,15 @@ def page_videos(page):
     return vids
 
 
-def img_coverage(page):
+def coverage_of(bboxes):
     """(max area fraction, is_fullbleed, center_x_fraction of largest image)."""
     best = 0.0
     fullbleed = False
     cx = 0.5
-    for im in page.get_image_info():
-        x0, y0, x1, y1 = im["bbox"]
+    for bb in bboxes:
+        if not bb:
+            continue
+        x0, y0, x1, y1 = bb
         frac = ((x1 - x0) / W) * ((y1 - y0) / H)
         if (x1 - x0) >= 0.92 * W and (y1 - y0) >= 0.9 * H:
             fullbleed = True
@@ -122,9 +156,10 @@ def oneline(text):
 def classify(page, pn, assets, prefix):
     P = pn + 1
     blocks = body_blocks(page)
-    files = page_image_files(assets, prefix, P)
+    vis = visible_images(page, assets, prefix, P)
+    files = [v["file"] for v in vis]
     vids = page_videos(page)
-    cov, fullbleed, cx = img_coverage(page)
+    cov, fullbleed, cx = coverage_of([v["bbox"] for v in vis])
     big_vid = max((v for v in vids if v["area"] > 0.25 * W * H), key=lambda v: v["area"], default=None)
 
     # 1) Cover (first page) — usually a single oversized mark.
