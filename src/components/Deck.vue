@@ -8,7 +8,7 @@ const props = defineProps<{ deck: Deck; modelValue: number; editable?: boolean }
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   patch: [p: Partial<Slide>]
-  upload: [e: { field: 'image' | 'portraits' | 'gallery'; file: File; index?: number }]
+  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)

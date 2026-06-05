@@ -7,7 +7,7 @@ const props = defineProps<{ deck: Deck; current: number; selected: number[] }>()
 const emit = defineEmits<{
   'update:current': [i: number]
   select: [e: { index: number; shift: boolean; meta: boolean }]
-  reorder: [e: { from: number; before: number }]
+  reorder: [e: { indices: number[]; before: number }]
   'join-group': [e: { from: number; name: string }]
   ungroup: [name: string]
   rename: [e: { indices: number[]; name: string }]
@@ -62,11 +62,17 @@ function commitRename(e: Entry & { kind: 'header' }) {
 
 // ── drag & drop reorder ──
 const dragFrom = ref<number | null>(null)
+const dragSet = ref<number[]>([]) // all indices being dragged (multi-select aware)
 const dropBefore = ref<number | null>(null) // insertion index in slide array
 const dropHeader = ref<number | null>(null) // runId of a header being hovered
 
 function onDragStart(index: number) {
   dragFrom.value = index
+  // if dragging a slide that's part of a multi-selection, move the whole set
+  dragSet.value =
+    props.selected.includes(index) && props.selected.length > 1
+      ? [...props.selected].sort((a, b) => a - b)
+      : [index]
 }
 function onSlideDragOver(e: DragEvent, index: number) {
   e.preventDefault()
@@ -88,12 +94,13 @@ function onDrop() {
       | undefined
     if (header) emit('join-group', { from: dragFrom.value, name: header.name })
   } else if (dropBefore.value != null) {
-    emit('reorder', { from: dragFrom.value, before: dropBefore.value })
+    emit('reorder', { indices: dragSet.value, before: dropBefore.value })
   }
   cleanupDrag()
 }
 function cleanupDrag() {
   dragFrom.value = null
+  dragSet.value = []
   dropBefore.value = null
   dropHeader.value = null
 }
@@ -130,7 +137,7 @@ const selSet = computed(() => new Set(props.selected))
       <div
         v-else
         class="row"
-        :class="{ active: e.index === current, sel: selSet.has(e.index), grouped: e.grouped, dragging: dragFrom === e.index }"
+        :class="{ active: e.index === current, sel: selSet.has(e.index), grouped: e.grouped, dragging: dragSet.includes(e.index) }"
         draggable="true"
         @dragstart="onDragStart(e.index)"
         @dragover="onSlideDragOver($event, e.index)"

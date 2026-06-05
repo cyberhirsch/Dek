@@ -17,7 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   patch: [p: Partial<Slide>]
-  upload: [e: { field: 'image' | 'portraits' | 'gallery'; file: File; index?: number }]
+  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -188,7 +188,7 @@ watch(
     </div>
 
     <!-- video-embed -->
-    <div v-else-if="slide.layout === 'video-embed'" class="dek-pad l-video">
+    <div v-else-if="slide.layout === 'video-embed'" class="dek-pad l-video-embed">
       <div class="vid-frame">
         <!-- player (present mode, after click) -->
         <iframe
@@ -205,7 +205,7 @@ watch(
             :src="posterSrc"
             fit="contain"
             :editable="editable"
-            @file="emit('upload', { field: 'image', file: $event })"
+            @file="emit('upload', { field: 'poster', file: $event })"
           />
           <button class="play" :class="{ ghost: editable }" @click="playVideo">
             <span class="tri" />

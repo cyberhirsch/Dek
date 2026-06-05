@@ -9,6 +9,8 @@ const props = defineProps<{
   selectedCount: number
   saveStatus: 'saved' | 'unsaved' | 'saving'
   autosave: boolean
+  canUndo: boolean
+  canRedo: boolean
 }>()
 const emit = defineEmits<{
   'change-layout': [id: LayoutId]
@@ -17,10 +19,18 @@ const emit = defineEmits<{
   duplicate: []
   remove: []
   group: []
+  undo: []
+  redo: []
   'toggle-autosave': []
   save: []
   close: []
 }>()
+
+function onAdd(ev: Event) {
+  const el = ev.target as HTMLSelectElement
+  if (el.value) emit('add', el.value as LayoutId)
+  el.value = '' // reset to placeholder
+}
 
 const slide = computed(() => props.deck.slides[props.index])
 const statusText = computed(() =>
@@ -74,7 +84,16 @@ const statusText = computed(() =>
 
     <div class="right">
       <div class="seg">
-        <button title="Add slide" @click="emit('add', slide?.layout ?? 'bullets')">＋ Slide</button>
+        <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
+        <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
+      </div>
+      <span class="div" />
+      <div class="seg">
+        <button title="Add slide (same layout)" @click="emit('add', slide?.layout ?? 'bullets')">＋ Slide</button>
+        <select class="sel add-as" title="Add slide as layout…" @change="onAdd">
+          <option value="">as…</option>
+          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ id }}</option>
+        </select>
         <button title="Duplicate" @click="emit('duplicate')">Duplicate</button>
         <button title="Delete" class="danger" :disabled="deck.slides.length <= 1" @click="emit('remove')">Delete</button>
         <button title="Group selected" :disabled="selectedCount < 1" @click="emit('group')">

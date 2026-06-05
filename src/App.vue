@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, LayoutId, Slide } from './core/types'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import type { Deck, DeckConfig, LayoutId, Slide } from './core/types'
 import { blankSlide } from './core/deck'
 import { fetchDeck, saveSlide, saveDeck, uploadImage } from './api'
 import DeckView from './components/Deck.vue'
@@ -17,6 +17,61 @@ const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 
 const selected = ref<number[]>([])
 let anchor = 0
+
+// ── undo / redo history ──
+interface Snap {
+  config: DeckConfig
+  slides: Slide[]
+  index: number
+}
+const past = ref<Snap[]>([])
+const future = ref<Snap[]>([])
+let lastSnapKey = ''
+let lastSnapTime = 0
+const canUndo = computed(() => past.value.length > 0)
+const canRedo = computed(() => future.value.length > 0)
+
+function cloneState(): Snap {
+  return {
+    config: JSON.parse(JSON.stringify(deck.value!.config)),
+    slides: JSON.parse(JSON.stringify(deck.value!.slides)),
+    index: current.value,
+  }
+}
+/** Record a checkpoint before a mutation. `coalesce` merges rapid same-key edits
+ *  (e.g. typing) into a single undo step. */
+function snap(key: string, coalesce = false) {
+  if (!deck.value) return
+  const now = Date.now()
+  if (coalesce && key === lastSnapKey && now - lastSnapTime < 800) {
+    lastSnapTime = now
+    return
+  }
+  past.value.push(cloneState())
+  if (past.value.length > 80) past.value.shift()
+  future.value = []
+  lastSnapKey = key
+  lastSnapTime = now
+}
+function applySnap(s: Snap) {
+  deck.value!.config = s.config
+  deck.value!.slides = s.slides
+  current.value = Math.min(s.index, s.slides.length - 1)
+  selected.value = [current.value]
+  anchor = current.value
+  lastSnapKey = ''
+  void saveWholeDeck()
+}
+function undo() {
+  if (!past.value.length) return
+  future.value.push(cloneState())
+  applySnap(past.value.pop()!)
+}
+function redo() {
+  if (!future.value.length) return
+  past.value.push(cloneState())
+  applySnap(future.value.pop()!)
+}
 
 onMounted(async () => {
   try {
@@ -35,11 +90,20 @@ function enterEdit() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+  const ae = document.activeElement as HTMLElement | null
+  const mod = e.ctrlKey || e.metaKey
+  if (mod && e.key.toLowerCase() === 'e') {
     e.preventDefault()
     editMode.value ? (editMode.value = false) : enterEdit()
+  } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    if (ae?.isContentEditable) return // let the field's native undo win
+    e.preventDefault()
+    undo()
+  } else if (mod && ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y')) {
+    if (ae?.isContentEditable) return
+    e.preventDefault()
+    redo()
   } else if (e.key === 'Escape' && editMode.value) {
-    const ae = document.activeElement as HTMLElement | null
     if (ae?.isContentEditable) ae.blur()
     else editMode.value = false
   }
@@ -77,6 +141,7 @@ async function saveWholeDeck() {
 // ── field edits ──
 function patchSlide(p: Partial<Slide>) {
   if (!deck.value) return
+  snap(`patch:${current.value}:${Object.keys(p).join(',')}`, true)
   deck.value.slides[current.value] = { ...deck.value.slides[current.value], ...p }
   scheduleSlideSave()
 }
@@ -104,6 +169,7 @@ function onSelect(e: { index: number; shift: boolean; meta: boolean }) {
 // ── slide array ops ──
 function addSlide(id: LayoutId) {
   if (!deck.value) return
+  snap('add')
   deck.value.slides.splice(current.value + 1, 0, blankSlide(id))
   current.value += 1
   selected.value = [current.value]
@@ -111,6 +177,7 @@ function addSlide(id: LayoutId) {
 }
 function duplicateSlide() {
   if (!deck.value) return
+  snap('duplicate')
   deck.value.slides.splice(current.value + 1, 0, structuredClone(deck.value.slides[current.value]))
   current.value += 1
   selected.value = [current.value]
@@ -118,21 +185,30 @@ function duplicateSlide() {
 }
 function removeSlide() {
   if (!deck.value || deck.value.slides.length <= 1) return
-  deck.value.slides.splice(current.value, 1)
-  current.value = Math.min(current.value, deck.value.slides.length - 1)
+  snap('remove')
+  // delete all selected (descending so indices stay valid)
+  const kill = [...new Set(selected.value.length ? selected.value : [current.value])].sort((a, b) => b - a)
+  for (const i of kill) deck.value.slides.splice(i, 1)
+  current.value = Math.min(Math.min(...kill), deck.value.slides.length - 1)
   selected.value = [current.value]
+  anchor = current.value
   void saveWholeDeck()
 }
 
-function reorder(e: { from: number; before: number }) {
+/** Block move: relocate one or more slides (preserving their order) before `before`. */
+function reorder(e: { indices: number[]; before: number }) {
   if (!deck.value) return
+  snap('reorder')
   const arr = deck.value.slides
-  const [item] = arr.splice(e.from, 1)
-  const to = e.before > e.from ? e.before - 1 : e.before
-  arr.splice(to, 0, item)
-  current.value = to
-  selected.value = [to]
-  anchor = to
+  const sorted = [...new Set(e.indices)].sort((a, b) => a - b)
+  const block = sorted.map((i) => arr[i])
+  const remaining = arr.filter((_, i) => !sorted.includes(i))
+  const insertAt = Math.max(0, Math.min(remaining.length, e.before - sorted.filter((i) => i < e.before).length))
+  remaining.splice(insertAt, 0, ...block)
+  deck.value.slides = remaining
+  current.value = insertAt
+  selected.value = block.map((_, k) => insertAt + k)
+  anchor = insertAt
   void saveWholeDeck()
 }
 
@@ -145,6 +221,7 @@ function uniqueGroupName(): string {
 }
 function groupSelected() {
   if (!deck.value || selected.value.length < 1) return
+  snap('group')
   const sorted = [...new Set(selected.value)].sort((a, b) => a - b)
   const name = uniqueGroupName()
   const block = sorted.map((i) => ({ ...deck.value!.slides[i], group: name }))
@@ -159,6 +236,7 @@ function groupSelected() {
 }
 function joinGroup(e: { from: number; name: string }) {
   if (!deck.value) return
+  snap('join-group')
   const arr = deck.value.slides
   let runStart = arr.findIndex((s) => s.group === e.name)
   if (runStart < 0) return
@@ -176,17 +254,19 @@ function joinGroup(e: { from: number; name: string }) {
 }
 function ungroup(name: string) {
   if (!deck.value) return
+  snap('ungroup')
   for (const s of deck.value.slides) if (s.group === name) delete s.group
   void saveWholeDeck()
 }
 function renameGroup(e: { indices: number[]; name: string }) {
   if (!deck.value) return
+  snap('rename-group')
   for (const i of e.indices) deck.value.slides[i].group = e.name
   void saveWholeDeck()
 }
 
 // ── image upload ──
-async function onUpload(e: { field: 'image' | 'portraits' | 'gallery'; file: File; index?: number }) {
+async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }) {
   if (!deck.value) return
   const dataUrl: string = await new Promise((res) => {
     const r = new FileReader()
@@ -197,6 +277,8 @@ async function onUpload(e: { field: 'image' | 'portraits' | 'gallery'; file: Fil
   const slide = deck.value.slides[current.value]
   if (e.field === 'image') {
     patchSlide({ image: url, focus: { x: 0, y: 0, scale: 1 } })
+  } else if (e.field === 'poster') {
+    patchSlide({ poster: url })
   } else if (e.field === 'portraits') {
     const portraits = [...(slide.portraits ?? [])]
     portraits[e.index ?? portraits.length] = url
@@ -218,12 +300,16 @@ async function onUpload(e: { field: 'image' | 'portraits' | 'gallery'; file: Fil
       :selected-count="selected.length"
       :save-status="saveStatus"
       :autosave="autosave"
+      :can-undo="canUndo"
+      :can-redo="canRedo"
       @change-layout="changeLayout"
       @patch="patchSlide"
       @add="addSlide"
       @duplicate="duplicateSlide"
       @remove="removeSlide"
       @group="groupSelected"
+      @undo="undo"
+      @redo="redo"
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
       @close="editMode = false"

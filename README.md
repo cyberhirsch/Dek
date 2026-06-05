@@ -40,20 +40,23 @@ src/api.ts            client over the dev API
 ```
 
 ### Built vs. next
-- **Done:** format + parser/serializer; 10 layout renderers; theme tokens; scaled 16:9
+- **Done:** format + parser/serializer; 11 layout renderers; theme tokens; scaled 16:9
   stage; keyboard nav; running header/footer/pagination; save API + image upload.
 - **Done — WYSIWYG editor (`Ctrl+E` or ✎):** Keynote-style chrome — a **top bar**
   (layout picker, per-layout controls [image side, caption position, gallery columns],
-  add/duplicate/delete, group, autosave + save status, Done) and a **left sidebar slide
-  navigator** with live thumbnails, click/shift-select, **drag-to-reorder**, and
-  **collapsible groups** (select → Group, drag a slide onto a header to join, rename via
-  double-click, ungroup). In-place `contenteditable` text on every layout; bullet list
-  add/remove (Enter / Backspace); image pan, scroll-zoom & drag-&-drop replace; debounced
-  autosave + manual save. Groups persist as a `group:` field per slide; all edits
-  round-trip straight to `deck.md`.
+  **undo/redo**, add / **add-as-layout** / duplicate / delete, group, autosave + save
+  status, Done) and a **left sidebar slide navigator** with live thumbnails,
+  click/shift/ctrl-select, **multi-select drag-to-reorder**, and **collapsible groups**
+  (select → Group, drag a slide onto a header to join, rename via double-click, ungroup).
+  In-place `contenteditable` text on every layout; bullet list add/remove (Enter /
+  Backspace); image pan, scroll-zoom & drag-&-drop replace; **undo/redo** (`Ctrl+Z` /
+  `Ctrl+Shift+Z`, coalesces typing); debounced autosave + manual save. Groups persist as a
+  `group:` field per slide; all edits round-trip straight to `deck.md`.
 - **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
   LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
-- **Next (see FEATURES.md):** PDF import of the 350-page M7 source → export to PDF/PPTX.
+- **Next (in order):** presenting essentials (fullscreen, speaker notes, overview grid) →
+  harden foundation (parser tests, prod build, hygiene) → export PDF/HTML → PDF import of
+  the 350-page M7 source.
 
 ## Read these first
 - **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three
