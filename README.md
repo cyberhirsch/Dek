@@ -58,10 +58,15 @@ src/api.ts            client over the dev API
   group labels, and a **presenter view** (P) showing the current slide, next slide, speaker
   notes, and an elapsed timer. Notes are editable per slide (the strip below the editor) and
   persist as a `notes:` field.
+- **Done — export (⤓):** a print view renders every slide as a 16:9 page →
+  **Print / Save as PDF** (dependency-free), plus **Download HTML** — a self-contained
+  `.html` (slides + inlined CSS) you can open or host anywhere.
+- **Done — hardening:** Vitest parser round-trip suite (`npm test`), clean production
+  build (`npm run build`), LF line-ending normalization.
 - **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
   LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
-- **Next (in order):** harden foundation (parser tests, prod build, hygiene) → export
-  PDF/HTML → PDF import of the 350-page M7 source.
+- **Next:** PDF import of the 350-page M7 source (extract → classify into layouts →
+  emit `deck.md`, using `links.json` to route video pages to `video-embed`).
 
 ## Read these first
 - **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three

@@ -8,6 +8,7 @@ import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
 import Overview from './components/Overview.vue'
 import Presenter from './components/Presenter.vue'
+import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 
 const deck = ref<Deck | null>(null)
@@ -21,6 +22,7 @@ const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 // present-mode views
 const overviewOpen = ref(false)
 const presenterOpen = ref(false)
+const exportOpen = ref(false)
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
   else document.exitFullscreen?.()
@@ -387,6 +389,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Overview (O)" @click="overviewOpen = true">▦</button>
       <button title="Presenter view (P)" @click="presenterOpen = true">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
+      <button title="Export (PDF / HTML)" @click="exportOpen = true">⤓</button>
     </div>
 
     <!-- overlays -->
@@ -404,6 +407,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @update:current="current = $event"
       @close="presenterOpen = false"
     />
+    <ExportView v-if="deck && exportOpen" :deck="deck" @close="exportOpen = false" />
   </div>
 </template>
 
