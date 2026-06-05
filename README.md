@@ -59,10 +59,17 @@ src/api.ts            client over the dev API
   `.html` (slides + inlined CSS) you can open or host anywhere.
 - **Done — hardening:** Vitest parser round-trip suite (`npm test`), clean production
   build (`npm run build`), LF line-ending normalization.
+- **Done — PDF import (`scripts/import_pdf.py`):** extracts text + images per page,
+  classifies each into a layout, maps content to fields, folds typographic ligatures
+  (ﬀ→ff), detects large YouTube/Vimeo links → `video-embed`, and emits `deck.md`.
+  Imported the full **350-page** M7 source (gallery 59 · bullets 59 · image-full 55 ·
+  bullets-image 53 · video-embed 51 · image-caption 40 · section 28 · statement 4 · cover 1).
+  Heuristic-based — fix the odd slide in the editor.
+  ```bash
+  python scripts/import_pdf.py "path/to/source.pdf"   # → writes deck.md
+  ```
 - **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
   LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
-- **Next:** PDF import of the 350-page M7 source (extract → classify into layouts →
-  emit `deck.md`, using `links.json` to route video pages to `video-embed`).
 
 ## Read these first
 - **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three
