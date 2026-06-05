@@ -5,8 +5,8 @@ import type { Deck, DeckConfig, Slide } from './core/types'
 import type { DeckRef, StorageBackend } from './storage/types'
 import { serverBackend } from './storage/server'
 import { browserBackend } from './storage/browser'
-import { fsBackend, pickOpen, pickSave, supportsFS } from './storage/fs'
-import { fsDirBackend, pickDir, supportsDir } from './storage/fsdir'
+import { fsBackend, pickOpen, supportsFS } from './storage/fs'
+import { fsDirBackend, pickDir, saveAsFolder, supportsDir } from './storage/fsdir'
 
 export { supportsFS, supportsDir }
 
@@ -126,11 +126,13 @@ export async function openLocalFolder(): Promise<Deck> {
   return deck
 }
 
-/** Save the current deck to a new local .md file via the OS picker. */
-export async function saveLocalFileAs(name: string, config: DeckConfig, slides: Slide[]): Promise<string> {
-  const handle = await pickSave(`${name || 'deck'}.md`)
-  override = fsBackend(handle)
-  await override.saveDeck(undefined, { config, slides })
-  setCurrent(handle.name)
-  return handle.name
+/**
+ * Save As → a folder: writes `<deck>.md` plus an `Assets/` folder with every
+ * image beside it, then keeps editing there. Returns the reloaded deck.
+ */
+export async function saveLocalFolderAs(name: string, config: DeckConfig, slides: Slide[]): Promise<Deck> {
+  const { backend, deck, dirName } = await saveAsFolder(name, { config, slides })
+  override = backend
+  setCurrent(dirName)
+  return deck
 }

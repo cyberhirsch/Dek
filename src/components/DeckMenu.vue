@@ -62,7 +62,7 @@ function pick(file: string) {
         <div class="dm-grp">
           <button v-if="dir" @click="openFolder">📁 Open folder…</button>
           <button v-if="fs" @click="openFile">📄 Open file…</button>
-          <button v-if="fs" @click="saveAs">⤓ Save As…</button>
+          <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>
           <button @click="newDeck">＋ New deck…</button>
         </div>
         <div v-if="decks.length" class="dm-grp">

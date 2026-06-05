@@ -28,6 +28,57 @@ export async function pickDir(): Promise<DirHandle> {
   return w.showDirectoryPicker!({ mode: 'readwrite' })
 }
 
+function slug(name: string): string {
+  return (name || 'deck').trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'deck'
+}
+
+function assetFileName(ref: string, blob: Blob, i: number): string {
+  const base = ref.split('/').pop()
+  if (base && !ref.startsWith('blob:') && !ref.startsWith('data:') && /\.[a-z0-9]+$/i.test(base)) return base
+  const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '')
+  return `img_${i}.${ext}`
+}
+
+/**
+ * Save As → a folder: pick a destination, write `<deck>.md` plus an `Assets/`
+ * folder containing every referenced image, then continue editing there.
+ * Returns the reloaded deck (images hydrated from the new folder).
+ */
+export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string }> {
+  const dir = await pickDir()
+  const mdName = `${slug(name)}.md`
+  const assets = await dir.getDirectoryHandle('Assets', { create: true })
+
+  // Write each unique image, mapping its current value → a clean /Assets/<file> path.
+  const map = new Map<string, string>()
+  let i = 0
+  for (const ref of collectImageRefs(deck.slides)) {
+    try {
+      const blob = await (await fetch(ref)).blob()
+      const fn = assetFileName(ref, blob, i++)
+      const h = await assets.getFileHandle(fn, { create: true })
+      const ws = await h.createWritable()
+      await ws.write(blob)
+      await ws.close()
+      map.set(ref, `/Assets/${fn}`)
+    } catch {
+      /* unreachable image — leave its ref as-is */
+    }
+  }
+
+  const saved: Deck = {
+    config: { ...deck.config, deck: name || deck.config.deck },
+    slides: deck.slides.map((s) => mapImages(s, (v) => map.get(v) ?? v)),
+  }
+  const mh = await dir.getFileHandle(mdName, { create: true })
+  const ws = await mh.createWritable()
+  await ws.write(serializeDeck(saved))
+  await ws.close()
+
+  const backend = fsDirBackend(dir, mdName)
+  return { backend, deck: await backend.loadDeck(), dirName: dir.name }
+}
+
 const isDir = (h: FileHandle | DirHandle): h is DirHandle => 'getFileHandle' in h
 
 /** Walk the image-bearing fields of a slide, mapping each path/url through fn. */

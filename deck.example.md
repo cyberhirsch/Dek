@@ -48,9 +48,9 @@ layout: bullets
 title: SAVE TO LOCAL FILES
 items:
   - "**Open folder…** loads a deck *and its images* (deck.md + an Assets folder)"
-  - "**Open file…** / **Save As…** work on a single .md; edits autosave back to it"
-  - "All via the browser's File System Access API — Chrome & Edge out of the box"
-  - "**Brave:** `brave://flags` → **File System Access API** → Enabled → relaunch"
+  - "**Save As…** writes the deck + an Assets folder of images to a folder you pick"
+  - "**Open file…** opens a single .md; edits autosave straight back to it"
+  - "All via the File System Access API — Chrome/Edge out of the box; **Brave:** enable it in `brave://flags`"
 ---
 layout: video-embed
 video: https://www.youtube.com/watch?v=qyZy-6VuSy4

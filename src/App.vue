@@ -11,7 +11,7 @@ import {
   newDeck,
   openLocalFile,
   openLocalFolder,
-  saveLocalFileAs,
+  saveLocalFolderAs,
 } from './api'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
@@ -145,7 +145,7 @@ async function onSaveAs() {
   if (!deck.value) return
   const name = deck.value.config.deck ?? 'deck'
   try {
-    await saveLocalFileAs(name, deck.value.config, deck.value.slides)
+    applyDeck(await saveLocalFolderAs(name, deck.value.config, deck.value.slides))
     saveStatus.value = 'saved'
   } catch (e) {
     if (!isAbort(e)) error.value = (e as Error).message
