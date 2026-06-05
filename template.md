@@ -150,6 +150,24 @@ items:
 ---
 
 # ============================================================================
+# 9b. diagram — a Mermaid flowchart from text. Write/generate the `code`; it
+#     renders live (themed to the deck). Great for processes & pipelines.
+#     Edit the code in the editor's bottom panel, or hand it to an LLM.
+# ============================================================================
+layout: diagram
+title: "Post-Production Pipeline"
+code: |
+  flowchart LR
+    A[Shoot] --> B[Editorial]
+    B --> C[VFX]
+    B --> D[Color Grade]
+    C --> E[Online]
+    D --> E
+    E --> F[Deliver]
+
+---
+
+# ============================================================================
 # 10. freeform — escape hatch. Raw HTML/CSS body for tables, quizzes, and
 #     bespoke slides. Only here is hand-written markup expected. Keep rare.
 # ============================================================================

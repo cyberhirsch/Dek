@@ -11,6 +11,7 @@ export type LayoutId =
   | 'image-caption'
   | 'video-embed'
   | 'gallery'
+  | 'diagram'
   | 'freeform'
 
 export const LAYOUT_IDS: LayoutId[] = [
@@ -24,6 +25,7 @@ export const LAYOUT_IDS: LayoutId[] = [
   'image-caption',
   'video-embed',
   'gallery',
+  'diagram',
   'freeform',
 ]
 
@@ -68,6 +70,8 @@ export interface Slide {
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus
+  // diagram: Mermaid source
+  code?: string
   // freeform
   body?: string
   // sidebar organization (Keynote-style sections). A group = a maximal run of

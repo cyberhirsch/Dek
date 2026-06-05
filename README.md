@@ -82,6 +82,9 @@ src/api.ts            client over the dev API
 
 ## The default layouts
 `cover` · `section` · `statement` · `speaker` · `bullets` · `bullets-image` ·
-`image-full` · `image-caption` · `video-embed` · `gallery` · `freeform`
+`image-full` · `image-caption` · `video-embed` · `gallery` · `diagram` · `freeform`
+
+`diagram` renders a **Mermaid** flowchart from a `code` field — edit the text in the
+editor's bottom panel (or hand it to an LLM) and the chart updates live.
 
 (See `template.md` for each one's fields.)

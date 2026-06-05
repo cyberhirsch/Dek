@@ -5,6 +5,7 @@ import { inlineMd } from '../render/inline'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
+import MermaidDiagram from './MermaidDiagram.vue'
 import '../styles/slide.css'
 
 const props = defineProps<{
@@ -245,6 +246,27 @@ watch(
           <div v-else-if="it.label" class="label">{{ it.label }}</div>
         </div>
         <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋<br />add image</button>
+      </div>
+    </div>
+
+    <!-- diagram (Mermaid) -->
+    <div v-else-if="slide.layout === 'diagram'" class="dek-pad l-diagram">
+      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Title (optional)" @update:model-value="patch({ title: $event })" />
+      <h1 v-else-if="slide.title">{{ slide.title }}</h1>
+      <div class="diagram-stage">
+        <MermaidDiagram :code="slide.code" />
+      </div>
+      <div v-if="editable" class="diagram-code">
+        <div class="code-label">Mermaid · edit to update the chart live</div>
+        <EditableText
+          tag="pre"
+          multiline
+          class="code-area"
+          :model-value="slide.code"
+          placeholder="flowchart LR
+  A[Shoot] --> B[Edit] --> C[Grade]"
+          @update:model-value="patch({ code: $event })"
+        />
       </div>
     </div>
 

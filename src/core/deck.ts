@@ -101,6 +101,8 @@ export function blankSlide(layout: LayoutId = 'bullets'): Slide {
       return { layout, video: '', poster: '', caption: '' }
     case 'gallery':
       return { layout, title: '', columns: 'auto', items: [] }
+    case 'diagram':
+      return { layout, title: '', code: 'flowchart LR\n  A[Start] --> B[Step]\n  B --> C[End]' }
     case 'freeform':
       return { layout, title: '', body: '<div></div>' }
   }

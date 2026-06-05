@@ -477,6 +477,50 @@
   background: rgba(127, 199, 255, 0.06);
 }
 
+/* ── Layout: diagram (Mermaid) ─────────────────────────────────── */
+.l-diagram {
+  padding: 50px 70px;
+}
+.l-diagram h1 {
+  margin-bottom: 18px;
+  flex: none;
+}
+.l-diagram .diagram-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.l-diagram .diagram-code {
+  flex: none;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+.l-diagram .code-label {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: rgba(230, 236, 242, 0.4);
+  margin-bottom: 6px;
+}
+.l-diagram .code-area {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-family: var(--dek-font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #e6ecf2;
+}
+
 /* Generic placeholder when an image is empty */
 .img-empty {
   width: 100%;
