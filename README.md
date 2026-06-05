@@ -2,13 +2,9 @@
 
 A minimal, single-file presentation editor. One Markdown file is the source of truth,
 and you edit it three interchangeable ways: **in code**, **by handing the `.md` to any
-LLM** (no in-app prompt box — the clean named-field format is LLM-native), and
-**visually (WYSIWYG) in the browser**. Built to re-author the 350-slide M7
-*Film- und Postproduktion* PDF into a clean, maintainable, exportable deck.
+LLM**, and
+**visually (WYSIWYG) in the browser**.
 
-Borrows the best of **Marp** (portable Markdown + CSS themes + export) and **Slidev**
-(named layouts + components + the in-browser editor we prototyped), while dropping
-their pain points.
 
 ## Status
 **v0.1 — running.** Vite + Vue 3 + TS app that renders a `deck.md` through 10 named
