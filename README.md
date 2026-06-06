@@ -90,6 +90,11 @@ src/api.ts            client over the dev API
 - **No LLM UI by design** — hand the `.md` to any external LLM; the named-field schema is
   LLM-native, so its edits drop back in and coexist with WYSIWYG edits.
 
+## Two versions
+Dek runs as a **local dev** app (real files via a small server) and as a **hosted static**
+app (browser storage + File System Access, on GitHub Pages). See **[docs/](./docs/)**:
+- [docs/local-version.md](./docs/local-version.md) · [docs/hosted-version.md](./docs/hosted-version.md) · [docs/storage.md](./docs/storage.md)
+
 ## Read these first
 - **[BRIEFING.md](./BRIEFING.md)** — vision, takeaways from Marp & Slidev, the three
   editing paths, the layout catalog (grounded in a 350-page classification of the M7
