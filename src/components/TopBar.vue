@@ -44,6 +44,21 @@ function onAdd(ev: Event) {
 
 const slide = computed(() => props.deck.slides[props.index])
 const canToggleBullets = computed(() => slide.value?.layout === 'bullets' || slide.value?.layout === 'bullets-image')
+
+const LAYOUT_LABELS: Record<LayoutId, string> = {
+  cover: 'Cover',
+  section: 'Section',
+  statement: 'Statement',
+  speaker: 'Speaker',
+  bullets: 'Text',
+  'bullets-image': 'Text + Image',
+  'image-full': 'Image – Full',
+  'image-caption': 'Image + Caption',
+  'video-embed': 'Video',
+  gallery: 'Gallery',
+  diagram: 'Diagram',
+  freeform: 'Freeform',
+}
 const statusText = computed(() =>
   props.saveStatus === 'saving' ? 'saving…' : props.saveStatus === 'unsaved' ? 'unsaved' : 'saved',
 )
@@ -66,7 +81,7 @@ const statusText = computed(() =>
     <div class="center">
       <label class="lbl">Layout</label>
       <select class="sel" :value="slide?.layout" @change="emit('change-layout', ($event.target as HTMLSelectElement).value as LayoutId)">
-        <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ id }}</option>
+        <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
       </select>
 
       <!-- contextual controls -->
@@ -125,7 +140,7 @@ const statusText = computed(() =>
         <button title="Add slide (same layout)" @click="emit('add', slide?.layout ?? 'bullets')">＋ Slide</button>
         <select class="sel add-as" title="Add slide as layout…" @change="onAdd">
           <option value="">as…</option>
-          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ id }}</option>
+          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
         </select>
         <button title="Duplicate" @click="emit('duplicate')">Duplicate</button>
         <button title="Delete" class="danger" :disabled="deck.slides.length <= 1" @click="emit('remove')">Delete</button>
