@@ -119,7 +119,7 @@ const statusText = computed(() =>
       <button class="save" :class="saveStatus" @click="emit('save')">
         <span class="dot" :class="saveStatus" />{{ statusText }}
       </button>
-      <button class="done" @click="emit('close')">Done</button>
+      <button class="present" title="Present (Ctrl+E)" @click="emit('close')">▶ Present</button>
     </div>
   </div>
 </template>
@@ -207,15 +207,16 @@ const statusText = computed(() =>
 .dot.saved { background: #4ade80; }
 .dot.unsaved { background: #fff; }
 .dot.saving { background: #facc15; }
-.done {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e6ecf2;
+.present {
+  background: rgba(127, 199, 255, 0.16);
+  border: 1px solid rgba(127, 199, 255, 0.5);
+  color: #cfe8ff;
   border-radius: 7px;
   padding: 5px 14px;
   font-family: inherit;
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
 }
-.done:hover { background: rgba(255, 255, 255, 0.12); }
+.present:hover { background: rgba(127, 199, 255, 0.28); }
 </style>

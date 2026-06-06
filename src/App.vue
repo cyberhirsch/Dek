@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide } from './core/types'
 import { blankSlide } from './core/deck'
 import {
@@ -26,7 +26,7 @@ const deck = ref<Deck | null>(null)
 const current = ref(0)
 const error = ref<string | null>(null)
 
-const editMode = ref(false)
+const editMode = ref(true) // start in the editor; "Present" switches to present mode
 const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 
@@ -39,7 +39,24 @@ function toggleFullscreen() {
   else document.exitFullscreen?.()
 }
 
-const selected = ref<number[]>([])
+// auto-hide present-mode chrome after a few seconds of no mouse movement
+const uiHidden = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+function resetIdle() {
+  if (uiHidden.value) uiHidden.value = false
+  if (idleTimer) clearTimeout(idleTimer)
+  if (!editMode.value) idleTimer = setTimeout(() => (uiHidden.value = true), 3000)
+}
+watch(editMode, (on) => {
+  if (on) {
+    uiHidden.value = false
+    if (idleTimer) clearTimeout(idleTimer)
+  } else {
+    resetIdle()
+  }
+})
+
+const selected = ref<number[]>([0])
 let anchor = 0
 
 // ── undo / redo history ──
@@ -104,8 +121,13 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
   window.addEventListener('keydown', onKey)
+  window.addEventListener('mousemove', resetIdle)
 })
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('mousemove', resetIdle)
+  if (idleTimer) clearTimeout(idleTimer)
+})
 
 // ── deck files: open / save-as / new / switch ──
 function applyDeck(d: Deck) {
@@ -384,7 +406,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
 </script>
 
 <template>
-  <div class="app-root" :class="{ editing: editMode }">
+  <div class="app-root" :class="{ editing: editMode, 'cursor-hidden': uiHidden && !editMode }">
     <TopBar
       v-if="deck && editMode"
       :deck="deck"
@@ -451,8 +473,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       />
     </div>
 
-    <!-- present-mode chrome -->
-    <div v-if="deck && !editMode" class="deck-menu-present">
+    <!-- present-mode chrome (fades out when idle) -->
+    <div v-if="deck && !editMode" class="deck-menu-present present-chrome" :class="{ 'ui-hidden': uiHidden }">
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         @open-file="onOpenFile"
@@ -462,8 +484,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @open="onOpenDeck"
       />
     </div>
-    <button v-if="deck && !editMode" class="edit-fab" title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
-    <div v-if="deck && !editMode" class="hud">
+    <button v-if="deck && !editMode" class="edit-fab present-chrome" :class="{ 'ui-hidden': uiHidden }" title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
+    <div v-if="deck && !editMode" class="hud present-chrome" :class="{ 'ui-hidden': uiHidden }">
       <button @click="current = Math.max(0, current - 1)" title="Previous">←</button>
       <span>{{ current + 1 }} / {{ deck.slides.length }}</span>
       <button @click="current = Math.min(deck.slides.length - 1, current + 1)" title="Next">→</button>
@@ -554,6 +576,16 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   top: 14px;
   left: 14px;
   z-index: 50;
+}
+.present-chrome {
+  transition: opacity 0.5s ease;
+}
+.present-chrome.ui-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.app-root.cursor-hidden {
+  cursor: none;
 }
 .edit-fab {
   position: fixed;
