@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
 import { blankSlide } from './core/deck'
-import { bakeToElements } from './core/bake'
+import { bakeToElements, canBake } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
@@ -350,7 +350,9 @@ function bakeCurrentToFreeform(extra?: SlideElement) {
 function onCreateElement(el: SlideElement) {
   if (!deck.value) return
   const s = deck.value.slides[current.value]
-  if (s.layout === 'freeform') {
+  if (s.layout === 'freeform' || !canBake(s.layout)) {
+    // Already a canvas, OR a layout we can't bake losslessly (video / diagram):
+    // overlay the element on the slide as-is so nothing is lost.
     const els = [...(s.elements ?? []), el]
     patchSlide({ elements: els })
     selectedEl.value = els.length - 1

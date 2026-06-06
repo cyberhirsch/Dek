@@ -66,6 +66,11 @@ function resolveFont(font?: string): string {
 }
 function textStyle(el: BoxElement) {
   const deco = [el.underline ? 'underline' : '', el.strike ? 'line-through' : ''].filter(Boolean).join(' ')
+  // Inset the text so it never collides with a rounded corner: padding scales
+  // with the corner radius (capped so the content area never collapses).
+  const r = el.radius ?? 0
+  const padX = Math.min(Math.max(10, r * 0.5), el.w / 2)
+  const padY = Math.min(Math.max(6, r * 0.35), el.h / 2)
   return {
     fontFamily: resolveFont(el.font),
     fontSize: (el.size ?? 28) + 'px',
@@ -75,6 +80,8 @@ function textStyle(el: BoxElement) {
     fontStyle: el.italic ? 'italic' : 'normal',
     textDecoration: deco || 'none',
     justifyContent: el.valign === 'middle' ? 'center' : el.valign === 'bottom' ? 'flex-end' : 'flex-start',
+    padding: `${padY}px ${padX}px`,
+    borderRadius: 'inherit',
   } as Record<string, string>
 }
 
@@ -339,6 +346,7 @@ defineExpose({ commitEdit })
 .el-text-body {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   line-height: 1.25;

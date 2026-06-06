@@ -76,14 +76,12 @@ function pickTool(t: CanvasTool) {
 }
 
 // ── selected-element controls ──
-const FONTS = [
-  { v: 'heading', label: 'Heading' },
-  { v: 'body', label: 'Body' },
-  { v: 'Georgia', label: 'Georgia' },
-  { v: 'Arial', label: 'Arial' },
-  { v: 'Times New Roman', label: 'Times' },
-  { v: 'Courier New', label: 'Courier' },
-]
+// Only the fonts the theme actually loads — 'heading'/'body' tokens resolve to
+// the deck's --dek-font-* CSS vars, so labels show the real family names.
+const FONTS = computed(() => [
+  { v: 'heading', label: `Heading · ${props.deck.config.theme?.fontHeading ?? 'Cormorant Garamond'}` },
+  { v: 'body', label: `Body · ${props.deck.config.theme?.fontBody ?? 'JetBrains Mono'}` },
+])
 const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selectedElement as BoxElement) : null))
 const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
 function upd(p: ElementPatch) {

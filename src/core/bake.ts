@@ -118,7 +118,9 @@ export function bakeToElements(slide: Slide): SlideElement[] {
 }
 
 /** A fresh element for the given tool, centred near a drop point. */
-export function newElement(tool: CanvasTool, x: number, y: number): SlideElement {
+export function newElement(tool: CanvasTool, rawX: number, rawY: number): SlideElement {
+  const x = Math.round(rawX)
+  const y = Math.round(rawY)
   switch (tool) {
     case 'text':
       // a text box = a box with transparent fill & stroke
