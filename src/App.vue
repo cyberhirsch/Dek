@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide } from './core/types'
 import { blankSlide } from './core/deck'
+import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
   saveSlide,
@@ -21,6 +22,7 @@ import Presenter from './components/Presenter.vue'
 import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
+import ReviewPanel from './components/ReviewPanel.vue'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -29,11 +31,18 @@ const error = ref<string | null>(null)
 const editMode = ref(true) // start in the editor; "Present" switches to present mode
 const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
+const bulletFormatCommand = ref(0)
 
 // present-mode views
 const overviewOpen = ref(false)
 const presenterOpen = ref(false)
 const exportOpen = ref(false)
+const reviewOpen = ref(false)
+const analysis = computed(() => (deck.value ? analyzeDeck(deck.value) : null))
+const reviewCount = computed(() => {
+  const c = analysis.value?.counts
+  return c ? c.error + c.warning + c.info : 0
+})
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
   else document.exitFullscreen?.()
@@ -190,12 +199,21 @@ function enterEdit() {
   anchor = current.value
 }
 
+function jumpToSlide(index: number) {
+  current.value = Math.max(0, Math.min(deck.value ? deck.value.slides.length - 1 : 0, index))
+  selected.value = [current.value]
+  anchor = current.value
+}
+
 function onKey(e: KeyboardEvent) {
   const ae = document.activeElement as HTMLElement | null
   const mod = e.ctrlKey || e.metaKey
   if (mod && e.key.toLowerCase() === 'e') {
     e.preventDefault()
     editMode.value ? (editMode.value = false) : enterEdit()
+  } else if (mod && e.shiftKey && e.code === 'Digit8') {
+    e.preventDefault()
+    toggleSelectedBullets()
   } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
     if (ae?.isContentEditable) return // let the field's native undo win
     e.preventDefault()
@@ -231,6 +249,12 @@ function scheduleSlideSave() {
   if (timer) clearTimeout(timer)
   timer = setTimeout(() => void saveCurrentSlide(), 700)
 }
+function scheduleWholeDeckSave() {
+  saveStatus.value = 'unsaved'
+  if (!autosave.value) return
+  if (timer) clearTimeout(timer)
+  timer = setTimeout(() => void saveWholeDeck(), 700)
+}
 async function saveCurrentSlide() {
   if (!deck.value) return
   saveStatus.value = 'saving'
@@ -259,8 +283,17 @@ function patchSlide(p: Partial<Slide>) {
   deck.value.slides[current.value] = { ...deck.value.slides[current.value], ...p }
   scheduleSlideSave()
 }
+function patchConfig(p: Partial<DeckConfig>) {
+  if (!deck.value) return
+  snap(`config:${Object.keys(p).join(',')}`, true)
+  deck.value.config = { ...deck.value.config, ...p }
+  scheduleWholeDeckSave()
+}
 function changeLayout(id: LayoutId) {
   patchSlide({ layout: id })
+}
+function toggleSelectedBullets() {
+  bulletFormatCommand.value += 1
 }
 
 // ── selection ──
@@ -398,7 +431,15 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     portraits[e.index ?? portraits.length] = url
     patchSlide({ portraits })
   } else if (e.field === 'gallery') {
-    const items = (slide.items ?? []).map((it) => (typeof it === 'string' ? { image: it } : { ...it }))
+    const items = (slide.items ?? []).flatMap((it): Array<{ image: string; label?: string }> => {
+      if (typeof it === 'string') return [{ image: it }]
+      if (it && typeof it === 'object' && 'image' in it && typeof it.image === 'string') {
+        const item: { image: string; label?: string } = { image: it.image }
+        if (typeof it.label === 'string') item.label = it.label
+        return [item]
+      }
+      return []
+    })
     if (e.index != null && items[e.index]) items[e.index].image = url
     patchSlide({ items })
   }
@@ -416,8 +457,10 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :autosave="autosave"
       :can-undo="canUndo"
       :can-redo="canRedo"
+      :review-count="reviewCount"
       @change-layout="changeLayout"
       @patch="patchSlide"
+      @toggle-bullets="toggleSelectedBullets"
       @add="addSlide"
       @duplicate="duplicateSlide"
       @remove="removeSlide"
@@ -428,6 +471,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @save="saveCurrentSlide"
       @close="editMode = false"
       @export="exportOpen = true"
+      @review="reviewOpen = !reviewOpen"
       @open-file="onOpenFile"
       @open-folder="onOpenFolder"
       @save-as="onSaveAs"
@@ -454,13 +498,23 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         v-model="current"
         :deck="deck"
         :editable="editMode"
+        :bullet-format-command="bulletFormatCommand"
         :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
         @patch="patchSlide"
+        @config-patch="patchConfig"
         @upload="onUpload"
       />
       <div v-else-if="error" class="msg err">{{ error }}</div>
       <div v-else class="msg">loading…</div>
     </div>
+
+    <ReviewPanel
+      v-if="deck && editMode && reviewOpen && analysis"
+      :analysis="analysis"
+      :current="current"
+      @jump="jumpToSlide"
+      @close="reviewOpen = false"
+    />
 
     <!-- edit-mode speaker-notes strip -->
     <div v-if="deck && editMode" class="notes-bar">

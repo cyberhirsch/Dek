@@ -69,6 +69,8 @@
   letter-spacing: 0.04em;
   color: rgba(230, 236, 242, 0.5);
   z-index: 5;
+  min-width: 160px;
+  min-height: 20px;
 }
 .dek-footer {
   position: absolute;
@@ -77,6 +79,8 @@
   font-size: 13px;
   color: rgba(230, 236, 242, 0.4);
   z-index: 5;
+  min-width: 160px;
+  min-height: 20px;
 }
 .dek-pageno {
   position: absolute;
@@ -184,6 +188,9 @@
   flex-direction: column;
   gap: 18px;
 }
+.dek-list.editable-list {
+  outline: none;
+}
 .dek-list li {
   position: relative;
   padding-left: 34px;
@@ -196,7 +203,33 @@
   font-size: 18px;
   top: 4px;
 }
-
+.dek-list li.plain {
+  padding-left: 0;
+}
+.dek-list li.plain::before {
+  content: none;
+}
+.dek-list li.editing {
+  min-width: 0;
+  margin: -6px -8px;
+  padding: 6px 8px 6px 34px;
+  border-radius: 8px;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.dek-list li.editing::before {
+  left: 8px;
+  top: 10px;
+}
+.dek-list li.editing.plain {
+  padding-left: 8px;
+}
+.dek-list li.editing .dek-editable {
+  min-width: 0;
+}
+.dek-list li.editing:empty::after {
+  content: 'Text...';
+  opacity: 0.35;
+}
 /* ── Layout: bullets-image ─────────────────────────────────────── */
 .l-bullets-image .cols {
   display: grid;

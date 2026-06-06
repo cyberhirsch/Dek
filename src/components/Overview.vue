@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
 
@@ -8,22 +8,61 @@ const emit = defineEmits<{ jump: [i: number]; close: [] }>()
 
 const grid = ref<HTMLElement | null>(null)
 const focus = ref(props.current)
+const scrollTop = ref(0)
+const viewW = ref(1)
+const viewH = ref(1)
+const CELL_W = 220
+const CELL_H = 124
+const GAP = 16
+const OVERSCAN_ROWS = 2
 
-function columns(): number {
-  const g = grid.value
-  if (!g) return 1
-  const first = g.querySelector('.cell') as HTMLElement | null
-  if (!first) return 1
-  const gap = 16
-  return Math.max(1, Math.round((g.clientWidth + gap) / (first.offsetWidth + gap)))
+const columns = computed(() => Math.max(1, Math.floor((viewW.value + GAP) / (CELL_W + GAP))))
+const rows = computed(() => Math.ceil(props.deck.slides.length / columns.value))
+const totalHeight = computed(() => rows.value * (CELL_H + GAP) - GAP)
+const visibleRange = computed(() => {
+  const row0 = Math.max(0, Math.floor(scrollTop.value / (CELL_H + GAP)) - OVERSCAN_ROWS)
+  const row1 = Math.min(rows.value - 1, Math.ceil((scrollTop.value + viewH.value) / (CELL_H + GAP)) + OVERSCAN_ROWS)
+  return {
+    start: row0 * columns.value,
+    end: Math.min(props.deck.slides.length, (row1 + 1) * columns.value),
+  }
+})
+const visible = computed(() => {
+  const out: { index: number; top: number; left: number }[] = []
+  for (let i = visibleRange.value.start; i < visibleRange.value.end; i++) {
+    out.push({
+      index: i,
+      top: Math.floor(i / columns.value) * (CELL_H + GAP),
+      left: (i % columns.value) * (CELL_W + GAP),
+    })
+  }
+  return out
+})
+
+function syncViewport() {
+  if (!grid.value) return
+  scrollTop.value = grid.value.scrollTop
+  viewW.value = grid.value.clientWidth
+  viewH.value = grid.value.clientHeight
+}
+
+function scrollFocusIntoView(block: ScrollLogicalPosition = 'nearest') {
+  nextTick(() => {
+    const g = grid.value
+    if (!g) return
+    const top = Math.floor(focus.value / columns.value) * (CELL_H + GAP)
+    const bottom = top + CELL_H
+    if (block === 'center') g.scrollTop = Math.max(0, top - (g.clientHeight - CELL_H) / 2)
+    else if (top < g.scrollTop) g.scrollTop = top
+    else if (bottom > g.scrollTop + g.clientHeight) g.scrollTop = bottom - g.clientHeight
+    syncViewport()
+  })
 }
 
 function move(delta: number) {
   const max = props.deck.slides.length - 1
   focus.value = Math.max(0, Math.min(max, focus.value + delta))
-  nextTick(() => {
-    grid.value?.querySelectorAll('.cell')[focus.value]?.scrollIntoView({ block: 'nearest' })
-  })
+  scrollFocusIntoView()
 }
 
 function onKey(e: KeyboardEvent) {
@@ -39,10 +78,10 @@ function onKey(e: KeyboardEvent) {
     move(-1)
   } else if (k === 'ArrowDown') {
     e.preventDefault()
-    move(columns())
+    move(columns.value)
   } else if (k === 'ArrowUp') {
     e.preventDefault()
-    move(-columns())
+    move(-columns.value)
   } else if (k === 'Home') {
     e.preventDefault()
     move(-1e9)
@@ -57,9 +96,16 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  nextTick(() => grid.value?.querySelectorAll('.cell')[focus.value]?.scrollIntoView({ block: 'center' }))
+  syncViewport()
+  ro = new ResizeObserver(syncViewport)
+  if (grid.value) ro.observe(grid.value)
+  scrollFocusIntoView('center')
 })
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+let ro: ResizeObserver | null = null
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  ro?.disconnect()
+})
 </script>
 
 <template>
@@ -68,19 +114,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <span>Overview — {{ deck.slides.length }} slides</span>
       <button @click="emit('close')">Close (Esc)</button>
     </div>
-    <div ref="grid" class="ov-grid">
+    <div ref="grid" class="ov-grid" @scroll="syncViewport">
+      <div class="ov-canvas" :style="{ height: totalHeight + 'px', width: columns * (CELL_W + GAP) - GAP + 'px' }">
       <button
-        v-for="(s, i) in deck.slides"
-        :key="i"
+        v-for="cell in visible"
+        :key="cell.index"
         class="cell"
-        :class="{ active: i === current, focused: i === focus }"
-        @click="emit('jump', i); emit('close')"
-        @mouseenter="focus = i"
+        :class="{ active: cell.index === current, focused: cell.index === focus }"
+        :style="{ transform: `translate(${cell.left}px, ${cell.top}px)`, width: CELL_W + 'px', height: CELL_H + 'px' }"
+        @click="emit('jump', cell.index); emit('close')"
+        @mouseenter="focus = cell.index"
       >
-        <span class="n">{{ i + 1 }}</span>
-        <span v-if="s.group" class="g">{{ s.group }}</span>
-        <SlideThumb :slide="s" :config="deck.config" :index="i" :total="deck.slides.length" :width="220" />
+        <span class="n">{{ cell.index + 1 }}</span>
+        <span v-if="deck.slides[cell.index].group" class="g">{{ deck.slides[cell.index].group }}</span>
+        <SlideThumb :slide="deck.slides[cell.index]" :config="deck.config" :index="cell.index" :total="deck.slides.length" :width="220" />
       </button>
+      </div>
     </div>
   </div>
 </template>
@@ -118,14 +167,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 .ov-grid {
   flex: 1;
   overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
   padding: 20px;
-  align-content: start;
+}
+.ov-canvas {
+  position: relative;
+  margin: 0 auto;
 }
 .cell {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   background: none;
   border: 2px solid transparent;
   border-radius: 7px;

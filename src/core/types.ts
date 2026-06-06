@@ -41,6 +41,12 @@ export interface GalleryItem {
   label?: string
 }
 
+export interface TextItem {
+  text: string
+  /** Defaults to true for legacy string items. */
+  bullet?: boolean
+}
+
 /**
  * A single slide. `layout` selects the renderer; the remaining fields are the
  * named content fields for that layout. Unknown fields are preserved verbatim so
@@ -59,7 +65,7 @@ export interface Slide {
   caption?: string
   notes?: string
   // lists
-  items?: Array<string | GalleryItem>
+  items?: Array<string | TextItem | GalleryItem>
   portraits?: string[]
   // image-ish
   image?: string

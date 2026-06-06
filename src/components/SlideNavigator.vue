@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
 
 const props = defineProps<{ deck: Deck; current: number; selected: number[] }>()
 
 const nav = ref<HTMLElement | null>(null)
-function scrollActiveIntoView() {
-  nextTick(() => nav.value?.querySelector('.row.active')?.scrollIntoView({ block: 'nearest' }))
-}
-watch(() => props.current, scrollActiveIntoView)
-onMounted(scrollActiveIntoView)
 const emit = defineEmits<{
   'update:current': [i: number]
   select: [e: { index: number; shift: boolean; meta: boolean }]
@@ -27,6 +22,11 @@ type Entry =
   | { kind: 'slide'; index: number; grouped: boolean }
 
 const collapsed = reactive<Set<number>>(new Set())
+const scrollTop = ref(0)
+const viewportH = ref(1)
+const ROW_H = 104
+const HEADER_H = 32
+const OVERSCAN = ROW_H * 4
 
 const entries = computed<Entry[]>(() => {
   const s = props.deck.slides
@@ -48,6 +48,54 @@ const entries = computed<Entry[]>(() => {
   }
   return out
 })
+
+type PositionedEntry = Entry & { key: string; top: number; height: number }
+const positioned = computed<PositionedEntry[]>(() => {
+  let top = 0
+  return entries.value.map((e) => {
+    const height = e.kind === 'header' ? HEADER_H : ROW_H
+    const key = e.kind === 'header' ? `h-${e.runId}` : `s-${e.index}`
+    const out = { ...e, key, top, height }
+    top += height
+    return out
+  })
+})
+const totalHeight = computed(() => {
+  const last = positioned.value.at(-1)
+  return last ? last.top + last.height : 0
+})
+const visibleEntries = computed(() => {
+  const lo = scrollTop.value - OVERSCAN
+  const hi = scrollTop.value + viewportH.value + OVERSCAN
+  return positioned.value.filter((e) => e.top + e.height >= lo && e.top <= hi)
+})
+
+function syncViewport() {
+  if (!nav.value) return
+  scrollTop.value = nav.value.scrollTop
+  viewportH.value = nav.value.clientHeight
+}
+function scrollActiveIntoView() {
+  nextTick(() => {
+    const el = nav.value
+    const row = positioned.value.find((e) => e.kind === 'slide' && e.index === props.current)
+    if (!el || !row) return
+    const top = row.top
+    const bottom = row.top + row.height
+    if (top < el.scrollTop) el.scrollTop = top
+    else if (bottom > el.scrollTop + el.clientHeight) el.scrollTop = bottom - el.clientHeight
+    syncViewport()
+  })
+}
+let ro: ResizeObserver | null = null
+watch(() => props.current, scrollActiveIntoView)
+onMounted(() => {
+  syncViewport()
+  ro = new ResizeObserver(syncViewport)
+  if (nav.value) ro.observe(nav.value)
+  scrollActiveIntoView()
+})
+onUnmounted(() => ro?.disconnect())
 
 function toggleCollapse(runId: number) {
   if (collapsed.has(runId)) collapsed.delete(runId)
@@ -117,13 +165,15 @@ const selSet = computed(() => new Set(props.selected))
 </script>
 
 <template>
-  <div ref="nav" class="nav" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
-    <template v-for="(e, ri) in entries" :key="ri">
+  <div ref="nav" class="nav" @scroll="syncViewport" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
+    <div class="virtual" :style="{ height: totalHeight + 'px' }">
+    <template v-for="e in visibleEntries" :key="e.key">
       <!-- group header -->
       <div
         v-if="e.kind === 'header'"
         class="grp"
         :class="{ 'drop-into': dropHeader === e.runId }"
+        :style="{ transform: `translateY(${e.top}px)`, height: e.height + 'px' }"
         @dragover="onHeaderDragOver($event, e.runId)"
       >
         <button class="chev" @click="toggleCollapse(e.runId)">{{ collapsed.has(e.runId) ? '▸' : '▾' }}</button>
@@ -145,6 +195,7 @@ const selSet = computed(() => new Set(props.selected))
         v-else
         class="row"
         :class="{ active: e.index === current, sel: selSet.has(e.index), grouped: e.grouped, dragging: dragSet.includes(e.index) }"
+        :style="{ transform: `translateY(${e.top}px)`, height: e.height + 'px' }"
         draggable="true"
         @dragstart="onDragStart(e.index)"
         @dragover="onSlideDragOver($event, e.index)"
@@ -156,6 +207,7 @@ const selSet = computed(() => new Set(props.selected))
         <div v-if="dropBefore === e.index + 1" class="drop-line bottom" />
       </div>
     </template>
+    </div>
   </div>
 </template>
 
@@ -170,7 +222,13 @@ const selSet = computed(() => new Set(props.selected))
   padding: 8px 6px 40px;
   user-select: none;
 }
+.virtual {
+  position: relative;
+}
 .grp {
+  position: absolute;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -178,7 +236,6 @@ const selSet = computed(() => new Set(props.selected))
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   color: rgba(230, 236, 242, 0.7);
-  position: relative;
 }
 .grp.drop-into {
   background: rgba(127, 199, 255, 0.12);
@@ -227,7 +284,9 @@ const selSet = computed(() => new Set(props.selected))
 .grp-x:hover { color: #f87171; }
 
 .row {
-  position: relative;
+  position: absolute;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   gap: 7px;

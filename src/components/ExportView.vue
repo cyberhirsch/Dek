@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import { themeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
@@ -9,8 +9,39 @@ const emit = defineEmits<{ close: [] }>()
 
 const vars = computed(() => themeVars(props.deck.config))
 const stack = ref<HTMLElement | null>(null)
+const rendered = ref(0)
+const visibleSlides = computed(() => props.deck.slides.slice(0, rendered.value))
+const progress = computed(() => {
+  if (!props.deck.slides.length) return 100
+  return Math.round((rendered.value / props.deck.slides.length) * 100)
+})
 
-function printPdf() {
+let cancelled = false
+let timer: number | null = null
+const FIRST_CHUNK = 12
+const CHUNK = 24
+
+function queueRender() {
+  if (cancelled || rendered.value >= props.deck.slides.length) return
+  timer = window.setTimeout(() => {
+    rendered.value = Math.min(props.deck.slides.length, rendered.value + CHUNK)
+    queueRender()
+  }, 16)
+}
+
+function startRender() {
+  cancelled = false
+  rendered.value = Math.min(props.deck.slides.length, FIRST_CHUNK)
+  queueRender()
+}
+
+async function renderAll() {
+  rendered.value = props.deck.slides.length
+  await nextTick()
+}
+
+async function printPdf() {
+  await renderAll()
   window.print()
 }
 
@@ -27,7 +58,8 @@ function collectCss(): string {
   return out
 }
 
-function downloadHtml() {
+async function downloadHtml() {
+  await renderAll()
   const css = collectCss()
   const slidesHtml = stack.value?.innerHTML ?? ''
   const fontLink =
@@ -65,12 +97,22 @@ html,body{margin:0;background:#050506;}
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
+
+onMounted(startRender)
+watch(() => props.deck.slides.length, startRender)
+onUnmounted(() => {
+  cancelled = true
+  if (timer) window.clearTimeout(timer)
+})
 </script>
 
 <template>
   <div class="export-root" :style="vars">
     <div class="export-bar no-print">
-      <span>Export — {{ deck.slides.length }} slides</span>
+      <div class="export-status">
+        <span>Export — {{ rendered }} / {{ deck.slides.length }} slides</span>
+        <span class="meter"><span :style="{ width: progress + '%' }" /></span>
+      </div>
       <div class="actions">
         <button @click="printPdf">⎙ Print / Save as PDF</button>
         <button @click="downloadHtml">⤓ Download HTML</button>
@@ -79,7 +121,7 @@ function escapeHtml(s: string) {
     </div>
 
     <div ref="stack" class="dek-export">
-      <div v-for="(s, i) in deck.slides" :key="i" class="print-page">
+      <div v-for="(s, i) in visibleSlides" :key="i" class="print-page">
         <SlideView :slide="s" :config="deck.config" :index="i" :total="deck.slides.length" />
       </div>
     </div>
@@ -108,6 +150,23 @@ function escapeHtml(s: string) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #e6ecf2;
   font-size: 13px;
+}
+.export-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.meter {
+  width: 150px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.meter span {
+  display: block;
+  height: 100%;
+  background: #7fc7ff;
 }
 .actions {
   display: flex;

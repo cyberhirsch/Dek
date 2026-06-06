@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, Slide } from '../core/types'
+import type { Deck, DeckConfig, Slide } from '../core/types'
 import { themeVars as buildThemeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
 
@@ -8,11 +8,13 @@ const props = defineProps<{
   deck: Deck
   modelValue: number
   editable?: boolean
+  bulletFormatCommand?: number
   navEnabled?: boolean
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   patch: [p: Partial<Slide>]
+  'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
 }>()
 
@@ -89,7 +91,9 @@ onUnmounted(() => {
         :index="modelValue"
         :total="deck.slides.length"
         :editable="editable"
+        :bullet-format-command="bulletFormatCommand"
         @patch="emit('patch', $event)"
+        @config-patch="emit('config-patch', $event)"
         @upload="emit('upload', $event)"
       />
     </div>

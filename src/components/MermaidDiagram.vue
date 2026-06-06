@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import mermaid from 'mermaid'
+
+type Mermaid = typeof import('mermaid')['default']
+let mermaidPromise: Promise<Mermaid> | null = null
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import('mermaid').then((m) => m.default)
+  return mermaidPromise
+}
 
 // Module-level so every render across all instances (main stage + each thumbnail)
 // gets a unique id — otherwise concurrent renders collide and produce empty SVGs.
@@ -11,6 +17,7 @@ let GID = 0
 let chain: Promise<unknown> = Promise.resolve()
 function renderMermaid(id: string, code: string): Promise<string> {
   const run = chain.then(async () => {
+    const mermaid = await init()
     if (!(await mermaid.parse(code, { suppressErrors: true }))) {
       throw new Error('Diagram syntax error')
     }
@@ -25,9 +32,9 @@ const props = defineProps<{ code?: string }>()
 
 // Initialize once per app load, themed to match the deck palette.
 let inited = false
-function init() {
-  if (inited) return
-  inited = true
+async function init(): Promise<Mermaid> {
+  const mermaid = await loadMermaid()
+  if (inited) return mermaid
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'loose',
@@ -51,13 +58,14 @@ function init() {
       edgeLabelBackground: '#0c0f15',
     },
   })
+  inited = true
+  return mermaid
 }
 
 const host = ref<HTMLElement | null>(null)
 const error = ref('')
 
 async function render() {
-  init()
   const code = (props.code ?? '').trim()
   if (!host.value) return
   if (!code) {

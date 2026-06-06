@@ -12,10 +12,12 @@ const props = defineProps<{
   autosave: boolean
   canUndo: boolean
   canRedo: boolean
+  reviewCount: number
 }>()
 const emit = defineEmits<{
   'change-layout': [id: LayoutId]
   patch: [p: Partial<Slide>]
+  'toggle-bullets': []
   add: [id: LayoutId]
   duplicate: []
   remove: []
@@ -26,6 +28,7 @@ const emit = defineEmits<{
   save: []
   close: []
   export: []
+  review: []
   'open-file': []
   'open-folder': []
   'save-as': []
@@ -40,6 +43,7 @@ function onAdd(ev: Event) {
 }
 
 const slide = computed(() => props.deck.slides[props.index])
+const canToggleBullets = computed(() => slide.value?.layout === 'bullets' || slide.value?.layout === 'bullets-image')
 const statusText = computed(() =>
   props.saveStatus === 'saving' ? 'saving…' : props.saveStatus === 'unsaved' ? 'unsaved' : 'saved',
 )
@@ -97,6 +101,21 @@ const statusText = computed(() =>
     </div>
 
     <div class="right">
+      <div class="seg tools">
+        <button
+          class="icon-btn bullet-list"
+          :class="{ on: canToggleBullets }"
+          :disabled="!canToggleBullets"
+          title="Bulleted list (Ctrl+Shift+8)"
+          aria-label="Bulleted list"
+          @mousedown.prevent="emit('toggle-bullets')"
+        >
+          <span class="bullet-list-icon" aria-hidden="true">
+            <i /><i /><i />
+          </span>
+        </button>
+      </div>
+      <span class="div" />
       <div class="seg">
         <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
         <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
@@ -119,6 +138,9 @@ const statusText = computed(() =>
       <label class="chk"><input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />auto</label>
       <button class="save" :class="saveStatus" @click="emit('save')">
         <span class="dot" :class="saveStatus" />{{ statusText }}
+      </button>
+      <button class="topbtn" title="Review validation and assets" @click="emit('review')">
+        Review{{ reviewCount ? ` ${reviewCount}` : '' }}
       </button>
       <button class="topbtn" title="Export (PDF / HTML)" @click="emit('export')">⤓ Export</button>
       <button class="present" title="Present (Ctrl+E)" @click="emit('close')">▶ Present</button>
@@ -183,6 +205,43 @@ const statusText = computed(() =>
 .seg button.on { border-color: #7fc7ff; color: #7fc7ff; }
 .seg button:disabled { opacity: 0.35; cursor: not-allowed; }
 .seg button.danger:hover { color: #f87171; border-color: rgba(248, 113, 113, 0.5); }
+.seg.tools {
+  gap: 2px;
+}
+.seg button.icon-btn {
+  width: 31px;
+  height: 29px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.seg button.icon-btn.on {
+  background: rgba(127, 199, 255, 0.12);
+}
+.bullet-list-icon {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  width: 17px;
+}
+.bullet-list-icon i {
+  display: block;
+  height: 2px;
+  margin-left: 7px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.bullet-list-icon i::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  margin-top: -0.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
 .chk {
   display: flex;
   align-items: center;

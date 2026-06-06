@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Slide, DeckConfig, GalleryItem, Focus } from '../core/types'
+import type { Slide, DeckConfig, GalleryItem, Focus, TextItem } from '../core/types'
 import { inlineMd } from '../render/inline'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
+import EditableTextList, { type EditableTextListRow } from './EditableTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import '../styles/slide.css'
 
@@ -14,20 +15,39 @@ const props = defineProps<{
   index: number
   total: number
   editable?: boolean
+  bulletFormatCommand?: number
 }>()
 
 const emit = defineEmits<{
   patch: [p: Partial<Slide>]
+  'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
 
-const textItems = computed<string[]>(() =>
-  (props.slide.items ?? []).filter((i): i is string => typeof i === 'string'),
+type TextRow = EditableTextListRow
+
+function isGalleryItem(i: unknown): i is GalleryItem {
+  return !!i && typeof i === 'object' && typeof (i as GalleryItem).image === 'string'
+}
+function isTextItem(i: unknown): i is TextItem {
+  return !!i && typeof i === 'object' && typeof (i as TextItem).text === 'string'
+}
+
+const textItems = computed<TextRow[]>(() =>
+  (props.slide.items ?? []).flatMap((i) => {
+    if (typeof i === 'string') return [{ text: i, bullet: true }]
+    if (isTextItem(i)) return [{ text: i.text, bullet: i.bullet !== false }]
+    return []
+  }),
 )
 const galleryItems = computed<GalleryItem[]>(() =>
-  (props.slide.items ?? []).map((i) => (typeof i === 'string' ? { image: i } : i)),
+  (props.slide.items ?? []).flatMap((i) => {
+    if (typeof i === 'string') return [{ image: i }]
+    if (isGalleryItem(i)) return [i]
+    return []
+  }),
 )
 const galleryCols = computed(() => {
   const c = props.slide.columns
@@ -38,23 +58,16 @@ const galleryCols = computed(() => {
 function patch(p: Partial<Slide>) {
   emit('patch', p)
 }
+function patchConfig(p: Partial<DeckConfig>) {
+  emit('config-patch', p)
+}
 
 // bullet list ops
-function setItem(i: number, v: string) {
-  const items = [...textItems.value]
-  items[i] = v
-  patch({ items })
+function storeRows(rows: TextRow[]): Array<string | TextItem> {
+  return rows.map((r) => (r.bullet ? r.text : { text: r.text, bullet: false }))
 }
-function addItem(i: number) {
-  const items = [...textItems.value]
-  items.splice(i + 1, 0, '')
-  patch({ items })
-}
-function removeItem(i: number) {
-  const items = [...textItems.value]
-  if (items.length <= 1) return
-  items.splice(i, 1)
-  patch({ items })
+function setRows(rows: TextRow[]) {
+  patch({ items: storeRows(rows) })
 }
 // gallery ops
 function setGalleryLabel(i: number, label: string) {
@@ -91,8 +104,22 @@ watch(
 
 <template>
   <div class="dek-slide" :class="['l-' + slide.layout, { glow }]">
-    <div v-if="config.header && slide.layout !== 'cover'" class="dek-header">{{ config.header }}</div>
-    <div v-if="config.footer && slide.layout !== 'cover'" class="dek-footer">{{ config.footer }}</div>
+    <EditableText
+      v-if="editable && slide.layout !== 'cover'"
+      class="dek-header"
+      :model-value="config.header"
+      placeholder="Running header"
+      @update:model-value="patchConfig({ header: $event })"
+    />
+    <div v-else-if="config.header && slide.layout !== 'cover'" class="dek-header">{{ config.header }}</div>
+    <EditableText
+      v-if="editable && slide.layout !== 'cover'"
+      class="dek-footer"
+      :model-value="config.footer"
+      placeholder="Running footer"
+      @update:model-value="patchConfig({ footer: $event })"
+    />
+    <div v-else-if="config.footer && slide.layout !== 'cover'" class="dek-footer">{{ config.footer }}</div>
     <div v-if="config.paginate" class="dek-pageno">{{ index + 1 }} / {{ total }}</div>
 
     <!-- cover -->
@@ -137,15 +164,9 @@ watch(
     <div v-else-if="slide.layout === 'bullets'" class="dek-pad l-bullets">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
-      <ul class="dek-list">
-        <template v-if="editable">
-          <li v-for="(it, i) in textItems" :key="i">
-            <EditableText :model-value="it" placeholder="Point…" @update:model-value="setItem(i, $event)" @enter="addItem(i)" @empty-backspace="removeItem(i)" />
-          </li>
-        </template>
-        <template v-else>
-          <li v-for="(it, i) in textItems" :key="i" v-html="inlineMd(it)" />
-        </template>
+      <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
+      <ul v-else class="dek-list">
+        <li v-for="(it, i) in textItems" :key="i" :class="{ plain: !it.bullet }" v-html="inlineMd(it.text)" />
       </ul>
     </div>
 
@@ -155,15 +176,9 @@ watch(
       <h1 v-else>{{ slide.title }}</h1>
       <div class="cols">
         <div class="text-col">
-          <ul class="dek-list">
-            <template v-if="editable">
-              <li v-for="(it, i) in textItems" :key="i">
-                <EditableText :model-value="it" placeholder="Point…" @update:model-value="setItem(i, $event)" @enter="addItem(i)" @empty-backspace="removeItem(i)" />
-              </li>
-            </template>
-            <template v-else>
-              <li v-for="(it, i) in textItems" :key="i" v-html="inlineMd(it)" />
-            </template>
+          <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
+          <ul v-else class="dek-list">
+            <li v-for="(it, i) in textItems" :key="i" :class="{ plain: !it.bullet }" v-html="inlineMd(it.text)" />
           </ul>
         </div>
         <div class="img-col">

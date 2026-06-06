@@ -72,13 +72,15 @@ portraits:
 
 # ============================================================================
 # 5. bullets — ALL-CAPS heading + bullet list. No image.
-#    Use real "- " list items; nesting allowed.
+#    String items are bullets. Use { text, bullet: false } for plain paragraphs.
 # ============================================================================
 layout: bullets
 title: "ABLAUF HEUTE"
 items:
   - Questionnaire
   - Anwesenheitsliste
+  - text: "Plain paragraph between bullet groups"
+    bullet: false
   - Semesterablauf
   - Rechnercheck
 

@@ -98,6 +98,21 @@ items:
     ])
   })
 
+  it('preserves mixed text rows in bullet layouts', () => {
+    const raw = `---
+deck: X
+---
+layout: bullets
+title: Mixed text
+items:
+  - "Bulleted point"
+  - text: "Plain paragraph"
+    bullet: false
+`
+    const { a } = roundTrip(raw)
+    expect(a.slides[0].items).toEqual(['Bulleted point', { text: 'Plain paragraph', bullet: false }])
+  })
+
   it('preserves group fields and ordering', () => {
     const raw = `---
 deck: X
