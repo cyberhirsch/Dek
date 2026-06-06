@@ -59,7 +59,7 @@ export interface TextItem {
 // space (top-left origin) so they scale with the slide. The moment a slide is
 // edited freely (an element added or moved), its `layout` flips to `freeform`.
 
-export type ElementType = 'text' | 'rect' | 'arrow'
+export type ElementType = 'text' | 'rect' | 'arrow' | 'image'
 
 export interface ElementBase {
   type: ElementType
@@ -100,7 +100,14 @@ export interface ArrowElement extends ElementBase {
   strokeWidth?: number
 }
 
-export type SlideElement = TextElement | RectElement | ArrowElement
+export interface ImageElement extends ElementBase {
+  type: 'image'
+  src: string
+  focus?: Focus
+  fit?: 'cover' | 'contain'
+}
+
+export type SlideElement = TextElement | RectElement | ArrowElement | ImageElement
 
 /**
  * A single slide. `layout` selects the renderer; the remaining fields are the

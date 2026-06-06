@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Slide, DeckConfig, GalleryItem, Focus } from '../core/types'
+import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../core/types'
 import { inlineMd, parseContent, rowsToContent } from '../render/inline'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
 import EditableTextList, { type EditableTextListRow } from './EditableTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
+import CanvasElements from './CanvasElements.vue'
+import type { CanvasTool } from './CanvasToolbar.vue'
 import '../styles/slide.css'
 
 const props = defineProps<{
@@ -16,12 +18,18 @@ const props = defineProps<{
   total: number
   editable?: boolean
   bulletFormatCommand?: number
+  tool?: CanvasTool
+  selectedEl?: number | null
 }>()
 
 const emit = defineEmits<{
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
+  'update:elements': [els: SlideElement[]]
+  'update:selectedEl': [i: number | null]
+  'create-element': [el: SlideElement]
+  'tool-reset': []
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -273,10 +281,22 @@ watch(
       </div>
     </div>
 
-    <!-- freeform -->
+    <!-- freeform — a bare canvas; content lives in the elements overlay below -->
     <div v-else class="dek-pad l-freeform">
-      <h1 v-if="slide.title">{{ slide.title }}</h1>
-      <div v-html="slide.body ?? ''" />
+      <div v-if="slide.body" v-html="slide.body" />
     </div>
+
+    <!-- free-positioned elements overlay (any layout may carry them) -->
+    <CanvasElements
+      v-if="editable || (slide.elements && slide.elements.length)"
+      :elements="slide.elements ?? []"
+      :editable="editable"
+      :tool="tool"
+      :selected="selectedEl"
+      @update:elements="emit('update:elements', $event)"
+      @update:selected="emit('update:selectedEl', $event)"
+      @create="emit('create-element', $event)"
+      @tool-reset="emit('tool-reset')"
+    />
   </div>
 </template>

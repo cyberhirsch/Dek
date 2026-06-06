@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, DeckConfig, Slide } from '../core/types'
+import type { Deck, DeckConfig, Slide, SlideElement } from '../core/types'
 import { themeVars as buildThemeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
+import type { CanvasTool } from './CanvasToolbar.vue'
 
 const props = defineProps<{
   deck: Deck
@@ -10,12 +11,18 @@ const props = defineProps<{
   editable?: boolean
   bulletFormatCommand?: number
   navEnabled?: boolean
+  tool?: CanvasTool
+  selectedEl?: number | null
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
+  'update:elements': [els: SlideElement[]]
+  'update:selectedEl': [i: number | null]
+  'create-element': [el: SlideElement]
+  'tool-reset': []
 }>()
 
 const stage = ref<HTMLElement | null>(null)
@@ -92,9 +99,15 @@ onUnmounted(() => {
         :total="deck.slides.length"
         :editable="editable"
         :bullet-format-command="bulletFormatCommand"
+        :tool="tool"
+        :selected-el="selectedEl"
         @patch="emit('patch', $event)"
         @config-patch="emit('config-patch', $event)"
         @upload="emit('upload', $event)"
+        @update:elements="emit('update:elements', $event)"
+        @update:selected-el="emit('update:selectedEl', $event)"
+        @create-element="emit('create-element', $event)"
+        @tool-reset="emit('tool-reset')"
       />
     </div>
   </div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { Deck, DeckConfig, LayoutId, Slide } from './core/types'
+import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
 import { blankSlide } from './core/deck'
+import { bakeToElements } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
@@ -23,6 +24,7 @@ import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
+import CanvasToolbar, { type CanvasTool } from './components/CanvasToolbar.vue'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -32,6 +34,14 @@ const editMode = ref(true) // start in the editor; "Present" switches to present
 const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 const bulletFormatCommand = ref(0)
+
+// ── canvas (free elements) ──
+const activeTool = ref<CanvasTool>('select')
+const selectedEl = ref<number | null>(null)
+watch(current, () => {
+  selectedEl.value = null
+  activeTool.value = 'select'
+})
 
 // present-mode views
 const overviewOpen = ref(false)
@@ -224,7 +234,23 @@ function onKey(e: KeyboardEvent) {
     redo()
   } else if (e.key === 'Escape' && editMode.value) {
     if (ae?.isContentEditable) ae.blur()
-    else editMode.value = false
+    else if (selectedEl.value != null) {
+      selectedEl.value = null
+      activeTool.value = 'select'
+    } else editMode.value = false
+  } else if (
+    editMode.value &&
+    selectedEl.value != null &&
+    !ae?.isContentEditable &&
+    (e.key === 'Delete' || e.key === 'Backspace')
+  ) {
+    e.preventDefault()
+    deleteSelectedElement()
+  } else if (editMode.value && !mod && !ae?.isContentEditable) {
+    // canvas tool shortcuts
+    const k = e.key.toLowerCase()
+    if (k === 'v') activeTool.value = 'select'
+    else if (k === 't') activeTool.value = 'text'
   } else if (!mod && !editMode.value && !ae?.isContentEditable && !overviewOpen.value && !presenterOpen.value) {
     // present-mode single-key shortcuts
     const k = e.key.toLowerCase()
@@ -290,7 +316,73 @@ function patchConfig(p: Partial<DeckConfig>) {
   scheduleWholeDeckSave()
 }
 function changeLayout(id: LayoutId) {
+  if (!deck.value) return
+  const s = deck.value.slides[current.value]
+  // Picking Freeform bakes the current content into movable elements so nothing
+  // is lost on conversion.
+  if (id === 'freeform' && s.layout !== 'freeform') {
+    bakeCurrentToFreeform()
+    return
+  }
   patchSlide({ layout: id })
+}
+
+// ── canvas element ops ──
+/** Convert the current slide into a freeform canvas, baking its layout fields
+ *  into elements (and optionally appending a freshly-created one). */
+function bakeCurrentToFreeform(extra?: SlideElement) {
+  if (!deck.value) return
+  const s = deck.value.slides[current.value]
+  const baked = bakeToElements(s)
+  if (extra) baked.push(extra)
+  const fresh: Slide = { layout: 'freeform', elements: baked }
+  if (s.group) fresh.group = s.group
+  if (s.notes) fresh.notes = s.notes
+  snap('bake-freeform')
+  deck.value.slides[current.value] = fresh
+  selectedEl.value = extra ? baked.length - 1 : null
+  scheduleSlideSave()
+}
+function onCreateElement(el: SlideElement) {
+  if (!deck.value) return
+  const s = deck.value.slides[current.value]
+  if (s.layout === 'freeform') {
+    const els = [...(s.elements ?? []), el]
+    patchSlide({ elements: els })
+    selectedEl.value = els.length - 1
+  } else {
+    bakeCurrentToFreeform(el)
+  }
+  activeTool.value = 'select'
+}
+function onUpdateElements(els: SlideElement[]) {
+  patchSlide({ elements: els })
+}
+function deleteSelectedElement() {
+  if (!deck.value || selectedEl.value == null) return
+  const s = deck.value.slides[current.value]
+  if (!s.elements) return
+  patchSlide({ elements: s.elements.filter((_, i) => i !== selectedEl.value) })
+  selectedEl.value = null
+}
+function onInsert(what: 'video' | 'diagram' | 'table') {
+  if (!deck.value) return
+  if (what === 'video') addSlide('video-embed')
+  else if (what === 'diagram') addSlide('diagram')
+  else {
+    // table: a freeform slide seeded with an editable HTML table
+    snap('add')
+    const body =
+      '<table style="width:100%; border-collapse:collapse; font-size:1.2rem;">\n' +
+      '  <tr><th>Column A</th><th>Column B</th></tr>\n' +
+      '  <tr><td>—</td><td>—</td></tr>\n' +
+      '  <tr><td>—</td><td>—</td></tr>\n' +
+      '</table>'
+    deck.value.slides.splice(current.value + 1, 0, { layout: 'freeform', body })
+    current.value += 1
+    selected.value = [current.value]
+    void saveWholeDeck()
+  }
 }
 function toggleSelectedBullets() {
   bulletFormatCommand.value += 1
@@ -493,17 +585,30 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @rename="renameGroup"
       />
 
-      <DeckView
-        v-if="deck"
-        v-model="current"
-        :deck="deck"
-        :editable="editMode"
-        :bullet-format-command="bulletFormatCommand"
-        :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
-        @patch="patchSlide"
-        @config-patch="patchConfig"
-        @upload="onUpload"
-      />
+      <div v-if="deck" class="stage-wrap">
+        <DeckView
+          v-model="current"
+          :deck="deck"
+          :editable="editMode"
+          :bullet-format-command="bulletFormatCommand"
+          :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
+          :tool="activeTool"
+          :selected-el="selectedEl"
+          @patch="patchSlide"
+          @config-patch="patchConfig"
+          @upload="onUpload"
+          @update:elements="onUpdateElements"
+          @update:selected-el="selectedEl = $event"
+          @create-element="onCreateElement"
+          @tool-reset="activeTool = 'select'"
+        />
+        <CanvasToolbar
+          v-if="editMode"
+          :tool="activeTool"
+          @update:tool="activeTool = $event"
+          @insert="onInsert"
+        />
+      </div>
       <div v-else-if="error" class="msg err">{{ error }}</div>
       <div v-else class="msg">loading…</div>
     </div>
@@ -578,6 +683,12 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   min-height: 0;
 }
 .body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.stage-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;
