@@ -178,16 +178,21 @@ code: |
 #     can author them too. Any layout that is edited freely becomes `freeform`.
 #
 #     Each element: { type, x, y, w, h, rotation } in 1280×720 stage pixels
-#     (top-left origin). Types so far:
-#       text   — { content (inline Markdown), align, size, color, bold }
-#       rect   — { fill, stroke, strokeWidth, radius }
+#     (top-left origin). Types:
+#       box    — a box that is BOTH a shape and a text box. A rectangle is a box
+#                with fill/stroke and no content; a text box is a box with
+#                transparent fill/stroke and `content`. Fields:
+#                { fill, stroke, strokeWidth, radius,        # shape
+#                  content (inline Markdown), font ('heading'|'body'|family),
+#                  size, color, align, bold, italic, underline, strike }   # text
 #       arrow  — { stroke, strokeWidth }  (drawn left→right inside its box)
+#       image  — { src, fit, focus }
 #
 #     A `body:` of raw HTML is still supported as a legacy escape hatch.
 # ============================================================================
 layout: freeform
 elements:
-  - { type: rect, x: 120, y: 160, w: 420, h: 220, rotation: 0, fill: "#7fc7ff22", stroke: "#7fc7ff", strokeWidth: 2, radius: 12 }
-  - { type: text, x: 150, y: 200, w: 360, h: 80, content: "**A free text box** you can move & rotate", size: 32 }
+  - { type: box, x: 120, y: 160, w: 420, h: 220, rotation: 0, fill: "#10243a", stroke: "#7fc7ff", strokeWidth: 2, radius: 12 }
+  - { type: box, x: 150, y: 200, w: 360, h: 80, content: "**A free text box** you can move & rotate", font: heading, size: 32, fill: transparent, stroke: transparent }
   - { type: arrow, x: 560, y: 270, w: 260, h: 0, rotation: 0, stroke: "#ffb474", strokeWidth: 3 }
-  - { type: text, x: 840, y: 240, w: 300, h: 80, content: "<u>pointing here</u>", size: 28, color: "#ffb474" }
+  - { type: box, x: 840, y: 240, w: 300, h: 80, content: "<u>pointing here</u>", size: 28, color: "#ffb474", fill: transparent, stroke: transparent }

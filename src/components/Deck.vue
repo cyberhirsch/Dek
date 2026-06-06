@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck, DeckConfig, Slide, SlideElement } from '../core/types'
 import { themeVars as buildThemeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
-import type { CanvasTool } from './CanvasToolbar.vue'
+import type { CanvasTool } from '../core/types'
 
 const props = defineProps<{
   deck: Deck

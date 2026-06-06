@@ -59,7 +59,10 @@ export interface TextItem {
 // space (top-left origin) so they scale with the slide. The moment a slide is
 // edited freely (an element added or moved), its `layout` flips to `freeform`.
 
-export type ElementType = 'text' | 'rect' | 'arrow' | 'image'
+export type ElementType = 'box' | 'arrow' | 'image'
+
+/** The active canvas tool. 'text' and 'rect' both create a `box`. */
+export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow'
 
 export interface ElementBase {
   type: ElementType
@@ -72,25 +75,32 @@ export interface ElementBase {
   rotation?: number
 }
 
-export interface TextElement extends ElementBase {
-  type: 'text'
-  /** Inline Markdown: **bold**, *italic*, <u>underline</u>, `code`. */
-  content: string
-  align?: 'left' | 'center' | 'right'
-  valign?: 'top' | 'middle' | 'bottom'
-  /** Font size in stage px. */
-  size?: number
-  color?: string
-  bold?: boolean
-}
-
-export interface RectElement extends ElementBase {
-  type: 'rect'
+/**
+ * A box: the one object behind both "text boxes" and "shapes". A rectangle is a
+ * box with a fill/stroke and no text; a text box is a box with transparent
+ * fill/stroke and `content`. Both can have both.
+ */
+export interface BoxElement extends ElementBase {
+  type: 'box'
+  // shape
   fill?: string
   stroke?: string
   strokeWidth?: number
   /** Corner radius in px. */
   radius?: number
+  // text (optional). Inline Markdown: **bold**, *italic*, <u>underline</u>, `code`.
+  content?: string
+  /** Font family, or the tokens 'heading' / 'body' (resolve to the theme fonts). */
+  font?: string
+  /** Font size in stage px. */
+  size?: number
+  color?: string
+  align?: 'left' | 'center' | 'right'
+  valign?: 'top' | 'middle' | 'bottom'
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  strike?: boolean
 }
 
 export interface ArrowElement extends ElementBase {
@@ -107,7 +117,10 @@ export interface ImageElement extends ElementBase {
   fit?: 'cover' | 'contain'
 }
 
-export type SlideElement = TextElement | RectElement | ArrowElement | ImageElement
+export type SlideElement = BoxElement | ArrowElement | ImageElement
+
+/** A partial patch of an element's style fields (everything except `type`). */
+export type ElementPatch = Partial<Omit<BoxElement, 'type'> & Omit<ArrowElement, 'type'> & Omit<ImageElement, 'type'>>
 
 /**
  * A single slide. `layout` selects the renderer; the remaining fields are the

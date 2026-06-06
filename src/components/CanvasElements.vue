@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { SlideElement, TextElement, RectElement, ArrowElement, ImageElement } from '../core/types'
+import type { SlideElement, BoxElement, ArrowElement, ImageElement, CanvasTool } from '../core/types'
 import { inlineMd } from '../render/inline'
 import { newElement } from '../core/bake'
 import FramedImage from './FramedImage.vue'
@@ -10,7 +10,7 @@ const STAGE_W = 1280
 const props = defineProps<{
   elements: SlideElement[]
   editable?: boolean
-  tool?: 'select' | 'text' | 'rect' | 'arrow'
+  tool?: CanvasTool
   selected?: number | null
 }>()
 
@@ -33,10 +33,6 @@ const interactive = computed(
   () => !!props.editable && ((props.tool && props.tool !== 'select') || props.elements.length > 0),
 )
 
-// While transforming, render from this local draft for smoothness; commit on up.
-const draft = ref<SlideElement[] | null>(null)
-const items = computed<SlideElement[]>(() => draft.value ?? props.elements)
-
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 type Handle = (typeof HANDLES)[number]
 
@@ -49,28 +45,36 @@ function toStage(e: PointerEvent): { x: number; y: number } {
 
 // ── element styles ──
 function boxStyle(el: SlideElement) {
-  return {
+  const s: Record<string, string> = {
     left: el.x + 'px',
     top: el.y + 'px',
     width: el.w + 'px',
     height: el.h + 'px',
     transform: `rotate(${el.rotation ?? 0}deg)`,
-  } as Record<string, string>
+  }
+  if (el.type === 'box') {
+    s.background = el.fill ?? 'transparent'
+    s.border = `${el.strokeWidth ?? 0}px solid ${el.stroke ?? 'transparent'}`
+    s.borderRadius = (el.radius ?? 0) + 'px'
+  }
+  return s
 }
-function textStyle(el: TextElement) {
+function resolveFont(font?: string): string {
+  if (!font || font === 'body') return 'var(--dek-font-body)'
+  if (font === 'heading') return 'var(--dek-font-heading)'
+  return `'${font}', sans-serif`
+}
+function textStyle(el: BoxElement) {
+  const deco = [el.underline ? 'underline' : '', el.strike ? 'line-through' : ''].filter(Boolean).join(' ')
   return {
+    fontFamily: resolveFont(el.font),
     fontSize: (el.size ?? 28) + 'px',
     textAlign: el.align ?? 'left',
-    color: el.color ?? 'var(--text)',
+    color: el.color ?? 'var(--dek-text)',
     fontWeight: el.bold ? '700' : '400',
+    fontStyle: el.italic ? 'italic' : 'normal',
+    textDecoration: deco || 'none',
     justifyContent: el.valign === 'middle' ? 'center' : el.valign === 'bottom' ? 'flex-end' : 'flex-start',
-  } as Record<string, string>
-}
-function rectStyle(el: RectElement) {
-  return {
-    background: el.fill ?? 'transparent',
-    border: `${el.strokeWidth ?? 2}px solid ${el.stroke ?? 'transparent'}`,
-    borderRadius: (el.radius ?? 0) + 'px',
   } as Record<string, string>
 }
 
@@ -90,7 +94,6 @@ function onBackgroundDown(e: PointerEvent) {
 function onElementDown(e: PointerEvent, i: number) {
   if (!props.editable) return
   if (props.tool && props.tool !== 'select') {
-    // creating: let the background handler place a new element instead
     onBackgroundDown(e)
     return
   }
@@ -111,6 +114,8 @@ interface DragState {
   cy: number
 }
 let drag: DragState | null = null
+const draft = ref<SlideElement[] | null>(null)
+const items = computed<SlideElement[]>(() => draft.value ?? props.elements)
 
 function startDrag(e: PointerEvent, index: number, mode: 'move' | 'resize' | 'rotate', handle?: Handle) {
   if (editing.value != null) return
@@ -144,7 +149,10 @@ function onDragMove(e: PointerEvent) {
     next.y = Math.round(o.y + dy)
   } else if (drag.mode === 'resize') {
     const h = drag.handle!
-    let { x, y, w, hgt } = { x: o.x, y: o.y, w: o.w, hgt: o.h }
+    let x = o.x
+    let y = o.y
+    let w = o.w
+    let hgt = o.h
     if (h.includes('e')) w = o.w + dx
     if (h.includes('s')) hgt = o.h + dy
     if (h.includes('w')) {
@@ -170,7 +178,6 @@ function onDragMove(e: PointerEvent) {
     next.w = Math.round(w)
     next.h = Math.round(hgt)
   } else {
-    // rotate
     let deg = (Math.atan2(p.y - drag.cy, p.x - drag.cx) * 180) / Math.PI + 90
     if (e.shiftKey) deg = Math.round(deg / 15) * 15
     next.rotation = Math.round(deg)
@@ -197,8 +204,7 @@ function onRotateDown(e: PointerEvent, i: number) {
 // ── text inline editing ──
 function onElementDblClick(i: number) {
   if (!props.editable) return
-  const el = props.elements[i]
-  if (el.type !== 'text') return
+  if (props.elements[i].type !== 'box') return
   editing.value = i
   emit('update:selected', i)
   nextTick(() => {
@@ -220,16 +226,15 @@ function commitEdit() {
   editing.value = null
   if (!node) return
   const content = node.innerText.replace(/\n+$/, '')
-  if (content !== (props.elements[i] as TextElement).content) {
+  if (content !== (props.elements[i] as BoxElement).content) {
     const next = props.elements.map((el) => ({ ...el }))
-    ;(next[i] as TextElement).content = content
+    ;(next[i] as BoxElement).content = content
     emit('update:elements', next)
   }
 }
 
-// type narrowing helpers for the template
-const asText = (el: SlideElement) => el as TextElement
-const asRect = (el: SlideElement) => el as RectElement
+// type-narrowing helpers for the template
+const asBox = (el: SlideElement) => el as BoxElement
 const asArrow = (el: SlideElement) => el as ArrowElement
 const asImage = (el: SlideElement) => el as ImageElement
 
@@ -253,24 +258,21 @@ defineExpose({ commitEdit })
       @pointerdown="onElementDown($event, i)"
       @dblclick="onElementDblClick(i)"
     >
-      <!-- text -->
-      <template v-if="el.type === 'text'">
+      <!-- box: shape (via the element's own bg/border) + optional text -->
+      <template v-if="el.type === 'box'">
         <div
           v-if="editing === i"
           class="el-text-body editing"
-          :style="textStyle(asText(el))"
+          :style="textStyle(asBox(el))"
           :data-edit="i"
           contenteditable="true"
           spellcheck="false"
           @pointerdown.stop
           @blur="commitEdit"
           @keydown.escape.prevent="commitEdit"
-        >{{ asText(el).content }}</div>
-        <div v-else class="el-text-body" :style="textStyle(asText(el))" v-html="inlineMd(asText(el).content)" />
+        >{{ asBox(el).content }}</div>
+        <div v-else class="el-text-body" :style="textStyle(asBox(el))" v-html="inlineMd(asBox(el).content)" />
       </template>
-
-      <!-- rectangle -->
-      <div v-else-if="el.type === 'rect'" class="el-rect" :style="rectStyle(asRect(el))" />
 
       <!-- arrow -->
       <svg
@@ -329,6 +331,7 @@ defineExpose({ commitEdit })
 .el {
   position: absolute;
   transform-origin: center center;
+  box-sizing: border-box;
 }
 .canvas-layer.editable .el {
   cursor: move;
@@ -339,7 +342,6 @@ defineExpose({ commitEdit })
   display: flex;
   flex-direction: column;
   line-height: 1.25;
-  font-family: var(--font-body);
   white-space: pre-wrap;
   word-break: break-word;
   overflow: hidden;
@@ -348,11 +350,6 @@ defineExpose({ commitEdit })
   outline: none;
   cursor: text;
   background: rgba(127, 199, 255, 0.08);
-}
-.el-rect {
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
 }
 .el-arrow {
   display: block;

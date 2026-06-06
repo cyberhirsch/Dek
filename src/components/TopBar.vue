@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Deck, LayoutId, Slide } from '../core/types'
+import { computed, ref } from 'vue'
+import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import DeckMenu from './DeckMenu.vue'
 
@@ -13,6 +13,8 @@ const props = defineProps<{
   canUndo: boolean
   canRedo: boolean
   reviewCount: number
+  tool: CanvasTool
+  selectedElement: SlideElement | null
 }>()
 const emit = defineEmits<{
   'change-layout': [id: LayoutId]
@@ -34,6 +36,9 @@ const emit = defineEmits<{
   'save-as': []
   'new-deck': []
   'open-deck': [file: string]
+  'update:tool': [t: CanvasTool]
+  insert: [what: 'video' | 'diagram' | 'table']
+  'update-element': [p: ElementPatch]
 }>()
 
 function onAdd(ev: Event) {
@@ -62,6 +67,35 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
 const statusText = computed(() =>
   props.saveStatus === 'saving' ? 'saving…' : props.saveStatus === 'unsaved' ? 'unsaved' : 'saved',
 )
+
+// ── canvas tools ──
+const insertOpen = ref(false)
+function pickTool(t: CanvasTool) {
+  emit('update:tool', t)
+  insertOpen.value = false
+}
+
+// ── selected-element controls ──
+const FONTS = [
+  { v: 'heading', label: 'Heading' },
+  { v: 'body', label: 'Body' },
+  { v: 'Georgia', label: 'Georgia' },
+  { v: 'Arial', label: 'Arial' },
+  { v: 'Times New Roman', label: 'Times' },
+  { v: 'Courier New', label: 'Courier' },
+]
+const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selectedElement as BoxElement) : null))
+const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
+function upd(p: ElementPatch) {
+  emit('update-element', p)
+}
+function toggle(k: 'bold' | 'italic' | 'underline' | 'strike') {
+  upd({ [k]: !box.value?.[k] } as ElementPatch)
+}
+/** A hex to show in a color picker even when the stored value is transparent/unset. */
+function colorOr(v: string | undefined, fallback: string) {
+  return v && v !== 'transparent' ? v : fallback
+}
 </script>
 
 <template>
@@ -83,6 +117,81 @@ const statusText = computed(() =>
       <select class="sel" :value="slide?.layout" @change="emit('change-layout', ($event.target as HTMLSelectElement).value as LayoutId)">
         <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
       </select>
+
+      <span class="div" />
+
+      <!-- canvas tools (always available) -->
+      <div class="seg ctools">
+        <button class="icon-btn" :class="{ on: tool === 'select' }" title="Select / move (V)" @click="pickTool('select')">
+          <svg viewBox="0 0 24 24" width="15" height="15"><path d="M5 3l14 7-6 1.5L9.5 18z" fill="currentColor" /></svg>
+        </button>
+        <button class="icon-btn" :class="{ on: tool === 'text' }" title="Text box (T)" @click="pickTool('text')">
+          <span class="tt">T</span>
+        </button>
+        <button class="icon-btn" :class="{ on: tool === 'rect' }" title="Box / rectangle" @click="pickTool('rect')">
+          <svg viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+        </button>
+        <button class="icon-btn" :class="{ on: tool === 'arrow' }" title="Arrow" @click="pickTool('arrow')">
+          <svg viewBox="0 0 24 24" width="15" height="15"><line x1="3" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" /><path d="M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+        </button>
+        <div class="grp">
+          <button class="ins" title="Insert…" @click="insertOpen = !insertOpen">＋ Insert ▾</button>
+          <div v-if="insertOpen" class="menu" @pointerleave="insertOpen = false">
+            <button @click="((insertOpen = false), emit('insert', 'video'))">▶ Video</button>
+            <button @click="((insertOpen = false), emit('insert', 'diagram'))">◇ Diagram</button>
+            <button @click="((insertOpen = false), emit('insert', 'table'))">▦ Table</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- selected box: shape + text styling -->
+      <template v-if="box">
+        <span class="div" />
+        <div class="seg style-seg">
+          <label class="swatch" title="Fill">
+            <input type="color" :value="colorOr(box.fill, '#7fc7ff')" @input="upd({ fill: ($event.target as HTMLInputElement).value })" />
+          </label>
+          <button class="mini" title="No fill" @click="upd({ fill: 'transparent' })">∅</button>
+          <label class="swatch stroke" title="Stroke">
+            <input type="color" :value="colorOr(box.stroke, '#7fc7ff')" @input="upd({ stroke: ($event.target as HTMLInputElement).value, strokeWidth: box.strokeWidth || 2 })" />
+          </label>
+          <button class="mini" title="No stroke" @click="upd({ stroke: 'transparent' })">∅</button>
+          <input class="num" type="number" min="0" max="40" title="Stroke width" :value="box.strokeWidth ?? 0" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
+          <input class="num" type="number" min="0" max="200" title="Corner radius" :value="box.radius ?? 0" @input="upd({ radius: +($event.target as HTMLInputElement).value })" />
+        </div>
+        <span class="div" />
+        <div class="seg style-seg">
+          <select class="sel font" title="Font" :value="box.font ?? 'body'" @change="upd({ font: ($event.target as HTMLSelectElement).value })">
+            <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
+          </select>
+          <input class="num" type="number" min="8" max="400" title="Font size" :value="box.size ?? 28" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
+          <label class="swatch" title="Text color">
+            <input type="color" :value="colorOr(box.color, '#e6ecf2')" @input="upd({ color: ($event.target as HTMLInputElement).value })" />
+          </label>
+        </div>
+        <div class="seg style-seg">
+          <button class="icon-btn fmt" :class="{ on: box.bold }" title="Bold" @click="toggle('bold')"><b>B</b></button>
+          <button class="icon-btn fmt" :class="{ on: box.italic }" title="Italic" @click="toggle('italic')"><i>I</i></button>
+          <button class="icon-btn fmt" :class="{ on: box.underline }" title="Underline" @click="toggle('underline')"><u>U</u></button>
+          <button class="icon-btn fmt" :class="{ on: box.strike }" title="Strikethrough" @click="toggle('strike')"><s>S</s></button>
+        </div>
+        <div class="seg style-seg">
+          <button class="icon-btn" :class="{ on: (box.align ?? 'left') === 'left' }" title="Align left" @click="upd({ align: 'left' })">⯇</button>
+          <button class="icon-btn" :class="{ on: box.align === 'center' }" title="Align center" @click="upd({ align: 'center' })">≡</button>
+          <button class="icon-btn" :class="{ on: box.align === 'right' }" title="Align right" @click="upd({ align: 'right' })">⯈</button>
+        </div>
+      </template>
+
+      <!-- selected arrow: stroke -->
+      <template v-else-if="arrow">
+        <span class="div" />
+        <div class="seg style-seg">
+          <label class="swatch stroke" title="Color">
+            <input type="color" :value="colorOr(arrow.stroke, '#e6ecf2')" @input="upd({ stroke: ($event.target as HTMLInputElement).value })" />
+          </label>
+          <input class="num" type="number" min="1" max="40" title="Thickness" :value="arrow.strokeWidth ?? 3" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
+        </div>
+      </template>
 
       <!-- contextual controls -->
       <template v-if="slide?.layout === 'text-image'">
@@ -306,4 +415,94 @@ const statusText = computed(() =>
   cursor: pointer;
 }
 .present:hover { background: rgba(127, 199, 255, 0.28); }
+
+/* ── canvas tools + element style controls ── */
+.ctools { gap: 2px; }
+.style-seg { gap: 3px; align-items: center; }
+.tt { font-weight: 700; font-size: 14px; }
+.grp { position: relative; }
+.ins {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(230, 236, 242, 0.85);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ins:hover { background: rgba(255, 255, 255, 0.1); }
+.menu {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  padding: 4px;
+  background: rgba(24, 26, 31, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  z-index: 60;
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: none;
+  background: transparent;
+  color: rgba(230, 236, 242, 0.85);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  font-family: inherit;
+}
+.menu button:hover { background: rgba(127, 199, 255, 0.18); color: #fff; }
+.fmt b, .fmt i, .fmt u, .fmt s { font-size: 13px; font-style: normal; }
+.fmt i { font-style: italic; }
+.num {
+  width: 42px;
+  background: #1e222b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6ecf2;
+  border-radius: 6px;
+  padding: 4px 5px;
+  font-family: inherit;
+  font-size: 11px;
+}
+.sel.font { padding: 4px 6px; }
+.swatch {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch input[type='color'] {
+  width: 150%;
+  height: 150%;
+  margin: -25%;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.mini {
+  width: 20px;
+  height: 26px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(230, 236, 242, 0.7);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.mini:hover { background: rgba(255, 255, 255, 0.1); }
 </style>

@@ -8,7 +8,7 @@
 // YAML and the round-trip stays lossless and predictable.
 
 import YAML from 'yaml'
-import type { Deck, DeckConfig, Slide, LayoutId, TextItem } from './types'
+import type { Deck, DeckConfig, Slide, LayoutId, TextItem, SlideElement } from './types'
 import { LAYOUT_IDS, LAYOUT_ALIASES } from './types'
 
 const SEP = /^---[ \t]*$/m
@@ -54,10 +54,19 @@ export function parseDeck(raw: string): Deck {
       obj.content = itemsToContent(obj.items as Array<string | TextItem>)
       delete obj.items
     }
+    // Migrate legacy element types (text/rect → box).
+    if (Array.isArray(obj.elements)) obj.elements = obj.elements.map(normalizeElement)
     return obj
   })
 
   return { config, slides }
+}
+
+/** Old element types `text` and `rect` are now the unified `box`. */
+function normalizeElement(el: SlideElement): SlideElement {
+  const t = (el as { type?: string }).type
+  if (t === 'text' || t === 'rect') return { ...el, type: 'box' } as SlideElement
+  return el
 }
 
 /** True when an `items` array is a text list (not a gallery of {image}). */

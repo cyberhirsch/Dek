@@ -24,7 +24,7 @@ import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
-import CanvasToolbar, { type CanvasTool } from './components/CanvasToolbar.vue'
+import type { CanvasTool, ElementPatch } from './core/types'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -41,6 +41,10 @@ const selectedEl = ref<number | null>(null)
 watch(current, () => {
   selectedEl.value = null
   activeTool.value = 'select'
+})
+const selectedElement = computed(() => {
+  if (!deck.value || selectedEl.value == null) return null
+  return deck.value.slides[current.value]?.elements?.[selectedEl.value] ?? null
 })
 
 // present-mode views
@@ -358,6 +362,14 @@ function onCreateElement(el: SlideElement) {
 function onUpdateElements(els: SlideElement[]) {
   patchSlide({ elements: els })
 }
+/** Patch the currently-selected element (from the top bar's style controls). */
+function onUpdateElement(p: ElementPatch) {
+  if (!deck.value || selectedEl.value == null) return
+  const s = deck.value.slides[current.value]
+  if (!s.elements) return
+  const els = s.elements.map((el, i) => (i === selectedEl.value ? ({ ...el, ...p } as SlideElement) : el))
+  patchSlide({ elements: els })
+}
 function deleteSelectedElement() {
   if (!deck.value || selectedEl.value == null) return
   const s = deck.value.slides[current.value]
@@ -550,9 +562,14 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :can-undo="canUndo"
       :can-redo="canRedo"
       :review-count="reviewCount"
+      :tool="activeTool"
+      :selected-element="selectedElement"
       @change-layout="changeLayout"
       @patch="patchSlide"
       @toggle-bullets="toggleSelectedBullets"
+      @update:tool="activeTool = $event"
+      @insert="onInsert"
+      @update-element="onUpdateElement"
       @add="addSlide"
       @duplicate="duplicateSlide"
       @remove="removeSlide"
@@ -601,12 +618,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           @update:selected-el="selectedEl = $event"
           @create-element="onCreateElement"
           @tool-reset="activeTool = 'select'"
-        />
-        <CanvasToolbar
-          v-if="editMode"
-          :tool="activeTool"
-          @update:tool="activeTool = $event"
-          @insert="onInsert"
         />
       </div>
       <div v-else-if="error" class="msg err">{{ error }}</div>

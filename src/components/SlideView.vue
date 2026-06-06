@@ -8,7 +8,7 @@ import EditableText from './EditableText.vue'
 import EditableTextList, { type EditableTextListRow } from './EditableTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import CanvasElements from './CanvasElements.vue'
-import type { CanvasTool } from './CanvasToolbar.vue'
+import type { CanvasTool } from '../core/types'
 import '../styles/slide.css'
 
 const props = defineProps<{
