@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Slide, DeckConfig, GalleryItem, Focus, TextItem } from '../core/types'
-import { inlineMd } from '../render/inline'
+import type { Slide, DeckConfig, GalleryItem, Focus } from '../core/types'
+import { inlineMd, parseContent, rowsToContent } from '../render/inline'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
@@ -31,17 +31,8 @@ type TextRow = EditableTextListRow
 function isGalleryItem(i: unknown): i is GalleryItem {
   return !!i && typeof i === 'object' && typeof (i as GalleryItem).image === 'string'
 }
-function isTextItem(i: unknown): i is TextItem {
-  return !!i && typeof i === 'object' && typeof (i as TextItem).text === 'string'
-}
 
-const textItems = computed<TextRow[]>(() =>
-  (props.slide.items ?? []).flatMap((i) => {
-    if (typeof i === 'string') return [{ text: i, bullet: true }]
-    if (isTextItem(i)) return [{ text: i.text, bullet: i.bullet !== false }]
-    return []
-  }),
-)
+const textItems = computed<TextRow[]>(() => parseContent(props.slide.content))
 const galleryItems = computed<GalleryItem[]>(() =>
   (props.slide.items ?? []).flatMap((i) => {
     if (typeof i === 'string') return [{ image: i }]
@@ -62,12 +53,9 @@ function patchConfig(p: Partial<DeckConfig>) {
   emit('config-patch', p)
 }
 
-// bullet list ops
-function storeRows(rows: TextRow[]): Array<string | TextItem> {
-  return rows.map((r) => (r.bullet ? r.text : { text: r.text, bullet: false }))
-}
+// text content ops — the editable list round-trips through the Markdown `content` field
 function setRows(rows: TextRow[]) {
-  patch({ items: storeRows(rows) })
+  patch({ content: rowsToContent(rows) })
 }
 // gallery ops
 function setGalleryLabel(i: number, label: string) {
@@ -160,8 +148,8 @@ watch(
       <div v-else-if="slide.role" class="role">{{ slide.role }}</div>
     </div>
 
-    <!-- bullets -->
-    <div v-else-if="slide.layout === 'bullets'" class="dek-pad l-bullets">
+    <!-- text -->
+    <div v-else-if="slide.layout === 'text'" class="dek-pad l-text">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
       <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
@@ -170,8 +158,8 @@ watch(
       </ul>
     </div>
 
-    <!-- bullets-image -->
-    <div v-else-if="slide.layout === 'bullets-image'" class="dek-pad l-bullets-image" :class="'side-' + (slide.side ?? 'right')">
+    <!-- text-image -->
+    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="'side-' + (slide.side ?? 'right')">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
       <div class="cols">

@@ -8,8 +8,8 @@
 // YAML and the round-trip stays lossless and predictable.
 
 import YAML from 'yaml'
-import type { Deck, DeckConfig, Slide, LayoutId } from './types'
-import { LAYOUT_IDS } from './types'
+import type { Deck, DeckConfig, Slide, LayoutId, TextItem } from './types'
+import { LAYOUT_IDS, LAYOUT_ALIASES } from './types'
 
 const SEP = /^---[ \t]*$/m
 
@@ -43,13 +43,37 @@ export function parseDeck(raw: string): Deck {
   const slides: Slide[] = slideBlocks.map((b, i) => {
     const obj = (YAML.parse(b) ?? {}) as Slide
     if (!obj.layout) obj.layout = 'freeform'
+    // Migrate old layout names (bullets → text, …) so older decks still load.
+    const alias = LAYOUT_ALIASES[obj.layout as string]
+    if (alias) obj.layout = alias
     if (!LAYOUT_IDS.includes(obj.layout as LayoutId)) {
       console.warn(`[dek] slide ${i + 1}: unknown layout "${obj.layout}"`)
+    }
+    // Migrate legacy `items` lists into a Markdown `content` block.
+    if (obj.content == null && Array.isArray(obj.items) && isTextItemList(obj.items)) {
+      obj.content = itemsToContent(obj.items as Array<string | TextItem>)
+      delete obj.items
     }
     return obj
   })
 
   return { config, slides }
+}
+
+/** True when an `items` array is a text list (not a gallery of {image}). */
+function isTextItemList(items: Slide['items']): boolean {
+  return !!items && items.every((it) => typeof it === 'string' || (!!it && typeof it === 'object' && 'text' in it))
+}
+
+/** Render a legacy text `items` array as a Markdown `content` block:
+ *  bullets get `- `, plain paragraphs ({ bullet: false }) are bare lines. */
+export function itemsToContent(items: Array<string | TextItem>): string {
+  return items
+    .map((it) => {
+      if (typeof it === 'string') return `- ${it}`
+      return it.bullet === false ? it.text : `- ${it.text}`
+    })
+    .join('\n')
 }
 
 const yamlOpts = { lineWidth: 0, indent: 2 } as const
@@ -79,7 +103,7 @@ export function defaultConfig(): DeckConfig {
   }
 }
 
-export function blankSlide(layout: LayoutId = 'bullets'): Slide {
+export function blankSlide(layout: LayoutId = 'text'): Slide {
   switch (layout) {
     case 'cover':
       return { layout, title: 'Title', subtitle: '' }
@@ -89,10 +113,10 @@ export function blankSlide(layout: LayoutId = 'bullets'): Slide {
       return { layout, text: 'A bold statement.' }
     case 'speaker':
       return { layout, name: 'Name', role: 'Role', portraits: [] }
-    case 'bullets':
-      return { layout, title: 'HEADING', items: ['First point'] }
-    case 'bullets-image':
-      return { layout, title: 'HEADING', side: 'left', image: '', items: ['First point'] }
+    case 'text':
+      return { layout, title: 'HEADING', content: '- First point' }
+    case 'text-image':
+      return { layout, title: 'HEADING', side: 'left', image: '', content: '- First point' }
     case 'image-full':
       return { layout, image: '', title: '', caption: '', focus: { x: 0, y: 0, scale: 1 } }
     case 'image-caption':
@@ -104,6 +128,6 @@ export function blankSlide(layout: LayoutId = 'bullets'): Slide {
     case 'diagram':
       return { layout, title: '', code: 'flowchart LR\n  A[Start] --> B[Step]\n  B --> C[End]' }
     case 'freeform':
-      return { layout, title: '', body: '<div></div>' }
+      return { layout, elements: [] }
   }
 }

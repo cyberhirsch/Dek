@@ -8,7 +8,7 @@ describe('analyzeDeck', () => {
       config: {},
       slides: [
         { layout: 'cover', title: '' },
-        { layout: 'bullets-image', title: 'A', items: ['one'], image: '' },
+        { layout: 'text-image', title: 'A', content: '- one', image: '' },
       ],
     }
 
@@ -23,10 +23,10 @@ describe('analyzeDeck', () => {
     expect(a.counts.warning).toBe(2)
   })
 
-  it('accepts mixed bullet and plain text rows', () => {
+  it('accepts a Markdown content block with bullets and a paragraph', () => {
     const deck: Deck = {
       config: {},
-      slides: [{ layout: 'bullets', title: 'A', items: ['bullet', { text: 'plain text', bullet: false }] }],
+      slides: [{ layout: 'text', title: 'A', content: '- bullet\nplain text' }],
     }
 
     const a = analyzeDeck(deck)
@@ -39,7 +39,7 @@ describe('analyzeDeck', () => {
       config: {},
       slides: [
         { layout: 'freeform', body: '<table></table>' },
-        { layout: 'bullets', title: 'A', items: Array.from({ length: 10 }, (_, i) => `item ${i}`) },
+        { layout: 'text', title: 'A', content: Array.from({ length: 10 }, (_, i) => `- item ${i}`).join('\n') },
       ],
     }
 

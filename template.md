@@ -71,33 +71,36 @@ portraits:
 ---
 
 # ============================================================================
-# 5. bullets — ALL-CAPS heading + bullet list. No image.
-#    String items are bullets. Use { text, bullet: false } for plain paragraphs.
+# 5. text — ALL-CAPS heading + a Markdown content block. No image.
+#    `content` is plain Markdown: a line starting with `- ` is a bullet, any
+#    other non-empty line is a paragraph. Inline: **bold**, *italic*,
+#    <u>underline</u>, `code`.
 # ============================================================================
-layout: bullets
+layout: text
 title: "ABLAUF HEUTE"
-items:
+content: |
   - Questionnaire
   - Anwesenheitsliste
-  - text: "Plain paragraph between bullet groups"
-    bullet: false
+
+  Plain paragraph between bullet groups
+
   - Semesterablauf
   - Rechnercheck
 
 ---
 
 # ============================================================================
-# 6. bullets-image — heading + bullets on one side, image on the other.
+# 6. text-image — heading + content on one side, image on the other.
 #    `side: left | right` controls which side the image sits on.
 # ============================================================================
-layout: bullets-image
+layout: text-image
 title: "BOKEH"
 side: left
 image: Assets/M7_p081_img1.jpeg
-items:
-  - "**Sensorgröße (Filmback)** — je größer, desto unschärfer"
-  - "**Brennweite (Focal length)** — je länger, desto unschärfer"
-  - "**Blende (Aperture)** — je offener, desto unschärfer"
+content: |
+  - **Sensorgröße (Filmback)** — je größer, desto unschärfer
+  - **Brennweite (Focal length)** — je länger, desto unschärfer
+  - **Blende (Aperture)** — je offener, desto unschärfer
 
 ---
 
@@ -170,14 +173,21 @@ code: |
 ---
 
 # ============================================================================
-# 10. freeform — escape hatch. Raw HTML/CSS body for tables, quizzes, and
-#     bespoke slides. Only here is hand-written markup expected. Keep rare.
+# 10. freeform — a free canvas of positioned, rotatable `elements`. This is
+#     where the visual editor's text boxes, shapes and arrows live, and an LLM
+#     can author them too. Any layout that is edited freely becomes `freeform`.
+#
+#     Each element: { type, x, y, w, h, rotation } in 1280×720 stage pixels
+#     (top-left origin). Types so far:
+#       text   — { content (inline Markdown), align, size, color, bold }
+#       rect   — { fill, stroke, strokeWidth, radius }
+#       arrow  — { stroke, strokeWidth }  (drawn left→right inside its box)
+#
+#     A `body:` of raw HTML is still supported as a legacy escape hatch.
 # ============================================================================
 layout: freeform
-title: "Bewertungskriterien"
-body: |
-  <table style="width:100%; border-collapse:collapse; font-size:1.1rem;">
-    <tr><td>1. Umsetzung und Präsentation</td><td style="text-align:right;">50 Punkte</td></tr>
-    <tr><td>2. Organisatorische Kompetenz</td><td style="text-align:right;">25 Punkte</td></tr>
-    <tr><td>3. Dokumentation</td><td style="text-align:right;">25 Punkte</td></tr>
-  </table>
+elements:
+  - { type: rect, x: 120, y: 160, w: 420, h: 220, rotation: 0, fill: "#7fc7ff22", stroke: "#7fc7ff", strokeWidth: 2, radius: 12 }
+  - { type: text, x: 150, y: 200, w: 360, h: 80, content: "**A free text box** you can move & rotate", size: 32 }
+  - { type: arrow, x: 560, y: 270, w: 260, h: 0, rotation: 0, stroke: "#ffb474", strokeWidth: 3 }
+  - { type: text, x: 840, y: 240, w: 300, h: 80, content: "<u>pointing here</u>", size: 28, color: "#ffb474" }

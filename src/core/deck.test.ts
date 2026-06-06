@@ -37,16 +37,16 @@ items:
     const raw = `---
 deck: X
 ---
-layout: bullets
+layout: text
 title: "Sensorgröße"
-items:
-  - "Seb Hirsch · Designer"
-  - "je größer — desto unschärfer"
+content: |
+  - Seb Hirsch · Designer
+  - je größer — desto unschärfer
 `
     const { a } = roundTrip(raw)
     expect(a.slides[0].title).toBe('Sensorgröße')
-    expect((a.slides[0].items as string[])[0]).toContain('·')
-    expect((a.slides[0].items as string[])[1]).toContain('—')
+    expect(a.slides[0].content).toContain('·')
+    expect(a.slides[0].content).toContain('—')
   })
 
   it('survives a freeform body containing a line that is just ---', () => {
@@ -98,7 +98,7 @@ items:
     ])
   })
 
-  it('preserves mixed text rows in bullet layouts', () => {
+  it('migrates legacy bullets + items into text + content', () => {
     const raw = `---
 deck: X
 ---
@@ -109,8 +109,27 @@ items:
   - text: "Plain paragraph"
     bullet: false
 `
-    const { a } = roundTrip(raw)
-    expect(a.slides[0].items).toEqual(['Bulleted point', { text: 'Plain paragraph', bullet: false }])
+    const a = parseDeck(raw)
+    expect(a.slides[0].layout).toBe('text')
+    expect(a.slides[0].items).toBeUndefined()
+    expect(a.slides[0].content).toBe('- Bulleted point\nPlain paragraph')
+  })
+
+  it('round-trips a Markdown content block (bullets + paragraph)', () => {
+    const raw = `---
+deck: X
+---
+layout: text
+title: Mixed
+content: |
+  Intro paragraph.
+  - **Bold** bullet
+  - plain *italic* bullet
+`
+    const { a, b } = roundTrip(raw)
+    // the YAML `|` block scalar preserves a trailing newline; parseContent ignores it
+    expect(a.slides[0].content).toBe('Intro paragraph.\n- **Bold** bullet\n- plain *italic* bullet\n')
+    expect(b).toEqual(a)
   })
 
   it('preserves group fields and ordering', () => {

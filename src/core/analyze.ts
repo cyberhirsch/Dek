@@ -1,4 +1,4 @@
-import type { Deck, GalleryItem, LayoutId, Slide, TextItem } from './types'
+import type { Deck, GalleryItem, LayoutId, Slide } from './types'
 import { LAYOUT_IDS } from './types'
 
 export type IssueKind = 'schema' | 'asset' | 'review'
@@ -42,6 +42,7 @@ type Field =
   | 'role'
   | 'caption'
   | 'notes'
+  | 'content'
   | 'items'
   | 'portraits'
   | 'image'
@@ -66,17 +67,17 @@ const RULES: Record<LayoutId, LayoutRule> = {
   section: { required: ['title'] },
   statement: { required: ['text'] },
   speaker: { required: ['name'], image: ['portraits'] },
-  bullets: { required: ['title', 'items'], list: 'text' },
-  'bullets-image': { required: ['title', 'items', 'image'], image: ['image'], list: 'text' },
+  text: { required: ['title', 'content'], list: 'text' },
+  'text-image': { required: ['title', 'content', 'image'], image: ['image'], list: 'text' },
   'image-full': { required: ['image'], image: ['image'] },
   'image-caption': { required: ['image'], image: ['image'] },
   'video-embed': { required: ['video'], image: ['poster'] },
   gallery: { required: ['items'], image: ['items'], list: 'gallery' },
   diagram: { required: ['code'] },
-  freeform: { required: ['body'] },
+  freeform: {},
 }
 
-const TEXT_LAYOUTS = new Set<LayoutId>(['cover', 'section', 'statement', 'bullets', 'bullets-image'])
+const TEXT_LAYOUTS = new Set<LayoutId>(['cover', 'section', 'statement', 'text', 'text-image'])
 
 function isBlank(v: unknown): boolean {
   if (v == null) return true
@@ -99,9 +100,6 @@ function issue(
 function isGalleryItem(v: unknown): v is GalleryItem {
   return !!v && typeof v === 'object' && typeof (v as GalleryItem).image === 'string'
 }
-function isTextItem(v: unknown): v is TextItem {
-  return !!v && typeof v === 'object' && typeof (v as TextItem).text === 'string'
-}
 
 function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   const n = index + 1
@@ -116,12 +114,11 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   }
 
   if (rule.list === 'text') {
-    if (!Array.isArray(slide.items)) {
-      issue(issues, n, 'warning', 'schema', 'Expected a text bullet list.', 'items')
-    } else if (!slide.items.every((it) => typeof it === 'string' || isTextItem(it))) {
-      issue(issues, n, 'warning', 'schema', 'Text list contains non-text items.', 'items')
-    } else if (slide.items.length > 9) {
-      issue(issues, n, 'info', 'review', 'Long bullet list may need splitting.', 'items')
+    const lines = typeof slide.content === 'string' ? slide.content.split('\n').filter((l) => l.trim()) : []
+    if (typeof slide.content !== 'string' || !lines.length) {
+      issue(issues, n, 'warning', 'schema', 'Expected a text content block.', 'content')
+    } else if (lines.length > 9) {
+      issue(issues, n, 'info', 'review', 'Long content block may need splitting.', 'content')
     }
   }
 
@@ -136,7 +133,11 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   }
 
   if (slide.layout === 'freeform') {
-    issue(issues, n, 'info', 'review', 'Freeform slide should be reviewed after import.', 'body')
+    if (!isBlank(slide.body)) {
+      issue(issues, n, 'info', 'review', 'Freeform HTML slide should be reviewed.', 'body')
+    } else if (!(slide.elements && slide.elements.length)) {
+      issue(issues, n, 'info', 'review', 'Empty freeform slide.', 'elements')
+    }
   }
 
   if (TEXT_LAYOUTS.has(slide.layout) && typeof slide.title === 'string' && slide.title.length > 90) {

@@ -175,7 +175,7 @@
 }
 
 /* ── Layout: bullets ───────────────────────────────────────────── */
-.l-bullets h1 {
+.l-text h1 {
   border-bottom: 1px solid rgba(230, 236, 242, 0.12);
   padding-bottom: 16px;
   margin-bottom: 36px;
@@ -231,26 +231,26 @@
   opacity: 0.35;
 }
 /* ── Layout: bullets-image ─────────────────────────────────────── */
-.l-bullets-image .cols {
+.l-text-image .cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 56px;
   flex: 1;
   align-items: center;
 }
-.l-bullets-image.side-right .text-col {
+.l-text-image.side-right .text-col {
   order: 1;
 }
-.l-bullets-image.side-right .img-col {
+.l-text-image.side-right .img-col {
   order: 2;
 }
-.l-bullets-image.side-left .img-col {
+.l-text-image.side-left .img-col {
   order: 1;
 }
-.l-bullets-image.side-left .text-col {
+.l-text-image.side-left .text-col {
   order: 2;
 }
-.l-bullets-image h1 {
+.l-text-image h1 {
   margin-bottom: 24px;
 }
 .frame-img {

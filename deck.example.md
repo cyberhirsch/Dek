@@ -26,31 +26,42 @@ text: >
   One Markdown file is the source of truth. Edit it three interchangeable ways —
   and it always round-trips cleanly.
 ---
-layout: bullets
+layout: text
 title: TRY IT
-items:
-  - "Press **Ctrl+E** (or the ✎ button) to open the editor"
+content: |
+  - Press **Ctrl+E** (or the ✎ button) to open the editor
   - Click any text on the slide to edit it in place
   - Reorder and group slides in the sidebar, Keynote-style
   - Drop an image onto a frame to upload it
+  - Use the canvas toolbar to add text boxes, shapes and arrows
 ---
-layout: bullets-image
+layout: text-image
 title: LAYOUTS
 side: right
 image: ""
-items:
-  - "cover · section · statement · speaker"
-  - "bullets · bullets-image"
-  - "image-full · image-caption · video-embed"
-  - "gallery · diagram · freeform"
+content: |
+  - cover · section · statement · speaker
+  - text · text-image
+  - image-full · image-caption · video-embed
+  - gallery · diagram · freeform
 ---
-layout: bullets
+layout: text
+title: TEXT, YOUR WAY
+content: |
+  Lines that start with a dash are bullets:
+
+  - **bold**, *italic*, <u>underline</u> and `code` all work inline
+  - hand the .md to an LLM and it can write these too
+
+  A line without a dash is just a paragraph.
+---
+layout: text
 title: SAVE TO LOCAL FILES
-items:
-  - "**Open folder…** loads a deck *and its images* (deck.md + an Assets folder)"
-  - "**Save As…** writes the deck + an Assets folder of images to a folder you pick"
-  - "**Open file…** opens a single .md; edits autosave straight back to it"
-  - "All via the File System Access API — Chrome/Edge out of the box; **Brave:** enable it in `brave://flags`"
+content: |
+  - **Open folder…** loads a deck *and its images* (deck.md + an Assets folder)
+  - **Save As…** writes the deck + an Assets folder of images to a folder you pick
+  - **Open file…** opens a single .md; edits autosave straight back to it
+  - All via the File System Access API — Chrome/Edge out of the box; **Brave:** enable it in `brave://flags`
 ---
 layout: video-embed
 video: https://www.youtube.com/watch?v=qyZy-6VuSy4
