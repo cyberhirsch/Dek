@@ -24,7 +24,8 @@ import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
-import type { CanvasTool, ElementPatch } from './core/types'
+import type { CanvasTool, ElementPatch, BoxElement } from './core/types'
+import { parseContent, rowsToContent } from './render/inline'
 
 const deck = ref<Deck | null>(null)
 const current = ref(0)
@@ -227,7 +228,7 @@ function onKey(e: KeyboardEvent) {
     editMode.value ? (editMode.value = false) : enterEdit()
   } else if (mod && e.shiftKey && e.code === 'Digit8') {
     e.preventDefault()
-    toggleSelectedBullets()
+    onFormat('bullet')
   } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
     if (ae?.isContentEditable) return // let the field's native undo win
     e.preventDefault()
@@ -402,6 +403,46 @@ function toggleSelectedBullets() {
   bulletFormatCommand.value += 1
 }
 
+// ── text formatting (works on whatever text is being edited) ──
+// Every editable surface here is contenteditable — the semantic title/list AND
+// canvas text boxes — so one DOM-level helper formats the active selection with
+// Markdown markers, no per-component wiring and no forced freeform conversion.
+const INLINE_MARKS: Record<string, [string, string]> = {
+  bold: ['**', '**'],
+  italic: ['*', '*'],
+  underline: ['<u>', '</u>'],
+  strike: ['~~', '~~'],
+}
+function onFormat(kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet') {
+  const ae = document.activeElement as HTMLElement | null
+  const editing = !!ae && ae.isContentEditable
+  if (kind === 'bullet') {
+    if (editing) toggleSelectedBullets()
+    else if (selectedElement.value?.type === 'box') toggleBoxBullets()
+    return
+  }
+  if (editing) {
+    const [open, close] = INLINE_MARKS[kind]
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) return
+    const text = sel.toString()
+    // insertText replaces the selection, fires `input`, and is natively undoable.
+    document.execCommand('insertText', false, open + text + close)
+  } else if (selectedElement.value?.type === 'box') {
+    const b = selectedElement.value as BoxElement
+    onUpdateElement({ [kind]: !b[kind] } as ElementPatch)
+  }
+}
+/** Toggle `- ` bullets across all lines of the selected box's content. */
+function toggleBoxBullets() {
+  const b = selectedElement.value
+  if (selectedEl.value == null || b?.type !== 'box') return
+  const rows = parseContent((b as BoxElement).content)
+  if (!rows.length) return
+  const allBullets = rows.every((r) => r.bullet)
+  onUpdateElement({ content: rowsToContent(rows.map((r) => ({ ...r, bullet: !allBullets }))) })
+}
+
 // ── selection ──
 function onSelect(e: { index: number; shift: boolean; meta: boolean }) {
   current.value = e.index
@@ -571,7 +612,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :selected-element="selectedElement"
       @change-layout="changeLayout"
       @patch="patchSlide"
-      @toggle-bullets="toggleSelectedBullets"
+      @format="onFormat"
       @update:tool="activeTool = $event"
       @insert="onInsert"
       @update-element="onUpdateElement"

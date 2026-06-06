@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from '../core/types'
-import { inlineMd } from '../render/inline'
+import { inlineMd, parseContent } from '../render/inline'
 import { newElement } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
@@ -299,7 +299,15 @@ defineExpose({ commitEdit })
           @blur="commitEdit"
           @keydown.escape.prevent="commitEdit"
         >{{ asBox(el).content }}</div>
-        <div v-else class="el-text-body" :style="textStyle(asBox(el))" v-html="inlineMd(asBox(el).content)" />
+        <div v-else class="el-text-body" :style="textStyle(asBox(el))">
+          <div
+            v-for="(row, ri) in parseContent(asBox(el).content)"
+            :key="ri"
+            class="el-line"
+            :class="{ bullet: row.bullet }"
+            v-html="inlineMd(row.text)"
+          />
+        </div>
       </template>
 
       <!-- arrow -->
@@ -387,10 +395,28 @@ defineExpose({ commitEdit })
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: 0.4em;
   line-height: 1.25;
   white-space: pre-wrap;
   word-break: break-word;
   overflow: hidden;
+}
+.el-text-body.editing {
+  display: block;
+  white-space: pre-wrap;
+}
+.el-line {
+  position: relative;
+}
+.el-line.bullet {
+  padding-left: 1.4em;
+}
+.el-line.bullet::before {
+  content: '▪';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--dek-accent);
 }
 .el-text-body.editing {
   outline: none;

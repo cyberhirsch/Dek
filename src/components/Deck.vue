@@ -67,16 +67,41 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
+// Present-mode: wheel scroll flips through slides. Accumulate delta so trackpad
+// inertia / fast wheels don't skip many slides at once.
+let wheelAccum = 0
+let wheelLock = false
+function onWheel(e: WheelEvent) {
+  if (props.editable || props.navEnabled === false) return
+  e.preventDefault()
+  if (wheelLock) return
+  wheelAccum += e.deltaY
+  const THRESH = 40
+  if (wheelAccum > THRESH) {
+    go(props.modelValue + 1)
+    wheelAccum = 0
+    wheelLock = true
+    setTimeout(() => (wheelLock = false), 250)
+  } else if (wheelAccum < -THRESH) {
+    go(props.modelValue - 1)
+    wheelAccum = 0
+    wheelLock = true
+    setTimeout(() => (wheelLock = false), 250)
+  }
+}
+
 let ro: ResizeObserver
 onMounted(() => {
   fit()
   ro = new ResizeObserver(fit)
   if (stage.value) ro.observe(stage.value)
   window.addEventListener('keydown', onKey)
+  stage.value?.addEventListener('wheel', onWheel, { passive: false })
 })
 onUnmounted(() => {
   ro?.disconnect()
   window.removeEventListener('keydown', onKey)
+  stage.value?.removeEventListener('wheel', onWheel)
 })
 </script>
 

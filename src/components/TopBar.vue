@@ -19,7 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'change-layout': [id: LayoutId]
   patch: [p: Partial<Slide>]
-  'toggle-bullets': []
+  format: [kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet']
   add: [id: LayoutId]
   duplicate: []
   remove: []
@@ -48,7 +48,6 @@ function onAdd(ev: Event) {
 }
 
 const slide = computed(() => props.deck.slides[props.index])
-const canToggleBullets = computed(() => slide.value?.layout === 'text' || slide.value?.layout === 'text-image')
 
 const LAYOUT_LABELS: Record<LayoutId, string> = {
   cover: 'Cover',
@@ -86,9 +85,6 @@ const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selec
 const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
 function upd(p: ElementPatch) {
   emit('update-element', p)
-}
-function toggle(k: 'bold' | 'italic' | 'underline' | 'strike') {
-  upd({ [k]: !box.value?.[k] } as ElementPatch)
 }
 /** A hex to show in a color picker even when the stored value is transparent/unset. */
 function colorOr(v: string | undefined, fallback: string) {
@@ -168,15 +164,32 @@ function colorOr(v: string | undefined, fallback: string) {
           </label>
         </div>
         <div class="seg style-seg">
-          <button class="icon-btn fmt" :class="{ on: box.bold }" title="Bold" @click="toggle('bold')"><b>B</b></button>
-          <button class="icon-btn fmt" :class="{ on: box.italic }" title="Italic" @click="toggle('italic')"><i>I</i></button>
-          <button class="icon-btn fmt" :class="{ on: box.underline }" title="Underline" @click="toggle('underline')"><u>U</u></button>
-          <button class="icon-btn fmt" :class="{ on: box.strike }" title="Strikethrough" @click="toggle('strike')"><s>S</s></button>
+          <button class="icon-btn fmt" title="Bullet list (Ctrl+Shift+8)" @mousedown.prevent="emit('format', 'bullet')">
+            <span class="bullet-list-icon" aria-hidden="true"><i /><i /><i /></span>
+          </button>
+          <button class="icon-btn fmt" :class="{ on: box.bold }" title="Bold" @mousedown.prevent="emit('format', 'bold')"><b>B</b></button>
+          <button class="icon-btn fmt" :class="{ on: box.italic }" title="Italic" @mousedown.prevent="emit('format', 'italic')"><i>I</i></button>
+          <button class="icon-btn fmt" :class="{ on: box.underline }" title="Underline" @mousedown.prevent="emit('format', 'underline')"><u>U</u></button>
+          <button class="icon-btn fmt" :class="{ on: box.strike }" title="Strikethrough" @mousedown.prevent="emit('format', 'strike')"><s>S</s></button>
         </div>
         <div class="seg style-seg">
           <button class="icon-btn" :class="{ on: (box.align ?? 'left') === 'left' }" title="Align left" @click="upd({ align: 'left' })">⯇</button>
           <button class="icon-btn" :class="{ on: box.align === 'center' }" title="Align center" @click="upd({ align: 'center' })">≡</button>
           <button class="icon-btn" :class="{ on: box.align === 'right' }" title="Align right" @click="upd({ align: 'right' })">⯈</button>
+        </div>
+      </template>
+
+      <!-- editing semantic text (no canvas element selected): inline formatting -->
+      <template v-else-if="slide?.layout === 'text' || slide?.layout === 'text-image'">
+        <span class="div" />
+        <div class="seg style-seg">
+          <button class="icon-btn fmt" title="Bullet list (Ctrl+Shift+8)" @mousedown.prevent="emit('format', 'bullet')">
+            <span class="bullet-list-icon" aria-hidden="true"><i /><i /><i /></span>
+          </button>
+          <button class="icon-btn fmt" title="Bold" @mousedown.prevent="emit('format', 'bold')"><b>B</b></button>
+          <button class="icon-btn fmt" title="Italic" @mousedown.prevent="emit('format', 'italic')"><i>I</i></button>
+          <button class="icon-btn fmt" title="Underline" @mousedown.prevent="emit('format', 'underline')"><u>U</u></button>
+          <button class="icon-btn fmt" title="Strikethrough" @mousedown.prevent="emit('format', 'strike')"><s>S</s></button>
         </div>
       </template>
 
@@ -223,21 +236,6 @@ function colorOr(v: string | undefined, fallback: string) {
     </div>
 
     <div class="right">
-      <div class="seg tools">
-        <button
-          class="icon-btn bullet-list"
-          :class="{ on: canToggleBullets }"
-          :disabled="!canToggleBullets"
-          title="Bulleted list (Ctrl+Shift+8)"
-          aria-label="Bulleted list"
-          @mousedown.prevent="emit('toggle-bullets')"
-        >
-          <span class="bullet-list-icon" aria-hidden="true">
-            <i /><i /><i />
-          </span>
-        </button>
-      </div>
-      <span class="div" />
       <div class="seg">
         <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
         <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>

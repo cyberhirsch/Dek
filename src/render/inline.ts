@@ -12,6 +12,7 @@ export function inlineMd(src: string | undefined): string {
     .replace(/&lt;u&gt;/g, '<u>')
     .replace(/&lt;\/u&gt;/g, '</u>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/~~([^~]+)~~/g, '<s>$1</s>')
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
 }
