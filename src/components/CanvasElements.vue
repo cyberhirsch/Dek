@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { SlideElement, BoxElement, ArrowElement, ImageElement, CanvasTool } from '../core/types'
+import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from '../core/types'
 import { inlineMd } from '../render/inline'
 import { newElement } from '../core/bake'
+import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
+import MermaidDiagram from './MermaidDiagram.vue'
 
 const STAGE_W = 1280
 
@@ -240,10 +242,29 @@ function commitEdit() {
   }
 }
 
+// ── video element playback ──
+const playing = ref<Set<number>>(new Set())
+function videoPoster(el: VideoElement) {
+  return el.poster || parseVideo(el.video)?.thumb || ''
+}
+function playVideo(i: number, el: VideoElement) {
+  if (!parseVideo(el.video)) return
+  playing.value = new Set(playing.value).add(i)
+}
+function videoSrc(el: VideoElement) {
+  const pv = parseVideo(el.video)
+  return pv ? autoplaySrc(pv) : ''
+}
+function isFileVideo(el: VideoElement) {
+  return parseVideo(el.video)?.provider === 'file'
+}
+
 // type-narrowing helpers for the template
 const asBox = (el: SlideElement) => el as BoxElement
 const asArrow = (el: SlideElement) => el as ArrowElement
 const asImage = (el: SlideElement) => el as ImageElement
+const asVideo = (el: SlideElement) => el as VideoElement
+const asDiagram = (el: SlideElement) => el as DiagramElement
 
 defineExpose({ commitEdit })
 </script>
@@ -310,6 +331,23 @@ defineExpose({ commitEdit })
       <!-- image -->
       <FramedImage v-else-if="el.type === 'image'" :src="asImage(el).src" :focus="asImage(el).focus" :fit="asImage(el).fit ?? 'cover'" />
 
+      <!-- video -->
+      <div v-else-if="el.type === 'video'" class="el-video">
+        <template v-if="playing.has(i)">
+          <iframe v-if="!isFileVideo(asVideo(el))" :src="videoSrc(asVideo(el))" allow="autoplay; encrypted-media; fullscreen" allowfullscreen />
+          <video v-else :src="asVideo(el).video" controls autoplay />
+        </template>
+        <template v-else>
+          <FramedImage :src="videoPoster(asVideo(el))" fit="contain" />
+          <button class="vid-play" title="Play" @click.stop="playVideo(i, asVideo(el))" @pointerdown.stop><span class="tri" /></button>
+        </template>
+      </div>
+
+      <!-- diagram -->
+      <div v-else-if="el.type === 'diagram'" class="el-diagram">
+        <MermaidDiagram :code="asDiagram(el).code" />
+      </div>
+
       <!-- selection chrome -->
       <template v-if="editable && selected === i && editing == null">
         <span class="rot-line" />
@@ -362,6 +400,53 @@ defineExpose({ commitEdit })
 .el-arrow {
   display: block;
   overflow: visible;
+}
+.el-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+}
+.el-video iframe,
+.el-video video {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+/* play button stays clickable even when the layer is non-interactive (present mode) */
+.el-video .vid-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.el-video .vid-play:hover { background: rgba(0, 0, 0, 0.75); }
+.el-video .tri {
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 13px 0 13px 22px;
+  border-color: transparent transparent transparent #fff;
+  margin-left: 4px;
+}
+.el-diagram {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 /* selection */
 .el.selected::after {

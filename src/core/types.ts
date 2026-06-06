@@ -59,7 +59,7 @@ export interface TextItem {
 // space (top-left origin) so they scale with the slide. The moment a slide is
 // edited freely (an element added or moved), its `layout` flips to `freeform`.
 
-export type ElementType = 'box' | 'arrow' | 'image'
+export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram'
 
 /** The active canvas tool. 'text' and 'rect' both create a `box`. */
 export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow'
@@ -117,10 +117,29 @@ export interface ImageElement extends ElementBase {
   fit?: 'cover' | 'contain'
 }
 
-export type SlideElement = BoxElement | ArrowElement | ImageElement
+export interface VideoElement extends ElementBase {
+  type: 'video'
+  /** Video URL (YouTube / Vimeo / direct file). */
+  video: string
+  poster?: string
+}
+
+export interface DiagramElement extends ElementBase {
+  type: 'diagram'
+  /** Mermaid source. */
+  code: string
+}
+
+export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement
 
 /** A partial patch of an element's style fields (everything except `type`). */
-export type ElementPatch = Partial<Omit<BoxElement, 'type'> & Omit<ArrowElement, 'type'> & Omit<ImageElement, 'type'>>
+export type ElementPatch = Partial<
+  Omit<BoxElement, 'type'> &
+    Omit<ArrowElement, 'type'> &
+    Omit<ImageElement, 'type'> &
+    Omit<VideoElement, 'type'> &
+    Omit<DiagramElement, 'type'>
+>
 
 /**
  * A single slide. `layout` selects the renderer; the remaining fields are the

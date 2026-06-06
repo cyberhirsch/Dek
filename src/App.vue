@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
 import { blankSlide } from './core/deck'
-import { bakeToElements, canBake } from './core/bake'
+import { bakeToElements } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
@@ -350,13 +350,13 @@ function bakeCurrentToFreeform(extra?: SlideElement) {
 function onCreateElement(el: SlideElement) {
   if (!deck.value) return
   const s = deck.value.slides[current.value]
-  if (s.layout === 'freeform' || !canBake(s.layout)) {
-    // Already a canvas, OR a layout we can't bake losslessly (video / diagram):
-    // overlay the element on the slide as-is so nothing is lost.
+  if (s.layout === 'freeform') {
     const els = [...(s.elements ?? []), el]
     patchSlide({ elements: els })
     selectedEl.value = els.length - 1
   } else {
+    // Any semantic layout converts to a freeform canvas, baking its content
+    // (text, images, video, diagram) into movable elements first.
     bakeCurrentToFreeform(el)
   }
   activeTool.value = 'select'
@@ -431,7 +431,10 @@ function addSlide(id: LayoutId) {
 function duplicateSlide() {
   if (!deck.value) return
   snap('duplicate')
-  deck.value.slides.splice(current.value + 1, 0, structuredClone(deck.value.slides[current.value]))
+  // JSON-clone (not structuredClone): the slide is a Vue reactive proxy, which
+  // structuredClone rejects with DataCloneError.
+  const copy = JSON.parse(JSON.stringify(deck.value.slides[current.value])) as Slide
+  deck.value.slides.splice(current.value + 1, 0, copy)
   current.value += 1
   selected.value = [current.value]
   void saveWholeDeck()

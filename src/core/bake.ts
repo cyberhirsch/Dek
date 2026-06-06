@@ -6,7 +6,7 @@
 // slide keeps looking the same — it's just editable as a canvas now. Fonts are
 // carried over via the 'heading' / 'body' tokens so conversion preserves the look.
 
-import type { Slide, SlideElement, BoxElement, ImageElement, CanvasTool } from './types'
+import type { Slide, SlideElement, BoxElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from './types'
 
 const STAGE_W = 1280
 const STAGE_H = 720
@@ -23,10 +23,11 @@ function image(src: string, x: number, y: number, w: number, h: number, extra: P
   return { type: 'image', x, y, w, h, rotation: 0, src, fit: 'cover', ...extra }
 }
 
-/** True for layouts we can fully bake without losing content in this version.
- *  (video-embed and diagram need element types that don't exist yet.) */
-export function canBake(layout: string): boolean {
-  return layout !== 'video-embed' && layout !== 'diagram'
+function video(v: string, x: number, y: number, w: number, h: number, poster?: string): VideoElement {
+  return { type: 'video', x, y, w, h, rotation: 0, video: v, ...(poster ? { poster } : {}) }
+}
+function diagram(code: string, x: number, y: number, w: number, h: number): DiagramElement {
+  return { type: 'diagram', x, y, w, h, rotation: 0, code }
 }
 
 /** Build the element list that reproduces a slide's current content. */
@@ -107,10 +108,17 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       })
       break
     }
+    case 'video-embed':
+      els.push(video(slide.video ?? '', PAD_X, PAD_Y, INNER_W, INNER_H - 60, slide.poster || undefined))
+      if (slide.caption) els.push(text(slide.caption, PAD_X, STAGE_H - 120, INNER_W, 40, { size: 22, align: 'center', font: B }))
+      break
+    case 'diagram':
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 80, { size: 44, bold: true, font: H }))
+      els.push(diagram(slide.code ?? '', PAD_X, title ? PAD_Y + 100 : PAD_Y, INNER_W, title ? INNER_H - 100 : INNER_H))
+      break
     default:
-      // video-embed / diagram / anything else: salvage what we can.
+      // anything else: salvage what we can.
       if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, bold: true, font: H }))
-      if (slide.poster) els.push(image(slide.poster, PAD_X, PAD_Y + 110, INNER_W, INNER_H - 160, { fit: 'contain' }))
       if (slide.caption) els.push(text(slide.caption, PAD_X, STAGE_H - 120, INNER_W, 40, { size: 22, align: 'center', font: B }))
       break
   }
