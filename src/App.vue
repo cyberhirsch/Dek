@@ -484,7 +484,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @open="onOpenDeck"
       />
     </div>
-    <button v-if="deck && !editMode" class="edit-fab present-chrome" :class="{ 'ui-hidden': uiHidden }" title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     <div v-if="deck && !editMode" class="hud present-chrome" :class="{ 'ui-hidden': uiHidden }">
       <button @click="current = Math.max(0, current - 1)" title="Previous">←</button>
       <span>{{ current + 1 }} / {{ deck.slides.length }}</span>
@@ -494,6 +493,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Presenter view (P)" @click="presenterOpen = true">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
       <button title="Export (PDF / HTML)" @click="exportOpen = true">⤓</button>
+      <span class="hud-sep" />
+      <button title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     </div>
 
     <!-- overlays -->
@@ -587,23 +588,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
 .app-root.cursor-hidden {
   cursor: none;
 }
-.edit-fab {
-  position: fixed;
-  bottom: 18px;
-  right: 18px;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(37, 99, 235, 0.9);
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  z-index: 70;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s;
-}
-.edit-fab:hover { transform: scale(1.08); }
 .hud {
   position: fixed;
   bottom: 16px;
