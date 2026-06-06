@@ -25,6 +25,7 @@ const emit = defineEmits<{
   'toggle-autosave': []
   save: []
   close: []
+  export: []
   'open-file': []
   'open-folder': []
   'save-as': []
@@ -119,6 +120,7 @@ const statusText = computed(() =>
       <button class="save" :class="saveStatus" @click="emit('save')">
         <span class="dot" :class="saveStatus" />{{ statusText }}
       </button>
+      <button class="topbtn" title="Export (PDF / HTML)" @click="emit('export')">⤓ Export</button>
       <button class="present" title="Present (Ctrl+E)" @click="emit('close')">▶ Present</button>
     </div>
   </div>
@@ -207,6 +209,17 @@ const statusText = computed(() =>
 .dot.saved { background: #4ade80; }
 .dot.unsaved { background: #fff; }
 .dot.saving { background: #facc15; }
+.topbtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6ecf2;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.topbtn:hover { background: rgba(255, 255, 255, 0.12); }
 .present {
   background: rgba(127, 199, 255, 0.16);
   border: 1px solid rgba(127, 199, 255, 0.5);

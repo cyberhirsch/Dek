@@ -427,6 +427,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
       @close="editMode = false"
+      @export="exportOpen = true"
       @open-file="onOpenFile"
       @open-folder="onOpenFolder"
       @save-as="onSaveAs"
@@ -492,8 +493,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Overview (O)" @click="overviewOpen = true">▦</button>
       <button title="Presenter view (P)" @click="presenterOpen = true">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
-      <button title="Export (PDF / HTML)" @click="exportOpen = true">⤓</button>
-      <span class="hud-sep" />
       <button title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     </div>
 
