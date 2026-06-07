@@ -88,6 +88,12 @@ export interface BoxElement extends ElementBase {
   strokeWidth?: number
   /** Corner radius in px. */
   radius?: number
+  // image (optional): a box may carry a picture, shown behind any text and
+  // clipped to the box (so an "image" is just a box with a src). Add/replace via
+  // the toolbar; coexists with fill/stroke/radius/content.
+  src?: string
+  fit?: 'cover' | 'contain'
+  focus?: Focus
   // text (optional). Inline Markdown: **bold**, *italic*, <u>underline</u>, `code`.
   content?: string
   /** Font family, or the tokens 'heading' / 'body' (resolve to the theme fonts). */
@@ -173,6 +179,8 @@ export interface Slide {
   video?: string
   poster?: string
   side?: 'left' | 'right'
+  /** text-image: aspect ratio of the image frame. */
+  imageRatio?: '16:9' | '1:1' | '9:16'
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus

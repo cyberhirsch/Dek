@@ -62,10 +62,15 @@ export function parseDeck(raw: string): Deck {
   return { config, slides }
 }
 
-/** Old element types `text` and `rect` are now the unified `box`. */
+/** Old element types fold into the unified `box`: `text`/`rect` were already
+ *  boxes; `image` becomes a box carrying a `src` (transparent fill/stroke) so a
+ *  box is the single model for shapes, text, and pictures. */
 function normalizeElement(el: SlideElement): SlideElement {
   const t = (el as { type?: string }).type
   if (t === 'text' || t === 'rect') return { ...el, type: 'box' } as SlideElement
+  if (t === 'image') {
+    return { fill: 'transparent', stroke: 'transparent', ...el, type: 'box' } as SlideElement
+  }
   return el
 }
 

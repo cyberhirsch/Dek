@@ -167,7 +167,7 @@ watch(
     </div>
 
     <!-- text-image -->
-    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="'side-' + (slide.side ?? 'right')">
+    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x')]">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
       <div class="cols">

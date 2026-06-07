@@ -288,8 +288,15 @@ defineExpose({ commitEdit })
       @pointerdown="onElementDown($event, i)"
       @dblclick="onElementDblClick(i)"
     >
-      <!-- box: shape (via the element's own bg/border) + optional text -->
+      <!-- box: shape (bg/border) + optional image + optional text -->
       <template v-if="el.type === 'box'">
+        <FramedImage
+          v-if="asBox(el).src"
+          class="el-box-img"
+          :src="asBox(el).src"
+          :focus="asBox(el).focus"
+          :fit="asBox(el).fit ?? 'cover'"
+        />
         <div
           v-if="editing === i"
           class="el-text-body editing"
@@ -393,7 +400,16 @@ defineExpose({ commitEdit })
 .canvas-layer.editable .el {
   cursor: move;
 }
+.el-box-img {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 0;
+}
 .el-text-body {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   box-sizing: border-box;

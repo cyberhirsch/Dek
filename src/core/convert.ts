@@ -14,7 +14,7 @@
 // → semantic best-effort un-bakes (first text box→heading, rest→prose, images→
 // image/gallery, etc.), parking leftover canvas objects under `stash.elements`.
 
-import type { Slide, LayoutId, SlideElement, BoxElement, ImageElement, VideoElement, DiagramElement, GalleryItem } from './types'
+import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, GalleryItem } from './types'
 import { bakeToElements } from './bake'
 
 type Slot = 'heading' | 'lede' | 'prose' | 'caption' | 'image' | 'gallery' | 'video' | 'diagram' | 'portraits'
@@ -61,7 +61,9 @@ const MOD_SUPPORT: Record<string, LayoutId[]> = {
 const MOD_FIELDS = Object.keys(MOD_SUPPORT)
 
 const isBox = (e: SlideElement): e is BoxElement => e.type === 'box'
-const isImg = (e: SlideElement): e is ImageElement => e.type === 'image'
+// An image is a box carrying a src; a text box is a box with content and no src.
+const isImgBox = (e: SlideElement): e is BoxElement => isBox(e) && nonEmpty(e.src)
+const isTextBox = (e: SlideElement): e is BoxElement => isBox(e) && nonEmpty(e.content) && !nonEmpty(e.src)
 
 function nonEmpty(v: unknown): boolean {
   if (v == null) return false
@@ -76,16 +78,16 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
   const fields: Record<string, unknown> = {}
   const leftover: SlideElement[] = []
 
-  const texts = elements.filter((e) => isBox(e) && nonEmpty(e.content)) as BoxElement[]
+  const texts = elements.filter(isTextBox)
   if (texts[0]) fields.title = texts[0].content
   if (texts.length > 1) fields.content = texts.slice(1).map((b) => b.content).join('\n\n')
 
-  const imgs = elements.filter(isImg)
+  const imgs = elements.filter(isImgBox)
   if (imgs.length === 1) {
     fields.image = imgs[0].src
     if (imgs[0].focus) fields.focus = imgs[0].focus
   } else if (imgs.length > 1) {
-    fields.items = imgs.map((im): GalleryItem => ({ image: im.src }))
+    fields.items = imgs.map((im): GalleryItem => ({ image: im.src! }))
   }
 
   const vid = elements.find((e): e is VideoElement => e.type === 'video')
@@ -98,8 +100,8 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
 
   // Everything not consumed above (arrows, contentless shape boxes) is leftover.
   for (const e of elements) {
-    if (isBox(e) && nonEmpty(e.content)) continue
-    if (isImg(e)) continue
+    if (isTextBox(e)) continue
+    if (isImgBox(e)) continue
     if (e.type === 'video' && e === vid) continue
     if (e.type === 'diagram' && e === dia) continue
     leftover.push(e)

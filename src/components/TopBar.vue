@@ -41,7 +41,28 @@ const emit = defineEmits<{
   insert: [what: 'video' | 'diagram' | 'table']
   'update-element': [p: ElementPatch]
   'toggle-source': []
+  /** Set the selected box's image (file picked in the bar). */
+  'set-image': [f: File]
+  /** Insert a new image as a box on the canvas. */
+  'insert-image': [f: File]
 }>()
+
+// One hidden file input drives both "add image to box" and "insert image".
+const imgInput = ref<HTMLInputElement | null>(null)
+let imgMode: 'set' | 'insert' = 'set'
+function pickImage(mode: 'set' | 'insert') {
+  imgMode = mode
+  imgInput.value?.click()
+}
+function onImgPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  if (f && f.type.startsWith('image/')) {
+    if (imgMode === 'set') emit('set-image', f)
+    else emit('insert-image', f)
+  }
+  input.value = ''
+}
 
 function onAdd(ev: Event) {
   const el = ev.target as HTMLSelectElement
@@ -130,6 +151,10 @@ function colorOr(v: string | undefined, fallback: string) {
         <button class="icon-btn" :class="{ on: tool === 'arrow' }" title="Arrow" @click="pickTool('arrow')">
           <svg viewBox="0 0 24 24" width="15" height="15"><line x1="3" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" /><path d="M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
         </button>
+        <button class="icon-btn" title="Insert image" @click="pickImage('insert')">
+          <svg viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="8.5" cy="10" r="1.5" fill="currentColor" /><path d="M5 17l5-5 4 4 2-2 3 3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+        </button>
+        <input ref="imgInput" type="file" accept="image/*" style="display: none" @change="onImgPick" />
         <div class="grp">
           <button class="ins" title="Insert…" @click="insertOpen = !insertOpen">＋ Insert ▾</button>
           <div v-if="insertOpen" class="menu" @pointerleave="insertOpen = false">
@@ -154,6 +179,10 @@ function colorOr(v: string | undefined, fallback: string) {
           <button class="mini" title="No stroke" @click="upd({ stroke: 'transparent' })">∅</button>
           <input class="num" type="number" min="0" max="40" title="Stroke width" :value="box.strokeWidth ?? 0" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
           <input class="num" type="number" min="0" max="200" title="Corner radius" :value="box.radius ?? 0" @input="upd({ radius: +($event.target as HTMLInputElement).value })" />
+          <button class="mini img" :title="box.src ? 'Replace image' : 'Add image'" @click="pickImage('set')">
+            <svg viewBox="0 0 24 24" width="13" height="13"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="8.5" cy="10" r="1.5" fill="currentColor" /><path d="M5 17l5-5 4 4 2-2 3 3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+          </button>
+          <button v-if="box.src" class="mini" title="Remove image" @click="upd({ src: '' })">∅</button>
         </div>
         <span class="div" />
         <div class="seg style-seg">
@@ -161,6 +190,7 @@ function colorOr(v: string | undefined, fallback: string) {
             <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
           </select>
           <input class="num" type="number" min="8" max="400" title="Font size" :value="box.size ?? 28" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
+          <input class="num" type="number" min="100" max="900" step="100" title="Font weight" :value="box.weight ?? (box.bold ? 700 : 400)" @input="upd({ weight: +($event.target as HTMLInputElement).value })" />
           <label class="swatch" title="Text color">
             <input type="color" :value="colorOr(box.color, '#e6ecf2')" @input="upd({ color: ($event.target as HTMLInputElement).value })" />
           </label>
@@ -213,6 +243,11 @@ function colorOr(v: string | undefined, fallback: string) {
         <div class="seg">
           <button :class="{ on: (slide.side ?? 'right') === 'left' }" @click="emit('patch', { side: 'left' })">left</button>
           <button :class="{ on: (slide.side ?? 'right') === 'right' }" @click="emit('patch', { side: 'right' })">right</button>
+        </div>
+        <div class="seg">
+          <button v-for="r in (['16:9', '1:1', '9:16'] as const)" :key="r"
+            :class="{ on: (slide.imageRatio ?? '16:9') === r }"
+            @click="emit('patch', { imageRatio: r })">{{ r }}</button>
         </div>
       </template>
 

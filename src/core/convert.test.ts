@@ -69,12 +69,12 @@ describe('convertLayout — best-effort un-bake', () => {
     expect(text.stash?.elements?.[0].type).toBe('arrow')
   })
 
-  it('multiple freeform images un-bake into a gallery', () => {
+  it('multiple freeform image boxes un-bake into a gallery', () => {
     const ff: Slide = {
       layout: 'freeform',
       elements: [
-        { type: 'image', x: 0, y: 0, w: 100, h: 100, src: 'a.png' },
-        { type: 'image', x: 110, y: 0, w: 100, h: 100, src: 'b.png' },
+        { type: 'box', x: 0, y: 0, w: 100, h: 100, src: 'a.png' },
+        { type: 'box', x: 110, y: 0, w: 100, h: 100, src: 'b.png' },
       ],
     }
     const gal = convertLayout(ff, 'gallery')

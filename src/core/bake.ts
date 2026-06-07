@@ -6,7 +6,7 @@
 // slide keeps looking the same — it's just editable as a canvas now. Fonts are
 // carried over via the 'heading' / 'body' tokens so conversion preserves the look.
 
-import type { Slide, SlideElement, BoxElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from './types'
+import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool } from './types'
 
 const STAGE_W = 1280
 const STAGE_H = 720
@@ -23,8 +23,10 @@ function text(content: string, x: number, y: number, w: number, h: number, extra
 // rather than the box default (upright 400). Passing `bold:true` is intentionally
 // NOT used so the elegant light italic survives the bake.
 const HEAD: Partial<BoxElement> = { font: 'heading', italic: true, weight: 300 }
-function image(src: string, x: number, y: number, w: number, h: number, extra: Partial<ImageElement> = {}): ImageElement {
-  return { type: 'image', x, y, w, h, rotation: 0, src, fit: 'cover', ...extra }
+// An image is just a box carrying a `src` (transparent fill/stroke), so any box
+// can gain or lose a picture later — one element model for shapes, text, images.
+function image(src: string, x: number, y: number, w: number, h: number, extra: Partial<BoxElement> = {}): BoxElement {
+  return { type: 'box', x, y, w, h, rotation: 0, src, fit: 'cover', fill: 'transparent', stroke: 'transparent', ...extra }
 }
 
 function video(v: string, x: number, y: number, w: number, h: number, poster?: string): VideoElement {

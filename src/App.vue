@@ -382,6 +382,30 @@ function onCreateElement(el: SlideElement) {
 function onUpdateElements(els: SlideElement[]) {
   patchSlide({ elements: els })
 }
+/** Upload a picked file and return its served URL. */
+async function fileToUrl(file: File): Promise<string> {
+  const dataUrl: string = await new Promise((res) => {
+    const r = new FileReader()
+    r.onload = () => res(r.result as string)
+    r.readAsDataURL(file)
+  })
+  return uploadImage(file.name, dataUrl)
+}
+/** Add / replace the selected box's image (it becomes an image-carrying box). */
+async function onSetElementImage(file: File) {
+  const url = await fileToUrl(file)
+  onUpdateElement({ src: url, fit: 'cover' })
+}
+/** Insert a new image as a box on the canvas (bakes to freeform if needed). */
+async function onInsertImage(file: File) {
+  const url = await fileToUrl(file)
+  const el: SlideElement = {
+    type: 'box',
+    x: 480, y: 230, w: 320, h: 220, rotation: 0,
+    src: url, fit: 'cover', fill: 'transparent', stroke: 'transparent',
+  }
+  onCreateElement(el)
+}
 /** Patch the currently-selected element (from the top bar's style controls). */
 function onUpdateElement(p: ElementPatch) {
   if (!deck.value || selectedEl.value == null) return
@@ -651,6 +675,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @update:tool="activeTool = $event"
       @insert="onInsert"
       @update-element="onUpdateElement"
+      @set-image="onSetElementImage"
+      @insert-image="onInsertImage"
       @add="addSlide"
       @duplicate="duplicateSlide"
       @remove="removeSlide"
