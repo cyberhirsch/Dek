@@ -57,6 +57,7 @@ function overAddBtn(x: number, y: number): boolean {
 }
 function onAddDown(e: PointerEvent) {
   e.preventDefault()
+  if (addOpen.value) return closeAdd() // pressing ＋ again toggles the menu closed
   const r = addBtn.value?.getBoundingClientRect()
   if (r) addPos.value = { top: r.bottom + 6, left: r.left }
   addOpen.value = true
