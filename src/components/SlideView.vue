@@ -158,7 +158,7 @@ watch(
 
     <!-- text -->
     <div v-else-if="slide.layout === 'text'" class="dek-pad l-text">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
+      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Heading" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
       <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
       <ul v-else class="dek-list">
@@ -168,7 +168,7 @@ watch(
 
     <!-- text-image -->
     <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x')]">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="HEADING" @update:model-value="patch({ title: $event })" />
+      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Heading" @update:model-value="patch({ title: $event })" />
       <h1 v-else>{{ slide.title }}</h1>
       <div class="cols">
         <div class="text-col">

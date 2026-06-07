@@ -136,9 +136,9 @@ export function blankSlide(layout: LayoutId = 'text'): Slide {
     case 'speaker':
       return { layout, name: 'Name', role: 'Role', portraits: [] }
     case 'text':
-      return { layout, title: 'HEADING', content: '- First point' }
+      return { layout, title: 'Heading', content: '- First point' }
     case 'text-image':
-      return { layout, title: 'HEADING', side: 'left', image: '', content: '- First point' }
+      return { layout, title: 'Heading', side: 'left', image: '', content: '- First point' }
     case 'image-full':
       return { layout, image: '', title: '', caption: '', focus: { x: 0, y: 0, scale: 1 } }
     case 'image-caption':
