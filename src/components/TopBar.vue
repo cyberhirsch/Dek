@@ -92,6 +92,17 @@ const statusText = computed(() =>
 
 // ── canvas tools ──
 const insertOpen = ref(false)
+const insertBtn = ref<HTMLButtonElement | null>(null)
+// The Insert menu is teleported to <body> so it isn't clipped by .center's
+// overflow: hidden. We anchor it under the button via its bounding rect.
+const menuPos = ref({ top: 0, left: 0 })
+function toggleInsert() {
+  insertOpen.value = !insertOpen.value
+  if (insertOpen.value) {
+    const r = insertBtn.value?.getBoundingClientRect()
+    if (r) menuPos.value = { top: r.bottom + 4, left: r.left }
+  }
+}
 function pickTool(t: CanvasTool) {
   emit('update:tool', t)
   insertOpen.value = false
@@ -156,12 +167,19 @@ function colorOr(v: string | undefined, fallback: string) {
         </button>
         <input ref="imgInput" type="file" accept="image/*" style="display: none" @change="onImgPick" />
         <div class="grp">
-          <button class="ins" title="Insert…" @click="insertOpen = !insertOpen">＋ Insert ▾</button>
-          <div v-if="insertOpen" class="menu" @pointerleave="insertOpen = false">
-            <button @click="((insertOpen = false), emit('insert', 'video'))">▶ Video</button>
-            <button @click="((insertOpen = false), emit('insert', 'diagram'))">◇ Diagram</button>
-            <button @click="((insertOpen = false), emit('insert', 'table'))">▦ Table</button>
-          </div>
+          <button ref="insertBtn" class="ins" title="Insert…" @click="toggleInsert">＋ Insert ▾</button>
+          <Teleport to="body">
+            <div
+              v-if="insertOpen"
+              class="menu"
+              :style="{ top: menuPos.top + 'px', left: menuPos.left + 'px' }"
+              @pointerleave="insertOpen = false"
+            >
+              <button @click="((insertOpen = false), emit('insert', 'video'))">▶ Video</button>
+              <button @click="((insertOpen = false), emit('insert', 'diagram'))">◇ Diagram</button>
+              <button @click="((insertOpen = false), emit('insert', 'table'))">▦ Table</button>
+            </div>
+          </Teleport>
         </div>
       </div>
 
@@ -469,9 +487,7 @@ function colorOr(v: string | undefined, fallback: string) {
 }
 .ins:hover { background: rgba(255, 255, 255, 0.1); }
 .menu {
-  position: absolute;
-  top: 32px;
-  left: 0;
+  position: fixed;
   display: flex;
   flex-direction: column;
   min-width: 130px;
