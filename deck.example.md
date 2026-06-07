@@ -26,7 +26,7 @@ byline: "One Markdown file · edit in code, with an LLM, or WYSIWYG"
 ---
 # 2 — section: a full-screen divider between parts of the talk
 layout: section
-title: THE BASICS
+title: The Basics
 ---
 # 3 — statement: one large centered line. Great for a thesis or quote.
 #      `cite` is optional.
@@ -41,7 +41,7 @@ cite: "the whole idea"
 #      ~~strikethrough~~ and `code`. Select text + the B / I / U / S buttons (or
 #      Ctrl+B etc.) format in place — no need to leave the layout.
 layout: text
-title: TEXT & FORMATTING
+title: Text & Formatting
 content: |
   This is a plain paragraph. The lines below it are bullets:
 
@@ -53,7 +53,7 @@ content: |
 # 5 — text-image: text on one side, an image on the other. `side: left|right`
 #      moves the image. Click the image to pan; scroll to zoom (focus is saved).
 layout: text-image
-title: TEXT + IMAGE
+title: Text + Image
 side: right
 image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23231533%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237fc7ff%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3Epan%20%2F%20zoom%20me%3C%2Ftext%3E%3C%2Fsvg%3E"
 content: |
@@ -65,7 +65,7 @@ content: |
 ---
 # 6 — section divider (start of a group — see the sidebar)
 layout: section
-title: IMAGES & MEDIA
+title: Images & Media
 group: Images & Media
 ---
 # 7 — image-full: edge-to-edge image with an optional title/caption overlay.
@@ -88,7 +88,7 @@ group: Images & Media
 # 9 — gallery: 2–4 images in a grid. `columns: auto` fits to the count, or set
 #      2 / 3 / 4. Each item is { image, label }.
 layout: gallery
-title: GALLERY
+title: Gallery
 columns: auto
 items:
   - { image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230b2447%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2319a974%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3EA%3C%2Ftext%3E%3C%2Fsvg%3E", label: "Before" }
@@ -106,13 +106,13 @@ group: Images & Media
 ---
 # 11 — section divider
 layout: section
-title: DIAGRAMS & CANVAS
+title: Diagrams & Canvas
 group: Diagrams & Canvas
 ---
 # 12 — diagram: a Mermaid flowchart from text. Edit the `code` and it re-renders
 #       live, themed to the deck.
 layout: diagram
-title: PIPELINES AS TEXT
+title: Pipelines as Text
 code: |
   flowchart LR
     A[Idea] --> B[Outline]
@@ -142,7 +142,7 @@ group: Diagrams & Canvas
 layout: freeform
 group: Diagrams & Canvas
 elements:
-  - { type: box, x: 90, y: 70, w: 760, h: 90, rotation: 0, content: "FREEFORM CANVAS", font: heading, size: 64, bold: true, fill: transparent, stroke: transparent }
+  - { type: box, x: 90, y: 70, w: 760, h: 90, rotation: 0, content: "Freeform Canvas", font: heading, size: 64, bold: true, fill: transparent, stroke: transparent }
   - { type: box, x: 90, y: 190, w: 560, h: 230, rotation: 0, content: "Move, resize and rotate anything. A box is **text and shape** at once — give it a fill, a stroke, a corner radius, or leave it transparent for a pure text box.", font: body, size: 26, fill: transparent, stroke: transparent }
   - { type: box, x: 720, y: 250, w: 440, h: 260, rotation: -4, content: "I'm a rounded box\nwith a fill", font: body, size: 28, align: center, color: "#07223a", fill: "#7fc7ff", stroke: "#cfe8ff", strokeWidth: 2, radius: 28 }
   - { type: arrow, x: 600, y: 340, w: 150, h: 0, rotation: 0, stroke: "#ffb474", strokeWidth: 4 }
@@ -151,7 +151,7 @@ elements:
 ---
 # 15 — back to a text slide to wrap up: presenting & saving
 layout: text
-title: PRESENT & SAVE
+title: Present & Save
 content: |
   - **Present:** click ▶ Present (or Ctrl+E). Arrows, space, or **scroll** to move; **F** fullscreen, **O** overview, **P** presenter view
   - **Save / Open:** the deck is one .md — *Open file…*, *Open folder…* (deck + an Assets folder), or *Save As…* via the File System Access API

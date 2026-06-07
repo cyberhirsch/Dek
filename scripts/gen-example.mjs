@@ -82,7 +82,7 @@ byline: "One Markdown file · edit in code, with an LLM, or WYSIWYG"`)
 
 S(`# 2 — section: a full-screen divider between parts of the talk
 layout: section
-title: THE BASICS`)
+title: The Basics`)
 
 S(`# 3 — statement: one large centered line. Great for a thesis or quote.
 #      \`cite\` is optional.
@@ -97,7 +97,7 @@ S(`# 4 — text: a heading + a Markdown body. Lines starting with "- " are bulle
 #      ~~strikethrough~~ and \`code\`. Select text + the B / I / U / S buttons (or
 #      Ctrl+B etc.) format in place — no need to leave the layout.
 layout: text
-title: TEXT & FORMATTING
+title: Text & Formatting
 content: |
   This is a plain paragraph. The lines below it are bullets:
 
@@ -109,7 +109,7 @@ content: |
 S(`# 5 — text-image: text on one side, an image on the other. \`side: left|right\`
 #      moves the image. Click the image to pan; scroll to zoom (focus is saved).
 layout: text-image
-title: TEXT + IMAGE
+title: Text + Image
 side: right
 image: "${IMG.panel}"
 content: |
@@ -121,7 +121,7 @@ content: |
 
 S(`# 6 — section divider (start of a group — see the sidebar)
 layout: section
-title: IMAGES & MEDIA
+title: Images & Media
 group: Images & Media`)
 
 S(`# 7 — image-full: edge-to-edge image with an optional title/caption overlay.
@@ -144,7 +144,7 @@ group: Images & Media`)
 S(`# 9 — gallery: 2–4 images in a grid. \`columns: auto\` fits to the count, or set
 #      2 / 3 / 4. Each item is { image, label }.
 layout: gallery
-title: GALLERY
+title: Gallery
 columns: auto
 items:
   - { image: "${IMG.g1}", label: "Before" }
@@ -162,13 +162,13 @@ group: Images & Media`)
 
 S(`# 11 — section divider
 layout: section
-title: DIAGRAMS & CANVAS
+title: Diagrams & Canvas
 group: Diagrams & Canvas`)
 
 S(`# 12 — diagram: a Mermaid flowchart from text. Edit the \`code\` and it re-renders
 #       live, themed to the deck.
 layout: diagram
-title: PIPELINES AS TEXT
+title: Pipelines as Text
 code: |
   flowchart LR
     A[Idea] --> B[Outline]
@@ -198,7 +198,7 @@ S(`# 14 — freeform: a free canvas of movable, rotatable elements, all stored r
 layout: freeform
 group: Diagrams & Canvas
 elements:
-  - { type: box, x: 90, y: 70, w: 760, h: 90, rotation: 0, content: "FREEFORM CANVAS", font: heading, size: 64, bold: true, fill: transparent, stroke: transparent }
+  - { type: box, x: 90, y: 70, w: 760, h: 90, rotation: 0, content: "Freeform Canvas", font: heading, size: 64, bold: true, fill: transparent, stroke: transparent }
   - { type: box, x: 90, y: 190, w: 560, h: 230, rotation: 0, content: "Move, resize and rotate anything. A box is **text and shape** at once — give it a fill, a stroke, a corner radius, or leave it transparent for a pure text box.", font: body, size: 26, fill: transparent, stroke: transparent }
   - { type: box, x: 720, y: 250, w: 440, h: 260, rotation: -4, content: "I'm a rounded box\\nwith a fill", font: body, size: 28, align: center, color: "#07223a", fill: "#7fc7ff", stroke: "#cfe8ff", strokeWidth: 2, radius: 28 }
   - { type: arrow, x: 600, y: 340, w: 150, h: 0, rotation: 0, stroke: "#ffb474", strokeWidth: 4 }
@@ -207,7 +207,7 @@ elements:
 
 S(`# 15 — back to a text slide to wrap up: presenting & saving
 layout: text
-title: PRESENT & SAVE
+title: Present & Save
 content: |
   - **Present:** click ▶ Present (or Ctrl+E). Arrows, space, or **scroll** to move; **F** fullscreen, **O** overview, **P** presenter view
   - **Save / Open:** the deck is one .md — *Open file…*, *Open folder…* (deck + an Assets folder), or *Save As…* via the File System Access API
