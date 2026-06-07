@@ -3,11 +3,11 @@ import { computed, ref } from 'vue'
 import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import DeckMenu from './DeckMenu.vue'
+import ColorPicker from './ColorPicker.vue'
 
 const props = defineProps<{
   deck: Deck
   index: number
-  selectedCount: number
   saveStatus: 'saved' | 'unsaved' | 'saving'
   autosave: boolean
   canUndo: boolean
@@ -21,10 +21,6 @@ const emit = defineEmits<{
   'change-layout': [id: LayoutId]
   patch: [p: Partial<Slide>]
   format: [kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet']
-  add: [id: LayoutId]
-  duplicate: []
-  remove: []
-  group: []
   undo: []
   redo: []
   'toggle-autosave': []
@@ -62,12 +58,6 @@ function onImgPick(e: Event) {
     else emit('insert-image', f)
   }
   input.value = ''
-}
-
-function onAdd(ev: Event) {
-  const el = ev.target as HTMLSelectElement
-  if (el.value) emit('add', el.value as LayoutId)
-  el.value = '' // reset to placeholder
 }
 
 const slide = computed(() => props.deck.slides[props.index])
@@ -120,10 +110,13 @@ const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.s
 function upd(p: ElementPatch) {
   emit('update-element', p)
 }
-/** A hex to show in a color picker even when the stored value is transparent/unset. */
-function colorOr(v: string | undefined, fallback: string) {
-  return v && v !== 'transparent' ? v : fallback
-}
+// Swatches offered in the color picker: the deck theme's own colors first, then
+// a couple of neutral anchors. De-duped, falling back to the built-in defaults.
+const themeSwatches = computed(() => {
+  const t = props.deck.config.theme ?? {}
+  const list = [t.text, t.accent, t.accent2, t.bg, '#e6ecf2', '#070809', '#ffffff', '#000000']
+  return [...new Set(list.filter((c): c is string => !!c).map((c) => c.toLowerCase()))]
+})
 </script>
 
 <template>
@@ -137,7 +130,17 @@ function colorOr(v: string | undefined, fallback: string) {
         @save-as="emit('save-as')"
         @new="emit('new-deck')"
         @open="emit('open-deck', $event)"
+        @export="emit('export')"
       />
+      <span class="div" />
+      <label class="chk"><input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />auto</label>
+      <button class="save" :class="saveStatus" @click="emit('save')">
+        <span class="dot" :class="saveStatus" />{{ statusText }}
+      </button>
+      <div class="seg">
+        <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
+        <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
+      </div>
     </div>
 
     <div class="center">
@@ -187,14 +190,22 @@ function colorOr(v: string | undefined, fallback: string) {
       <template v-if="box">
         <span class="div" />
         <div class="seg style-seg">
-          <label class="swatch" title="Fill">
-            <input type="color" :value="colorOr(box.fill, '#7fc7ff')" @input="upd({ fill: ($event.target as HTMLInputElement).value })" />
-          </label>
-          <button class="mini" title="No fill" @click="upd({ fill: 'transparent' })">∅</button>
-          <label class="swatch stroke" title="Stroke">
-            <input type="color" :value="colorOr(box.stroke, '#7fc7ff')" @input="upd({ stroke: ($event.target as HTMLInputElement).value, strokeWidth: box.strokeWidth || 2 })" />
-          </label>
-          <button class="mini" title="No stroke" @click="upd({ stroke: 'transparent' })">∅</button>
+          <ColorPicker
+            title="Fill"
+            :model-value="box.fill"
+            :swatches="themeSwatches"
+            allow-transparent
+            fallback="#7fc7ff"
+            @update:model-value="upd({ fill: $event })"
+          />
+          <ColorPicker
+            title="Stroke"
+            :model-value="box.stroke"
+            :swatches="themeSwatches"
+            allow-transparent
+            fallback="#7fc7ff"
+            @update:model-value="upd({ stroke: $event, strokeWidth: box.strokeWidth || 2 })"
+          />
           <input class="num" type="number" min="0" max="40" title="Stroke width" :value="box.strokeWidth ?? 0" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
           <input class="num" type="number" min="0" max="200" title="Corner radius" :value="box.radius ?? 0" @input="upd({ radius: +($event.target as HTMLInputElement).value })" />
           <button class="mini img" :title="box.src ? 'Replace image' : 'Add image'" @click="pickImage('set')">
@@ -209,9 +220,13 @@ function colorOr(v: string | undefined, fallback: string) {
           </select>
           <input class="num" type="number" min="8" max="400" title="Font size" :value="box.size ?? 28" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
           <input class="num" type="number" min="100" max="900" step="100" title="Font weight" :value="box.weight ?? (box.bold ? 700 : 400)" @input="upd({ weight: +($event.target as HTMLInputElement).value })" />
-          <label class="swatch" title="Text color">
-            <input type="color" :value="colorOr(box.color, '#e6ecf2')" @input="upd({ color: ($event.target as HTMLInputElement).value })" />
-          </label>
+          <ColorPicker
+            title="Text color"
+            :model-value="box.color"
+            :swatches="themeSwatches"
+            fallback="#e6ecf2"
+            @update:model-value="upd({ color: $event })"
+          />
         </div>
         <div class="seg style-seg">
           <button class="icon-btn fmt" title="Bullet list (Ctrl+Shift+8)" @mousedown.prevent="emit('format', 'bullet')">
@@ -247,9 +262,13 @@ function colorOr(v: string | undefined, fallback: string) {
       <template v-else-if="arrow">
         <span class="div" />
         <div class="seg style-seg">
-          <label class="swatch stroke" title="Color">
-            <input type="color" :value="colorOr(arrow.stroke, '#e6ecf2')" @input="upd({ stroke: ($event.target as HTMLInputElement).value })" />
-          </label>
+          <ColorPicker
+            title="Color"
+            :model-value="arrow.stroke"
+            :swatches="themeSwatches"
+            fallback="#e6ecf2"
+            @update:model-value="upd({ stroke: $event })"
+          />
           <input class="num" type="number" min="1" max="40" title="Thickness" :value="arrow.strokeWidth ?? 3" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
         </div>
       </template>
@@ -291,34 +310,10 @@ function colorOr(v: string | undefined, fallback: string) {
     </div>
 
     <div class="right">
-      <div class="seg">
-        <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
-        <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
-      </div>
-      <span class="div" />
-      <div class="seg">
-        <button title="Add slide (same layout)" @click="emit('add', slide?.layout ?? 'text')">＋ Slide</button>
-        <select class="sel add-as" title="Add slide as layout…" @change="onAdd">
-          <option value="">as…</option>
-          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
-        </select>
-        <button title="Duplicate" @click="emit('duplicate')">Duplicate</button>
-        <button title="Delete" class="danger" :disabled="deck.slides.length <= 1" @click="emit('remove')">Delete</button>
-        <button title="Group selected" :disabled="selectedCount < 1" @click="emit('group')">
-          Group{{ selectedCount > 1 ? ` (${selectedCount})` : '' }}
-        </button>
-      </div>
-
-      <span class="div" />
-      <label class="chk"><input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />auto</label>
-      <button class="save" :class="saveStatus" @click="emit('save')">
-        <span class="dot" :class="saveStatus" />{{ statusText }}
-      </button>
       <button class="topbtn" title="Review validation and assets" @click="emit('review')">
         Review{{ reviewCount ? ` ${reviewCount}` : '' }}
       </button>
       <button class="topbtn" :class="{ on: showSource }" title="Toggle Markdown source view" @click="emit('toggle-source')">&lt;/&gt; Source</button>
-      <button class="topbtn" title="Export (PDF / HTML)" @click="emit('export')">⤓ Export</button>
       <button class="present" title="Present (Ctrl+E)" @click="emit('close')">▶ Present</button>
     </div>
   </div>
@@ -526,24 +521,6 @@ function colorOr(v: string | undefined, fallback: string) {
   font-size: 11px;
 }
 .sel.font { padding: 4px 6px; }
-.swatch {
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  overflow: hidden;
-  cursor: pointer;
-  padding: 0;
-}
-.swatch input[type='color'] {
-  width: 150%;
-  height: 150%;
-  margin: -25%;
-  border: none;
-  background: none;
-  cursor: pointer;
-}
 .mini {
   width: 20px;
   height: 26px;

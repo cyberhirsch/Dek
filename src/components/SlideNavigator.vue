@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import type { Deck } from '../core/types'
+import type { Deck, LayoutId } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
+import SlideActions from './SlideActions.vue'
 
 const props = defineProps<{ deck: Deck; current: number; selected: number[] }>()
 
@@ -13,6 +14,11 @@ const emit = defineEmits<{
   'join-group': [e: { from: number; name: string }]
   ungroup: [name: string]
   rename: [e: { indices: number[]; name: string }]
+  add: [id: LayoutId]
+  duplicate: []
+  remove: []
+  group: []
+  autogroup: []
 }>()
 
 // Build navigator rows: a header before each maximal contiguous run sharing a
@@ -162,10 +168,36 @@ function cleanupDrag() {
 
 const total = computed(() => props.deck.slides.length)
 const selSet = computed(() => new Set(props.selected))
+
+// Expand / collapse every group at once (collapse state lives here in the nav).
+const headerRunIds = computed(() =>
+  entries.value.flatMap((e) => (e.kind === 'header' ? [e.runId] : [])),
+)
+const hasGroups = computed(() => headerRunIds.value.length > 0)
+const allCollapsed = computed(
+  () => hasGroups.value && headerRunIds.value.every((id) => collapsed.has(id)),
+)
+function toggleCollapseAll() {
+  if (allCollapsed.value) collapsed.clear()
+  else for (const id of headerRunIds.value) collapsed.add(id)
+}
 </script>
 
 <template>
-  <div ref="nav" class="nav" @scroll="syncViewport" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
+  <div class="sidebar">
+    <SlideActions
+      :selected-count="selected.length"
+      :slide-count="deck.slides.length"
+      :has-groups="hasGroups"
+      :all-collapsed="allCollapsed"
+      @add="emit('add', $event)"
+      @duplicate="emit('duplicate')"
+      @remove="emit('remove')"
+      @group="emit('group')"
+      @autogroup="emit('autogroup')"
+      @toggle-collapse="toggleCollapseAll"
+    />
+    <div ref="nav" class="nav" @scroll="syncViewport" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
     <div class="virtual" :style="{ height: totalHeight + 'px' }">
     <template v-for="e in visibleEntries" :key="e.key">
       <!-- group header -->
@@ -208,17 +240,25 @@ const selSet = computed(() => new Set(props.selected))
       </div>
     </template>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.nav {
+.sidebar {
   width: 210px;
   flex: none;
   height: 100%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: #0c0d10;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+.nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 8px 6px 40px;
   user-select: none;
 }
