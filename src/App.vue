@@ -848,6 +848,9 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   flex: 1;
   display: flex;
   min-height: 0;
+  /* allow the stage to shrink below the 1280px frame so a docked side pane
+     (the Markdown source) fits instead of pushing the stage off-screen */
+  min-width: 0;
 }
 .msg {
   flex: 1;

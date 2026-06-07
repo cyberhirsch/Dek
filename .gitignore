@@ -9,5 +9,7 @@ dist
 # Slide content stays local / private — the repo ships the *tool*, not the lectures.
 /deck.md
 /decks/
-/public/Assets/
+/public/Assets/*
+# …but the tutorial screenshots used by deck.example.md are committed.
+!/public/Assets/tutorial/
 # (deck.example.md is committed as a runnable starting point)

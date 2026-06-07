@@ -1,118 +1,103 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Dek — a presentation is ONE Markdown file. This first block is the global
-# config + theme. Every following `---` block is a slide: a `layout:` plus that
-# layout's named fields. Edit here in code, hand the file to an LLM, or use the
+# config + theme; every following `---` block is a slide (a `layout:` plus that
+# layout's fields). Edit here in code, hand the file to an LLM, or use the
 # in-browser WYSIWYG editor — all three read & write these same fields.
 # ─────────────────────────────────────────────────────────────────────────────
 deck: Dek — A Guided Tour
-ratio: "16:9"                       # 1280×720 stage
-paginate: true                      # page numbers, bottom-right
-header: "Dek · a guided tour"       # running header on every slide
+ratio: "16:9"
+paginate: true
+header: "Dek · a guided tour"
 footer: "Press → or scroll · Ctrl+E toggles edit / present"
 theme:
   bg: "#070809"
   text: "#e6ecf2"
-  accent: "#7fc7ff"                 # blue  — headings / links / bullets
-  accent2: "#ffb474"               # amber — secondary accent
-  glow: true                        # soft background glow
+  accent: "#7fc7ff"
+  accent2: "#ffb474"
+  glow: true
   fontHeading: "Cormorant Garamond"
   fontBody: "JetBrains Mono"
 ---
-# 1 — cover: the title slide (oversized mark + subtitle + byline)
 layout: cover
 title: Dek
-subtitle: A minimal presentation editor
+subtitle: A Guided Tour
 byline: "One Markdown file · edit in code, with an LLM, or WYSIWYG"
 ---
-# 2 — section: a full-screen divider between parts of the talk
-layout: section
-title: The Basics
----
-# 3 — statement: one large centered line. Great for a thesis or quote.
-#      `cite` is optional.
 layout: statement
 text: >
   A deck is just text. Because the source is Markdown, anything that edits
   text — you, your editor, or an LLM — can build the slides.
 cite: "the whole idea"
 ---
-# 4 — text: a heading + a Markdown body. Lines starting with "- " are bullets;
-#      other lines are paragraphs. Inline: **bold**, *italic*, <u>underline</u>,
-#      ~~strikethrough~~ and `code`. Select text + the B / I / U / S buttons (or
-#      Ctrl+B etc.) format in place — no need to leave the layout.
+layout: section
+title: Editing & Presenting
+group: Editing & Presenting
+---
+layout: freeform
+group: "Editing & Presenting"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "The Editor at a Glance", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/editor.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- **Top bar** — layout, canvas tools, and live style controls for the selection\n- **Sidebar** — drag to reorder; drop one slide onto another to **group** them\n- **Stage** — click any text to edit it in place\n- **Notes** — speaker notes, shown later in Presenter view\n- The dot by *saved* tracks every autosaved change", font: "body", size: 21 }
+---
 layout: text
-title: Text & Formatting
+title: Edit and Present
+group: Editing & Presenting
 content: |
-  This is a plain paragraph. The lines below it are bullets:
-
-  - **Bold** for emphasis, *italic* for nuance
-  - <u>Underline</u> and ~~strikethrough~~ too
-  - Inline `code` for keys like `Ctrl+E`
-  - Toggle any line between bullet and paragraph with the list button
+  - **Ctrl+E** toggles between editing and presenting
+  - Move with the arrow keys, space, or just **scroll**
+  - **F** fullscreen · **O** overview · **P** presenter view
+  - Click straight onto a heading or bullet to rewrite it
 ---
-# 5 — text-image: text on one side, an image on the other. `side: left|right`
-#      moves the image. Click the image to pan; scroll to zoom (focus is saved).
-layout: text-image
-title: Text + Image
-side: right
-image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23231533%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237fc7ff%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3Epan%20%2F%20zoom%20me%3C%2Ftext%3E%3C%2Fsvg%3E"
+layout: freeform
+group: "Editing & Presenting"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "See the Markdown Live", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/source-pane.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Toggle **</> Source** to see the exact file the deck saves to\n- Edit on **either** side — slide and text stay in sync\n- Broken YAML is caught and shown, never silently saved\n- Drag the pane's edge to resize it", font: "body", size: 21 }
+---
+layout: section
+title: The Canvas
+group: The Canvas
+---
+layout: freeform
+group: "The Canvas"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Freeform: a Free Canvas", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/canvas-handles.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Select anything to **move, resize, and rotate** it\n- The dot on top spins it — hold **Shift** to snap to 15°\n- A **box** is text, shape, and image in one object\n- Add a text box, rectangle, arrow, or image from the top bar", font: "body", size: 21 }
+---
+layout: text
+title: Layouts Convert Into Each Other
+group: The Canvas
 content: |
-  Put talking points beside a visual.
-
-  - Flip the image to the **left** or **right** in the top bar
-  - Drag the image to **pan**, scroll to **zoom**
-  - Drop a new image on the frame to replace it
+  - Pick any layout from the dropdown — shared content carries across
+  - A statement becomes body text; a heading stays a heading
+  - Add an element to any slide and it **bakes** into a freeform canvas
+  - Nothing is lost: hidden fields are parked under `stash:` in the file
 ---
-# 6 — section divider (start of a group — see the sidebar)
+layout: freeform
+group: "The Canvas"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Text + Image, Your Way", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/text-image-ratio.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Choose the image shape: **16:9**, **1:1**, or **9:16**\n- The text column grows as the image gets narrower\n- Flip the image to the **left** or **right**\n- Drag the image to **pan**, scroll to **zoom**", font: "body", size: 21 }
+---
 layout: section
-title: Images & Media
-group: Images & Media
+title: Media
+group: Media
 ---
-# 7 — image-full: edge-to-edge image with an optional title/caption overlay.
-layout: image-full
-image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230b2447%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237fc7ff%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3Eimage-full%3C%2Ftext%3E%3C%2Fsvg%3E"
-title: Full-bleed imagery
-caption: "Overlay a title and caption on a gradient scrim"
-focus: { x: 0, y: 0, scale: 1 }
-group: Images & Media
+layout: freeform
+group: "Media"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Galleries & Images", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/gallery-controls.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Hover a tile for **replace** and **remove**\n- Drop an image straight onto a frame to swap it\n- Set columns to **auto** or a fixed 2–4\n- Every image is stored with the deck", font: "body", size: 21 }
 ---
-# 8 — image-caption: a framed image with a small credit. `captionPos` picks the
-#      corner (bottom-right / bottom-left / top-right / top-left).
-layout: image-caption
-image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%231a1333%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffb474%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3Eimage-caption%3C%2Ftext%3E%3C%2Fsvg%3E"
-caption: "A framed still — captionPos sets the corner"
-captionPos: bottom-right
-focus: { x: 0, y: 0, scale: 1 }
-group: Images & Media
----
-# 9 — gallery: 2–4 images in a grid. `columns: auto` fits to the count, or set
-#      2 / 3 / 4. Each item is { image, label }.
-layout: gallery
-title: Gallery
-columns: auto
-items:
-  - { image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230b2447%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2319a974%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3EA%3C%2Ftext%3E%3C%2Fsvg%3E", label: "Before" }
-  - { image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2333122b%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffb474%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3EB%3C%2Ftext%3E%3C%2Fsvg%3E", label: "After" }
-  - { image: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23102a2a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237fc7ff%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3EC%3C%2Ftext%3E%3C%2Fsvg%3E", label: "Final" }
-group: Images & Media
----
-# 10 — video-embed: click-to-play YouTube / Vimeo / .mp4. The poster falls back
-#       to the video's own thumbnail when omitted.
-layout: video-embed
-video: https://www.youtube.com/watch?v=qyZy-6VuSy4
-poster: ""
-caption: "Click to play — YouTube, Vimeo, or a direct .mp4"
-group: Images & Media
----
-# 11 — section divider
-layout: section
-title: Diagrams & Canvas
-group: Diagrams & Canvas
----
-# 12 — diagram: a Mermaid flowchart from text. Edit the `code` and it re-renders
-#       live, themed to the deck.
+# A real, editable diagram — change the `code` and it re-renders, themed.
 layout: diagram
-title: Pipelines as Text
+title: Diagrams From Text
+group: Media
 code: |
   flowchart LR
     A[Idea] --> B[Outline]
@@ -120,47 +105,43 @@ code: |
     C --> D{Review}
     D -- yes --> E[Present]
     D -- no --> B
-group: Diagrams & Canvas
 ---
-# 13 — speaker: a bio slide — 1–2 portraits + name + role.
-layout: speaker
-name: "Your Name"
-role: "Lecturer · Designer · Enthusiast"
-portraits:
-  - "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20400%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230b2447%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%237fc7ff%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%22200%22%20cy%3D%22160%22%20r%3D%2280%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.85%22%2F%3E%3Crect%20x%3D%2290%22%20y%3D%22250%22%20width%3D%22220%22%20height%3D%22160%22%20rx%3D%22110%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.85%22%2F%3E%3Ctext%20x%3D%22200%22%20y%3D%22380%22%20font-family%3D%22JetBrains%20Mono%2C%20monospace%22%20font-size%3D%2242%22%20fill%3D%22%230b2447%22%20text-anchor%3D%22middle%22%3EAB%3C%2Ftext%3E%3C%2Fsvg%3E"
-  - "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20400%20400%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2333122b%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffb474%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22400%22%20height%3D%22400%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%22200%22%20cy%3D%22160%22%20r%3D%2280%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.85%22%2F%3E%3Crect%20x%3D%2290%22%20y%3D%22250%22%20width%3D%22220%22%20height%3D%22160%22%20rx%3D%22110%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.85%22%2F%3E%3Ctext%20x%3D%22200%22%20y%3D%22380%22%20font-family%3D%22JetBrains%20Mono%2C%20monospace%22%20font-size%3D%2242%22%20fill%3D%22%2333122b%22%20text-anchor%3D%22middle%22%3ECD%3C%2Ftext%3E%3C%2Fsvg%3E"
-group: Diagrams & Canvas
+layout: video-embed
+group: Media
+video: https://www.youtube.com/watch?v=qyZy-6VuSy4
+poster: ""
+caption: "Click to play — YouTube, Vimeo, or a direct .mp4 file"
 ---
-# 14 — freeform: a free canvas of movable, rotatable elements, all stored right
-#       here in the .md so an LLM can place them too. Element types:
-#         box   — text AND shape in one (a text box = transparent fill/stroke;
-#                 a rectangle = fill/stroke, no text)
-#         arrow — a line with an arrowhead
-#         image / video / diagram — positioned media
-#       Tip: add a text box or shape to ANY layout and it converts to freeform,
-#       baking the existing content into elements so nothing is lost.
+layout: section
+title: Present & Share
+group: Present & Share
+---
 layout: freeform
-group: Diagrams & Canvas
+group: "Present & Share"
 elements:
-  - { type: box, x: 90, y: 70, w: 760, h: 90, rotation: 0, content: "Freeform Canvas", font: heading, size: 64, bold: true, fill: transparent, stroke: transparent }
-  - { type: box, x: 90, y: 190, w: 560, h: 230, rotation: 0, content: "Move, resize and rotate anything. A box is **text and shape** at once — give it a fill, a stroke, a corner radius, or leave it transparent for a pure text box.", font: body, size: 26, fill: transparent, stroke: transparent }
-  - { type: box, x: 720, y: 250, w: 440, h: 260, rotation: -4, content: "I'm a rounded box\nwith a fill", font: body, size: 28, align: center, color: "#07223a", fill: "#7fc7ff", stroke: "#cfe8ff", strokeWidth: 2, radius: 28 }
-  - { type: arrow, x: 600, y: 340, w: 150, h: 0, rotation: 0, stroke: "#ffb474", strokeWidth: 4 }
-  - { type: image, x: 90, y: 460, w: 360, h: 180, rotation: 3, src: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201600%20900%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230b2447%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23ffb474%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%221600%22%20height%3D%22900%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%221180%22%20cy%3D%22250%22%20r%3D%22230%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.10%22%2F%3E%3Ccircle%20cx%3D%22320%22%20cy%3D%22720%22%20r%3D%22320%22%20fill%3D%22%23000000%22%20opacity%3D%220.12%22%2F%3E%3Ctext%20x%3D%22800%22%20y%3D%22480%22%20font-family%3D%22Cormorant%20Garamond%2C%20serif%22%20font-size%3D%22120%22%20fill%3D%22%23ffffff%22%20opacity%3D%220.9%22%20text-anchor%3D%22middle%22%3E%3C%2Ftext%3E%3C%2Fsvg%3E", fit: cover }
-  - { type: box, x: 480, y: 520, w: 360, h: 120, rotation: 0, content: "<u>Drag the handles</u> · the rotate dot is on top", font: body, size: 22, color: "#ffb474", fill: transparent, stroke: transparent }
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Presenter View on a Second Screen", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/presenter.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Press **P** for a **separate window** — drag it to another monitor\n- See the current slide, what's **next**, your notes, and a timer\n- Advancing in either window moves both\n- Drag the divider to give notes more room", font: "body", size: 21 }
 ---
-# 15 — back to a text slide to wrap up: presenting & saving
+layout: freeform
+group: "Present & Share"
+elements:
+  - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Open & Save Real Files", font: "heading", italic: true, weight: 300, size: 44 }
+  - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/deck-menu.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- **Open file** or **Open folder** (deck + an Assets folder)\n- **Save As** writes the .md plus every image beside it\n- Switch between decks from the same menu\n- **Export** to PDF or a standalone HTML file", font: "body", size: 21 }
+---
 layout: text
-title: Present & Save
+title: Made for LLMs, Too
+group: Present & Share
 content: |
-  - **Present:** click ▶ Present (or Ctrl+E). Arrows, space, or **scroll** to move; **F** fullscreen, **O** overview, **P** presenter view
-  - **Save / Open:** the deck is one .md — *Open file…*, *Open folder…* (deck + an Assets folder), or *Save As…* via the File System Access API
-  - **Organize:** reorder and **group** slides in the sidebar, Keynote-style (see the groups in this deck)
-  - **Export:** to PDF or a standalone HTML file
+  - The whole deck is plain text — hand the .md to an LLM
+  - Say what you want changed and let it edit the file
+  - Even canvas elements are simple data an LLM can author
+  - You stay in control: review, then present when ready
 ---
-# 16 — closing
 layout: statement
+group: Present & Share
 text: >
-  That's the whole tool. Delete these slides, or hand this file to an LLM and
-  say what you want — then present.
+  That's the tour. Delete these slides, or hand the file to an LLM and say
+  what you want — then present.
 cite: "now make it yours"
