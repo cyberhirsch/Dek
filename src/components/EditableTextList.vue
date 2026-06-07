@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { inlineMd, htmlToInline } from '../render/inline'
 
 export interface EditableTextListRow {
   text: string
@@ -21,7 +22,9 @@ function buildRow(row: EditableTextListRow, index: number): HTMLLIElement {
   const li = document.createElement('li')
   li.className = row.bullet ? 'editing' : 'editing plain'
   li.dataset.textRow = String(index)
-  li.textContent = row.text
+  // Render the inline Markdown as real HTML so the user sees styled text while
+  // editing (WYSIWYG); readRows() serializes it back to Markdown on the way out.
+  li.innerHTML = inlineMd(row.text)
   return li
 }
 function syncDomRows() {
@@ -47,7 +50,7 @@ function readRows(): EditableTextListRow[] {
   return Array.from(list.children).map((child) => {
     const row = child as HTMLElement
     return {
-      text: row.innerText.replace(/\n$/, ''),
+      text: htmlToInline(row.innerHTML),
       bullet: !row.classList.contains('plain'),
     }
   })

@@ -457,18 +457,20 @@
 .gallery-cell .frame {
   position: relative;
 }
+/* Remove button: top-left so it never overlaps FramedImage's top-right replace
+   (⤓) button, and sized/shaped to match it exactly. */
 .gallery-cell .cell-x {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  left: 8px;
   z-index: 5;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(7, 8, 9, 0.7);
+  background: rgba(7, 8, 9, 0.65);
   color: #fff;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;

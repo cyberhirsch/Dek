@@ -413,6 +413,13 @@ const INLINE_MARKS: Record<string, [string, string]> = {
   underline: ['<u>', '</u>'],
   strike: ['~~', '~~'],
 }
+// Native execCommand names for the WYSIWYG (rich) surfaces.
+const EXEC_CMD: Record<string, string> = {
+  bold: 'bold',
+  italic: 'italic',
+  underline: 'underline',
+  strike: 'strikeThrough',
+}
 function onFormat(kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet') {
   const ae = document.activeElement as HTMLElement | null
   const editing = !!ae && ae.isContentEditable
@@ -422,6 +429,15 @@ function onFormat(kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet') {
     return
   }
   if (editing) {
+    // Rich surfaces (the text list, canvas text boxes) render Markdown as live
+    // HTML, so toggle real formatting and let them serialize back to Markdown.
+    // Plain fields (title, statement, caption…) get literal markers as before.
+    const rich = ae!.closest('.editable-list, [data-rich]')
+    if (rich) {
+      document.execCommand('styleWithCSS', false, 'false')
+      document.execCommand(EXEC_CMD[kind])
+      return
+    }
     const [open, close] = INLINE_MARKS[kind]
     const sel = window.getSelection()
     if (!sel || !sel.rangeCount) return

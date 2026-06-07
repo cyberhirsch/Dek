@@ -96,12 +96,12 @@ function onPick(e: Event) {
     </div>
 
     <!-- replace button for an existing image (editable) -->
-    <button v-if="editable && src" class="fi-upload" title="Replace image" @click.stop="pick">⤓</button>
+    <button v-if="editable && src" class="fi-upload" title="Replace image" @click.stop="pick">⇄</button>
 
     <input ref="fileEl" type="file" accept="image/*" class="fi-input" @change="onPick" />
 
     <div v-if="over" class="fi-drop">drop to replace</div>
-    <div v-if="editable && pannable && src" class="fi-hint">drag to pan · scroll to zoom · click ⤓ or drop to replace</div>
+    <div v-if="editable && pannable && src" class="fi-hint">drag to pan · scroll to zoom · click ⇄ or drop to replace</div>
   </div>
 </template>
 

@@ -17,6 +17,43 @@ export function inlineMd(src: string | undefined): string {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
 }
 
+// Inverse of inlineMd: turn the HTML a contenteditable produces back into the
+// Markdown we store. This lets the editor render **bold**/<u>underline</u>/etc.
+// live (WYSIWYG) while the source of truth on disk stays clean Markdown.
+// Handles both semantic tags (<strong>/<b>, <em>/<i>, <u>, <s>/<strike>/<del>,
+// <code>) and the inline-styled <span>s some browsers emit from execCommand.
+function serializeNode(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.nodeValue ?? ''
+  if (node.nodeType !== Node.ELEMENT_NODE) return ''
+  const eln = node as HTMLElement
+  const tag = eln.tagName.toLowerCase()
+  if (tag === 'br') return '\n'
+  let inner = ''
+  node.childNodes.forEach((c) => (inner += serializeNode(c)))
+  // Block elements (a contenteditable wraps new lines in <div>/<p>) become line breaks.
+  if (tag === 'div' || tag === 'p') return inner + '\n'
+  if (!inner.trim()) return inner // don't wrap whitespace-only spans in markers
+  const style = eln.getAttribute('style') ?? ''
+  const bold = tag === 'b' || tag === 'strong' || /font-weight\s*:\s*(bold|[6-9]00)/i.test(style)
+  const italic = tag === 'i' || tag === 'em' || /font-style\s*:\s*italic/i.test(style)
+  const underline = tag === 'u' || /text-decoration[^;]*underline/i.test(style)
+  const strike =
+    tag === 's' || tag === 'strike' || tag === 'del' || /text-decoration[^;]*line-through/i.test(style)
+  let s = tag === 'code' ? '`' + inner + '`' : inner
+  if (bold) s = `**${s}**`
+  if (italic) s = `*${s}*`
+  if (underline) s = `<u>${s}</u>`
+  if (strike) s = `~~${s}~~`
+  return s
+}
+export function htmlToInline(html: string): string {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = html
+  let out = ''
+  tpl.content.childNodes.forEach((c) => (out += serializeNode(c)))
+  return out.replace(/\u00a0/g, ' ').replace(/\n$/, '')
+}
+
 export interface ContentRow {
   text: string
   bullet: boolean

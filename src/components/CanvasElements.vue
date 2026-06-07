@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from '../core/types'
-import { inlineMd, parseContent } from '../render/inline'
+import { inlineMd, parseContent, htmlToInline } from '../render/inline'
 import { newElement } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
@@ -234,7 +234,7 @@ function commitEdit() {
   const node = root.value?.querySelector<HTMLElement>(`[data-edit="${i}"]`)
   editing.value = null
   if (!node) return
-  const content = node.innerText.replace(/\n+$/, '')
+  const content = htmlToInline(node.innerHTML).replace(/\n+$/, '')
   if (content !== (props.elements[i] as BoxElement).content) {
     const next = props.elements.map((el) => ({ ...el }))
     ;(next[i] as BoxElement).content = content
@@ -293,12 +293,14 @@ defineExpose({ commitEdit })
           class="el-text-body editing"
           :style="textStyle(asBox(el))"
           :data-edit="i"
+          data-rich
           contenteditable="true"
           spellcheck="false"
           @pointerdown.stop
           @blur="commitEdit"
           @keydown.escape.prevent="commitEdit"
-        >{{ asBox(el).content }}</div>
+          v-html="inlineMd(asBox(el).content)"
+        />
         <div v-else class="el-text-body" :style="textStyle(asBox(el))">
           <div
             v-for="(row, ri) in parseContent(asBox(el).content)"
