@@ -50,6 +50,14 @@ const selectedElement = computed(() => {
   return deck.value.slides[current.value]?.elements?.[selectedEl.value] ?? null
 })
 
+// Track whether the slide navigator was the last thing clicked. Delete then
+// removes the selected slide(s) when focus is on the slide list — but on the
+// stage/canvas, Delete keeps removing the selected canvas element instead.
+const navFocused = ref(false)
+function trackClick(e: PointerEvent) {
+  navFocused.value = !!(e.target as HTMLElement | null)?.closest?.('.nav')
+}
+
 // present-mode views
 const overviewOpen = ref(false)
 const presenterOpen = ref(false) // in-app overlay fallback when a popup is blocked
@@ -178,10 +186,12 @@ onMounted(async () => {
   }
   window.addEventListener('keydown', onKey)
   window.addEventListener('mousemove', resetIdle)
+  window.addEventListener('pointerdown', trackClick, true)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('mousemove', resetIdle)
+  window.removeEventListener('pointerdown', trackClick, true)
   if (idleTimer) clearTimeout(idleTimer)
   presenterBC.close()
 })
@@ -290,6 +300,15 @@ function onKey(e: KeyboardEvent) {
   ) {
     e.preventDefault()
     deleteSelectedElement()
+  } else if (
+    editMode.value &&
+    selectedEl.value == null &&
+    navFocused.value &&
+    !typing &&
+    e.key === 'Delete'
+  ) {
+    e.preventDefault()
+    removeSlide()
   } else if (editMode.value && !mod && !typing) {
     // canvas tool shortcuts
     const k = e.key.toLowerCase()
@@ -619,6 +638,20 @@ function groupSelected() {
   anchor = insertAt
   void saveWholeDeck()
 }
+/** Group every section slide together with the slides that follow it (up to the
+ *  next section), naming each group after that section's title. Slides before the
+ *  first section are left untouched. Order is preserved, so the contiguous runs
+ *  form groups naturally. */
+function autoGroup() {
+  if (!deck.value) return
+  snap('autogroup')
+  let name: string | null = null
+  for (const s of deck.value.slides) {
+    if (s.layout === 'section') name = ((s.title ?? '') as string).trim() || 'Section'
+    if (name) s.group = name
+  }
+  void saveWholeDeck()
+}
 function joinGroup(e: { from: number; name: string }) {
   if (!deck.value) return
   snap('join-group')
@@ -690,7 +723,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       v-if="deck && editMode"
       :deck="deck"
       :index="current"
-      :selected-count="selected.length"
       :save-status="saveStatus"
       :autosave="autosave"
       :can-undo="canUndo"
@@ -708,10 +740,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @update-element="onUpdateElement"
       @set-image="onSetElementImage"
       @insert-image="onInsertImage"
-      @add="addSlide"
-      @duplicate="duplicateSlide"
-      @remove="removeSlide"
-      @group="groupSelected"
       @undo="undo"
       @redo="redo"
       @toggle-autosave="autosave = !autosave"
@@ -738,6 +766,11 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @join-group="joinGroup"
         @ungroup="ungroup"
         @rename="renameGroup"
+        @add="addSlide"
+        @duplicate="duplicateSlide"
+        @remove="removeSlide"
+        @group="groupSelected"
+        @autogroup="autoGroup"
       />
 
       <div v-if="deck" class="stage-wrap">
@@ -764,6 +797,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <SourcePane
         v-if="deck && editMode && showSource"
         :deck="deck"
+        :index="current"
         @apply="applySource"
         @close="showSource = false"
       />

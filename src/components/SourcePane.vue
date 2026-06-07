@@ -2,17 +2,46 @@
 // A live Markdown source pane: shows the exact .md the deck serializes to, and
 // (Tier 2) parses edits back into the deck. The conversion engine already runs
 // in the browser (core/deck.ts is pure TS), so this is a thin two-way bridge.
-import { ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import { parseDeck, serializeDeck } from '../core/deck'
 
-const props = defineProps<{ deck: Deck }>()
+const props = defineProps<{ deck: Deck; index: number }>()
 const emit = defineEmits<{ apply: [Deck]; close: [] }>()
 
 const text = ref(serializeDeck(props.deck))
 const error = ref<string | null>(null)
+const ta = ref<HTMLTextAreaElement | null>(null)
 let focused = false
 let timer: ReturnType<typeof setTimeout> | null = null
+
+// Scroll the textarea so the selected slide's block sits near the top. Block
+// separators (`---` at column 0) delimit blocks: block 0 is the config, so
+// slide N starts at the (N+1)-th separator. Skip while the user is typing here.
+function scrollToSlide() {
+  const el = ta.value
+  if (!el || focused) return
+  const lines = text.value.split('\n')
+  let seen = -1
+  let lineNo = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (/^---[ \t]*$/.test(lines[i])) {
+      if (++seen === props.index + 1) {
+        lineNo = i
+        break
+      }
+    }
+  }
+  const cs = getComputedStyle(el)
+  const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.55
+  const pad = parseFloat(cs.paddingTop) || 0
+  el.scrollTop = Math.max(0, lineNo * lh + pad - 12)
+}
+watch(
+  () => props.index,
+  () => void nextTick(scrollToSlide),
+)
+onMounted(() => void nextTick(scrollToSlide))
 
 // ── horizontal resize (drag the left edge) ──
 const width = ref(420)
@@ -86,6 +115,7 @@ function onBlur() {
       <button class="sp-close" title="Close source view" @click="emit('close')">✕</button>
     </header>
     <textarea
+      ref="ta"
       class="sp-text"
       spellcheck="false"
       :value="text"
