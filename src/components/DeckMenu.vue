@@ -10,6 +10,7 @@ const emit = defineEmits<{
   'save-as': []
   new: []
   open: [file: string]
+  export: []
 }>()
 
 const open = ref(false)
@@ -47,6 +48,10 @@ function pick(file: string) {
   open.value = false
   emit('open', file)
 }
+function exportDeck() {
+  open.value = false
+  emit('export')
+}
 </script>
 
 <template>
@@ -60,10 +65,11 @@ function pick(file: string) {
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
+          <button @click="newDeck">＋ New deck…</button>
           <button v-if="dir" @click="openFolder">📁 Open folder…</button>
           <button v-if="fs" @click="openFile">📄 Open file…</button>
           <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>
-          <button @click="newDeck">＋ New deck…</button>
+          <button @click="exportDeck">⇪ Export (PDF / HTML)…</button>
         </div>
         <div v-if="decks.length" class="dm-grp">
           <div class="dm-lbl">Decks</div>

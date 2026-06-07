@@ -117,6 +117,14 @@ export function defaultConfig(): DeckConfig {
   }
 }
 
+/** A brand-new deck: default theme/config and a single empty cover slide. */
+export function emptyDeck(name?: string): Deck {
+  return {
+    config: { ...defaultConfig(), deck: name || 'Untitled' },
+    slides: [{ layout: 'cover', title: '', subtitle: '' }],
+  }
+}
+
 export function blankSlide(layout: LayoutId = 'text'): Slide {
   switch (layout) {
     case 'cover':

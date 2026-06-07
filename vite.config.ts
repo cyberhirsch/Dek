@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'node:path'
 import fs from 'node:fs'
-import { parseDeck, serializeDeck } from './src/core/deck'
+import { parseDeck, serializeDeck, emptyDeck } from './src/core/deck'
 import type { Slide, DeckConfig } from './src/core/types'
 
 const ROOT = __dirname
@@ -133,17 +133,13 @@ function dekApi() {
             return json(res, 200, { ok: true, file: `decks/${fileName}` })
           }
 
-          // Create a new empty deck (seeded from the example) in decks/.
+          // Create a new empty deck (just a blank cover slide) in decks/.
           if (url === '/api/new' && req.method === 'POST') {
             const { name } = JSON.parse(await readBody(req)) as { name: string }
             fs.mkdirSync(DECKS_DIR, { recursive: true })
             const fileName = `${slug(name)}.md`
             const dest = path.join(DECKS_DIR, fileName)
-            const base = fs.existsSync(EXAMPLE_PATH)
-              ? parseDeck(fs.readFileSync(EXAMPLE_PATH, 'utf-8'))
-              : { config: {}, slides: [] }
-            base.config = { ...base.config, deck: name || 'Untitled' }
-            fs.writeFileSync(dest, serializeDeck(base), 'utf-8')
+            fs.writeFileSync(dest, serializeDeck(emptyDeck(name)), 'utf-8')
             return json(res, 200, { ok: true, file: `decks/${fileName}` })
           }
 

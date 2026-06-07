@@ -4,7 +4,7 @@
 // and cloud backends layer on top of this later.
 import type { Deck } from '../core/types'
 import type { DeckRef, StorageBackend } from './types'
-import { parseDeck } from '../core/deck'
+import { parseDeck, emptyDeck } from '../core/deck'
 import { idbGet, idbKeys, idbSet } from './idb'
 // The example deck ships with the app so a fresh visitor sees something.
 import exampleRaw from '../../deck.example.md?raw'
@@ -93,9 +93,8 @@ export const browserBackend: StorageBackend = {
 
   async newDeck(name) {
     const file = `${slug(name)}.md`
-    const base = parseDeck(exampleRaw)
-    base.config = { ...base.config, deck: name || 'Untitled' }
-    await idbSet(PREFIX + file, { file, name: name || 'Untitled', deck: base } satisfies Stored)
+    const deck = emptyDeck(name)
+    await idbSet(PREFIX + file, { file, name: name || 'Untitled', deck } satisfies Stored)
     return file
   },
 }
