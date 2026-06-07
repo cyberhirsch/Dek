@@ -26,6 +26,25 @@ function reset() {
   elapsed.value = 0
 }
 
+// resizable side pane (drag the divider so notes can be bigger or smaller)
+const sideW = ref(420)
+let rsx = 0
+let rsw = 0
+function onSideDown(e: PointerEvent) {
+  e.preventDefault()
+  rsx = e.clientX
+  rsw = sideW.value
+  window.addEventListener('pointermove', onSideMove)
+  window.addEventListener('pointerup', onSideUp)
+}
+function onSideMove(e: PointerEvent) {
+  sideW.value = Math.max(240, Math.min(window.innerWidth - 360, rsw + (rsx - e.clientX)))
+}
+function onSideUp() {
+  window.removeEventListener('pointermove', onSideMove)
+  window.removeEventListener('pointerup', onSideUp)
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 's') {
     e.preventDefault()
@@ -69,7 +88,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="side">
+      <div class="side-resizer" title="Drag to resize" @pointerdown="onSideDown" />
+
+      <div class="side" :style="{ flex: 'none', width: sideW + 'px' }">
         <div class="next">
           <div class="label">Next</div>
           <SlideThumb v-if="next" :slide="next" :config="deck.config" :index="current + 1" :total="deck.slides.length" :width="300" />
@@ -131,15 +152,24 @@ onUnmounted(() => {
   min-height: 0;
 }
 .main {
-  flex: 2;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   min-width: 0;
 }
+.side-resizer {
+  flex: none;
+  width: 8px;
+  margin: 0 -8px 0 0;
+  cursor: ew-resize;
+  border-radius: 4px;
+}
+.side-resizer:hover {
+  background: rgba(127, 199, 255, 0.3);
+}
 .side {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 20px;

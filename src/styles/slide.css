@@ -277,6 +277,22 @@
   width: auto;
   max-width: 100%;
 }
+/* The text column grows/shrinks inversely to the image's width: a wide 16:9
+   image takes more room (less text), a tall 9:16 image takes little (much more
+   text). The image is whichever track `side` ordered second/first, so each
+   ratio needs a left- and right-side variant. (1:1 keeps the base 1fr 1fr.) */
+.l-text-image.ratio-16x9.side-right .cols {
+  grid-template-columns: 1fr 1.5fr; /* text | image */
+}
+.l-text-image.ratio-16x9.side-left .cols {
+  grid-template-columns: 1.5fr 1fr; /* image | text */
+}
+.l-text-image.ratio-9x16.side-right .cols {
+  grid-template-columns: 1.9fr 1fr; /* text | image */
+}
+.l-text-image.ratio-9x16.side-left .cols {
+  grid-template-columns: 1fr 1.9fr; /* image | text */
+}
 
 /* ── Layout: image-full ────────────────────────────────────────── */
 .l-image-full {

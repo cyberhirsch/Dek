@@ -52,9 +52,39 @@ const selectedElement = computed(() => {
 
 // present-mode views
 const overviewOpen = ref(false)
-const presenterOpen = ref(false)
+const presenterOpen = ref(false) // in-app overlay fallback when a popup is blocked
 const exportOpen = ref(false)
 const reviewOpen = ref(false)
+
+// ── presenter popup (a separate window for a second monitor) ──
+// Opens the app with ?view=presenter and keeps it in sync over a BroadcastChannel:
+// it sends the current index on change, answers the popup's hello, and accepts
+// navigation back so advancing in either window moves both.
+const presenterWin = ref<Window | null>(null)
+const presenterBC = new BroadcastChannel('dek-presenter')
+presenterBC.onmessage = (e: MessageEvent) => {
+  const m = e.data as { type?: string; index?: number }
+  if (!m) return
+  if (m.type === 'nav' && typeof m.index === 'number') current.value = m.index
+  else if (m.type === 'hello') presenterBC.postMessage({ type: 'state', index: current.value })
+  else if (m.type === 'bye') presenterWin.value = null
+}
+watch(current, (i) => presenterBC.postMessage({ type: 'state', index: i }))
+function openPresenter() {
+  if (presenterWin.value && !presenterWin.value.closed) {
+    presenterWin.value.focus()
+    return
+  }
+  const url = new URL(location.href)
+  url.searchParams.set('view', 'presenter')
+  const w = window.open(url.toString(), 'dek-presenter', 'popup,width=1100,height=700')
+  if (!w) {
+    presenterOpen.value = true // popup blocked → fall back to the in-app overlay
+    return
+  }
+  presenterWin.value = w
+  if (editMode.value) editMode.value = false // the main window becomes the audience view
+}
 const analysis = computed(() => (deck.value ? analyzeDeck(deck.value) : null))
 const reviewCount = computed(() => {
   const c = analysis.value?.counts
@@ -153,6 +183,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('mousemove', resetIdle)
   if (idleTimer) clearTimeout(idleTimer)
+  presenterBC.close()
 })
 
 // ── deck files: open / save-as / new / switch ──
@@ -275,7 +306,7 @@ function onKey(e: KeyboardEvent) {
       overviewOpen.value = true
     } else if (k === 'p' || k === 's') {
       e.preventDefault()
-      presenterOpen.value = true
+      openPresenter()
     }
   }
 }
@@ -775,7 +806,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button @click="current = Math.min(deck.slides.length - 1, current + 1)" title="Next">→</button>
       <span class="hud-sep" />
       <button title="Overview (O)" @click="overviewOpen = true">▦</button>
-      <button title="Presenter view (P)" @click="presenterOpen = true">◉</button>
+      <button title="Presenter view (P) — opens a separate window" @click="openPresenter">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
       <button title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
     </div>
