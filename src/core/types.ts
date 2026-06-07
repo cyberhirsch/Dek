@@ -97,6 +97,9 @@ export interface BoxElement extends ElementBase {
   color?: string
   align?: 'left' | 'center' | 'right'
   valign?: 'top' | 'middle' | 'bottom'
+  /** Numeric font weight (e.g. 300 for the light heading look). When set it wins
+   *  over `bold`, except `bold: true` always forces 700 so the B button works. */
+  weight?: number
   bold?: boolean
   italic?: boolean
   underline?: boolean
@@ -179,6 +182,11 @@ export interface Slide {
   body?: string
   /** Free-positioned canvas elements drawn over the layout. */
   elements?: SlideElement[]
+  /** Content kept but NOT rendered by the current layout — preserved verbatim so
+   *  switching layouts is reversible (the "Map + keep hidden" policy). Holds
+   *  inactive slot fields (e.g. a `cite` while in a text layout) and, under
+   *  `elements`, canvas objects with no slot in this layout. Never rendered. */
+  stash?: Partial<Slide>
   // sidebar organization (Keynote-style sections). A group = a maximal run of
   // consecutive slides sharing the same non-empty `group` string.
   group?: string

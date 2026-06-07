@@ -86,9 +86,10 @@ function go(n: number) {
 function onKey(e: KeyboardEvent) {
   // Suspended while an overlay (overview / presenter / export) owns the keyboard.
   if (props.navEnabled === false) return
-  // Don't hijack arrows/space while typing in a contenteditable field.
+  // Don't hijack arrows/space while typing in a contenteditable or form field
+  // (e.g. the Markdown source textarea) — only Page Up/Down still navigates.
   const ae = document.activeElement as HTMLElement | null
-  if (ae && ae.isContentEditable) {
+  if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) {
     if (e.key === 'PageDown') go(props.modelValue + 1)
     if (e.key === 'PageUp') go(props.modelValue - 1)
     return

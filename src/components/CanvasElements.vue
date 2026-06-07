@@ -78,7 +78,9 @@ function textStyle(el: BoxElement) {
     fontSize: (el.size ?? 28) + 'px',
     textAlign: el.align ?? 'left',
     color: el.color ?? 'var(--dek-text)',
-    fontWeight: el.bold ? '700' : '400',
+    // bold always wins (so the B button works); otherwise use an explicit weight
+    // (e.g. 300 from a baked heading), defaulting to 400.
+    fontWeight: el.bold ? '700' : el.weight != null ? String(el.weight) : '400',
     fontStyle: el.italic ? 'italic' : 'normal',
     textDecoration: deco || 'none',
     justifyContent: el.valign === 'middle' ? 'center' : el.valign === 'bottom' ? 'flex-end' : 'flex-start',

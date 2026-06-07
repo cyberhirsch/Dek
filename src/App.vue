@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
 import { blankSlide } from './core/deck'
-import { bakeToElements } from './core/bake'
+import { convertLayout } from './core/convert'
 import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
@@ -24,6 +24,7 @@ import ExportView from './components/ExportView.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
+import SourcePane from './components/SourcePane.vue'
 import type { CanvasTool, ElementPatch, BoxElement } from './core/types'
 import { parseContent, rowsToContent } from './render/inline'
 
@@ -32,6 +33,7 @@ const current = ref(0)
 const error = ref<string | null>(null)
 
 const editMode = ref(true) // start in the editor; "Present" switches to present mode
+const showSource = ref(false) // raw Markdown source pane (right dock)
 const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 const bulletFormatCommand = ref(0)
@@ -220,8 +222,14 @@ function jumpToSlide(index: number) {
   anchor = current.value
 }
 
+// A field is "typing" if it's contenteditable OR a native form control — in any
+// of these the global shortcuts must yield to the field (arrows, letters, undo).
+function isTyping(el: HTMLElement | null): boolean {
+  return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
+}
 function onKey(e: KeyboardEvent) {
   const ae = document.activeElement as HTMLElement | null
+  const typing = isTyping(ae)
   const mod = e.ctrlKey || e.metaKey
   if (mod && e.key.toLowerCase() === 'e') {
     e.preventDefault()
@@ -230,15 +238,15 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault()
     onFormat('bullet')
   } else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-    if (ae?.isContentEditable) return // let the field's native undo win
+    if (typing) return // let the field's native undo win
     e.preventDefault()
     undo()
   } else if (mod && ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y')) {
-    if (ae?.isContentEditable) return
+    if (typing) return
     e.preventDefault()
     redo()
   } else if (e.key === 'Escape' && editMode.value) {
-    if (ae?.isContentEditable) ae.blur()
+    if (typing) ae!.blur()
     else if (selectedEl.value != null) {
       selectedEl.value = null
       activeTool.value = 'select'
@@ -246,17 +254,17 @@ function onKey(e: KeyboardEvent) {
   } else if (
     editMode.value &&
     selectedEl.value != null &&
-    !ae?.isContentEditable &&
+    !typing &&
     (e.key === 'Delete' || e.key === 'Backspace')
   ) {
     e.preventDefault()
     deleteSelectedElement()
-  } else if (editMode.value && !mod && !ae?.isContentEditable) {
+  } else if (editMode.value && !mod && !typing) {
     // canvas tool shortcuts
     const k = e.key.toLowerCase()
     if (k === 'v') activeTool.value = 'select'
     else if (k === 't') activeTool.value = 'text'
-  } else if (!mod && !editMode.value && !ae?.isContentEditable && !overviewOpen.value && !presenterOpen.value) {
+  } else if (!mod && !editMode.value && !typing && !overviewOpen.value && !presenterOpen.value) {
     // present-mode single-key shortcuts
     const k = e.key.toLowerCase()
     if (k === 'f') {
@@ -320,16 +328,27 @@ function patchConfig(p: Partial<DeckConfig>) {
   deck.value.config = { ...deck.value.config, ...p }
   scheduleWholeDeckSave()
 }
+/** Apply an edit made in the raw Markdown source pane: replace the whole deck
+ *  with the re-parsed result. Coalesced into one undo step per typing burst. */
+function applySource(d: Deck) {
+  if (!deck.value) return
+  snap('source-edit', true)
+  deck.value.config = d.config
+  deck.value.slides = d.slides
+  if (current.value > d.slides.length - 1) current.value = Math.max(0, d.slides.length - 1)
+  selected.value = [Math.min(current.value, Math.max(0, d.slides.length - 1))]
+  scheduleWholeDeckSave()
+}
 function changeLayout(id: LayoutId) {
   if (!deck.value) return
   const s = deck.value.slides[current.value]
-  // Picking Freeform bakes the current content into movable elements so nothing
-  // is lost on conversion.
-  if (id === 'freeform' && s.layout !== 'freeform') {
-    bakeCurrentToFreeform()
-    return
-  }
-  patchSlide({ layout: id })
+  if (s.layout === id) return
+  // convertLayout maps shared content across the two layouts and parks the rest
+  // in `stash` (reversible), so nothing is lost and nothing renders twice.
+  snap('layout')
+  deck.value.slides[current.value] = convertLayout(s, id)
+  selectedEl.value = null
+  scheduleSlideSave()
 }
 
 // ── canvas element ops ──
@@ -338,14 +357,12 @@ function changeLayout(id: LayoutId) {
 function bakeCurrentToFreeform(extra?: SlideElement) {
   if (!deck.value) return
   const s = deck.value.slides[current.value]
-  const baked = bakeToElements(s)
-  if (extra) baked.push(extra)
-  const fresh: Slide = { layout: 'freeform', elements: baked }
-  if (s.group) fresh.group = s.group
-  if (s.notes) fresh.notes = s.notes
+  const fresh = convertLayout(s, 'freeform')
+  if (!fresh.elements) fresh.elements = []
+  if (extra) fresh.elements.push(extra)
   snap('bake-freeform')
   deck.value.slides[current.value] = fresh
-  selectedEl.value = extra ? baked.length - 1 : null
+  selectedEl.value = extra ? fresh.elements.length - 1 : null
   scheduleSlideSave()
 }
 function onCreateElement(el: SlideElement) {
@@ -626,7 +643,9 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :review-count="reviewCount"
       :tool="activeTool"
       :selected-element="selectedElement"
+      :show-source="showSource"
       @change-layout="changeLayout"
+      @toggle-source="showSource = !showSource"
       @patch="patchSlide"
       @format="onFormat"
       @update:tool="activeTool = $event"
@@ -684,6 +703,13 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       </div>
       <div v-else-if="error" class="msg err">{{ error }}</div>
       <div v-else class="msg">loading…</div>
+
+      <SourcePane
+        v-if="deck && editMode && showSource"
+        :deck="deck"
+        @apply="applySource"
+        @close="showSource = false"
+      />
     </div>
 
     <ReviewPanel

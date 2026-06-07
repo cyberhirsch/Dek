@@ -15,6 +15,7 @@ const props = defineProps<{
   reviewCount: number
   tool: CanvasTool
   selectedElement: SlideElement | null
+  showSource: boolean
 }>()
 const emit = defineEmits<{
   'change-layout': [id: LayoutId]
@@ -39,6 +40,7 @@ const emit = defineEmits<{
   'update:tool': [t: CanvasTool]
   insert: [what: 'video' | 'diagram' | 'table']
   'update-element': [p: ElementPatch]
+  'toggle-source': []
 }>()
 
 function onAdd(ev: Event) {
@@ -262,6 +264,7 @@ function colorOr(v: string | undefined, fallback: string) {
       <button class="topbtn" title="Review validation and assets" @click="emit('review')">
         Review{{ reviewCount ? ` ${reviewCount}` : '' }}
       </button>
+      <button class="topbtn" :class="{ on: showSource }" title="Toggle Markdown source view" @click="emit('toggle-source')">&lt;/&gt; Source</button>
       <button class="topbtn" title="Export (PDF / HTML)" @click="emit('export')">⤓ Export</button>
       <button class="present" title="Present (Ctrl+E)" @click="emit('close')">▶ Present</button>
     </div>
@@ -399,6 +402,7 @@ function colorOr(v: string | undefined, fallback: string) {
   cursor: pointer;
 }
 .topbtn:hover { background: rgba(255, 255, 255, 0.12); }
+.topbtn.on { border-color: #7fc7ff; color: #7fc7ff; background: rgba(127, 199, 255, 0.12); }
 .present {
   background: rgba(127, 199, 255, 0.16);
   border: 1px solid rgba(127, 199, 255, 0.5);

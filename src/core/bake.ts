@@ -19,6 +19,10 @@ const INNER_H = STAGE_H - PAD_Y * 2 // 580
 function text(content: string, x: number, y: number, w: number, h: number, extra: Partial<BoxElement> = {}): BoxElement {
   return { type: 'box', x, y, w, h, rotation: 0, content, font: 'body', size: 28, ...extra }
 }
+// A heading box that matches the CSS heading look (Cormorant italic, weight 300)
+// rather than the box default (upright 400). Passing `bold:true` is intentionally
+// NOT used so the elegant light italic survives the bake.
+const HEAD: Partial<BoxElement> = { font: 'heading', italic: true, weight: 300 }
 function image(src: string, x: number, y: number, w: number, h: number, extra: Partial<ImageElement> = {}): ImageElement {
   return { type: 'image', x, y, w, h, rotation: 0, src, fit: 'cover', ...extra }
 }
@@ -38,20 +42,19 @@ export function bakeToElements(slide: Slide): SlideElement[] {
   const els: SlideElement[] = []
   const title = (slide.title ?? '').trim()
   const content = (slide.content ?? '').trim()
-  const H = 'heading' // heading-font token
   const B = 'body'
 
   switch (slide.layout) {
     case 'cover':
-      els.push(text(slide.title ?? '', PAD_X, 250, INNER_W, 240, { size: 200, align: 'center', bold: true, font: H }))
+      els.push(text(slide.title ?? '', PAD_X, 250, INNER_W, 240, { size: 200, align: 'center', ...HEAD }))
       if (slide.subtitle) els.push(text(slide.subtitle, PAD_X, 470, INNER_W, 80, { size: 48, align: 'center', font: B }))
       if (slide.byline) els.push(text(slide.byline, PAD_X, 580, INNER_W, 40, { size: 20, align: 'center', font: B }))
       break
     case 'section':
-      els.push(text(slide.title ?? '', PAD_X, 280, INNER_W, 160, { size: 110, align: 'center', bold: true, font: H }))
+      els.push(text(slide.title ?? '', PAD_X, 280, INNER_W, 160, { size: 110, align: 'center', ...HEAD }))
       break
     case 'statement':
-      els.push(text(slide.text ?? '', PAD_X, 230, INNER_W, 200, { size: 56, align: 'center', font: H }))
+      els.push(text(slide.text ?? '', PAD_X, 230, INNER_W, 200, { size: 56, align: 'center', ...HEAD }))
       if (slide.cite) els.push(text(`— ${slide.cite}`, PAD_X, 470, INNER_W, 40, { size: 22, align: 'center', font: B }))
       break
     case 'speaker': {
@@ -64,12 +67,12 @@ export function bakeToElements(slide: Slide): SlideElement[] {
         if (p) els.push(image(p, px, 120, pw, pw))
         px += pw + gap
       }
-      if (slide.name) els.push(text(slide.name, PAD_X, 380, INNER_W, 80, { size: 64, align: 'center', bold: true, font: H }))
+      if (slide.name) els.push(text(slide.name, PAD_X, 380, INNER_W, 80, { size: 64, align: 'center', ...HEAD }))
       if (slide.role) els.push(text(slide.role, PAD_X, 470, INNER_W, 40, { size: 24, align: 'center', font: B }))
       break
     }
     case 'text':
-      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, bold: true, font: H }))
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, ...HEAD }))
       els.push(text(content, PAD_X, PAD_Y + 110, INNER_W, INNER_H - 110, { size: 28, font: B }))
       break
     case 'text-image': {
@@ -78,13 +81,13 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       const imgX = left ? PAD_X : PAD_X + half + 40
       const txtX = left ? PAD_X + half + 40 : PAD_X
       if (slide.image) els.push(image(slide.image, imgX, PAD_Y + 110, half, INNER_H - 110, { focus: slide.focus }))
-      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, bold: true, font: H }))
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, ...HEAD }))
       els.push(text(content, txtX, PAD_Y + 110, half, INNER_H - 110, { size: 26, font: B }))
       break
     }
     case 'image-full':
       if (slide.image) els.push(image(slide.image, 0, 0, STAGE_W, STAGE_H, { focus: slide.focus }))
-      if (slide.title) els.push(text(slide.title, PAD_X, 560, INNER_W, 70, { size: 48, bold: true, font: H }))
+      if (slide.title) els.push(text(slide.title, PAD_X, 560, INNER_W, 70, { size: 48, ...HEAD }))
       if (slide.caption) els.push(text(slide.caption, PAD_X, 640, INNER_W, 40, { size: 22, font: B }))
       break
     case 'image-caption':
@@ -95,7 +98,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       const items = (slide.items ?? []).filter(
         (it): it is { image: string; label?: string } => !!it && typeof it === 'object' && 'image' in it,
       )
-      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 70, { size: 40, bold: true, font: H }))
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 70, { size: 40, ...HEAD }))
       const cols = Math.min(items.length || 1, 3)
       const gap = 24
       const cellW = (INNER_W - gap * (cols - 1)) / cols
@@ -113,12 +116,12 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       if (slide.caption) els.push(text(slide.caption, PAD_X, STAGE_H - 120, INNER_W, 40, { size: 22, align: 'center', font: B }))
       break
     case 'diagram':
-      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 80, { size: 44, bold: true, font: H }))
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 80, { size: 44, ...HEAD }))
       els.push(diagram(slide.code ?? '', PAD_X, title ? PAD_Y + 100 : PAD_Y, INNER_W, title ? INNER_H - 100 : INNER_H))
       break
     default:
       // anything else: salvage what we can.
-      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, bold: true, font: H }))
+      if (title) els.push(text(title, PAD_X, PAD_Y, INNER_W, 90, { size: 48, ...HEAD }))
       if (slide.caption) els.push(text(slide.caption, PAD_X, STAGE_H - 120, INNER_W, 40, { size: 22, align: 'center', font: B }))
       break
   }
