@@ -174,4 +174,14 @@ export default defineConfig(({ command }) => ({
   // project site at /<repo>/). Dev stays at '/'.
   base: command === 'build' ? './' : '/',
   plugins: [vue(), dekApi()],
+  server: {
+    // Autosave writes deck files (and uploaded images) into the project root via
+    // the dev API. deck.example.md is also pulled into the module graph by a
+    // `?raw` import (browser-build seeding), so a save would otherwise trigger a
+    // full HMR page reload — a visible flicker mid-edit. Keep these out of the
+    // watcher: their content is owned by the app, not by source HMR.
+    watch: {
+      ignored: ['**/deck.md', '**/deck.example.md', '**/decks/**', '**/public/Assets/**'],
+    },
+  },
 }))
