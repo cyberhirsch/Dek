@@ -9,7 +9,18 @@ const ROOT = __dirname
 const DECK_PATH = path.resolve(ROOT, 'deck.md')
 const EXAMPLE_PATH = path.resolve(ROOT, 'deck.example.md')
 const DECKS_DIR = path.resolve(ROOT, 'decks')
-const ASSETS_DIR = path.resolve(ROOT, 'public/Assets')
+
+const MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+}
 
 /** On a fresh clone deck.md is gitignored/absent — seed it from the example. */
 function ensureDeck() {
@@ -25,6 +36,18 @@ function resolveDeck(file: string | null): string {
   const m = /^decks\/([a-zA-Z0-9_-]+)\.md$/.exec(file)
   if (m) return path.join(DECKS_DIR, `${m[1]}.md`)
   throw new Error(`invalid deck file: ${file}`)
+}
+
+/** Each deck keeps its images in a dedicated "<name> Assets" folder right next to
+ *  its `.md` (mirroring the local-folder backend), e.g. `deck.md` →
+ *  `deck Assets/`, `decks/talk.md` → `decks/talk Assets/`. Returns the absolute
+ *  dir plus the root-relative URL the dev server serves it under. */
+function assetsFor(file: string | null): { dir: string; urlPrefix: string } {
+  const p = resolveDeck(file)
+  const base = path.basename(p, '.md')
+  const dir = path.join(path.dirname(p), `${base} Assets`)
+  const rel = path.relative(ROOT, dir).split(path.sep).join('/')
+  return { dir, urlPrefix: '/' + rel }
 }
 
 function slug(name: string): string {
@@ -84,6 +107,18 @@ function dekApi() {
         const url = u.pathname
         const file = u.searchParams.get('file')
         try {
+          // Serve a deck's dedicated "<name> Assets/" folder (these live next to
+          // the .md, outside Vite's public/, so they need an explicit route).
+          const decoded = decodeURIComponent(url)
+          if (req.method === 'GET' && / Assets\//.test(decoded)) {
+            const abs = path.resolve(ROOT, decoded.replace(/^\/+/, ''))
+            if (abs.startsWith(ROOT + path.sep) && fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+              res.writeHead(200, { 'Content-Type': MIME[path.extname(abs).toLowerCase()] ?? 'application/octet-stream' })
+              fs.createReadStream(abs).pipe(res)
+              return
+            }
+          }
+
           if (url === '/api/decks' && req.method === 'GET') {
             return json(res, 200, { decks: listDecks() })
           }
@@ -149,12 +184,14 @@ function dekApi() {
               dataUrl: string
             }
             const b64 = dataUrl.replace(/^data:[^;]+;base64,/, '')
-            fs.mkdirSync(ASSETS_DIR, { recursive: true })
+            const { dir, urlPrefix } = assetsFor(file)
+            fs.mkdirSync(dir, { recursive: true })
             const ext = path.extname(filename) || '.png'
             const base = path.basename(filename, ext).replace(/[^a-zA-Z0-9_-]/g, '_')
             const name = `${base}_${Date.now()}${ext}`
-            fs.writeFileSync(path.join(ASSETS_DIR, name), Buffer.from(b64, 'base64'))
-            return json(res, 200, { ok: true, url: `/Assets/${name}` })
+            fs.writeFileSync(path.join(dir, name), Buffer.from(b64, 'base64'))
+            // URL-encode the space in "<name> Assets" so the <img src> is valid.
+            return json(res, 200, { ok: true, url: `${urlPrefix.replace(/ /g, '%20')}/${name}` })
           }
         } catch (e) {
           return json(res, 500, { error: (e as Error).message })
@@ -177,7 +214,7 @@ export default defineConfig(({ command }) => ({
     // full HMR page reload — a visible flicker mid-edit. Keep these out of the
     // watcher: their content is owned by the app, not by source HMR.
     watch: {
-      ignored: ['**/deck.md', '**/deck.example.md', '**/decks/**', '**/public/Assets/**'],
+      ignored: ['**/deck.md', '**/deck.example.md', '**/decks/**', '**/public/Assets/**', '**/* Assets/**'],
     },
   },
 }))

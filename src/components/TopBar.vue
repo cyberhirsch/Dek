@@ -337,6 +337,7 @@ const themeSwatches = computed(() => {
 .brand {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
+  font-weight: 700;
   font-size: 22px;
   color: #fff;
 }

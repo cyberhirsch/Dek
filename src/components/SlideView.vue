@@ -20,6 +20,7 @@ const props = defineProps<{
   bulletFormatCommand?: number
   tool?: CanvasTool
   selectedEl?: number | null
+  pendingImage?: string
 }>()
 
 const emit = defineEmits<{
@@ -293,6 +294,7 @@ watch(
       :editable="editable"
       :tool="tool"
       :selected="selectedEl"
+      :pending-image="pendingImage"
       @update:elements="emit('update:elements', $event)"
       @update:selected="emit('update:selectedEl', $event)"
       @create="emit('create-element', $event)"

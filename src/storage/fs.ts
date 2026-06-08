@@ -73,7 +73,7 @@ export function fsBackend(handle: FileHandle): StorageBackend {
       deck.slides[index] = slide
       await write(deck)
     },
-    async uploadAsset(_filename, dataUrl) {
+    async uploadAsset(_file, _filename, dataUrl) {
       return dataUrl
     },
     async saveAs(name, deck) {

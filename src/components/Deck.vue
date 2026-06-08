@@ -13,6 +13,7 @@ const props = defineProps<{
   navEnabled?: boolean
   tool?: CanvasTool
   selectedEl?: number | null
+  pendingImage?: string
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
@@ -161,6 +162,7 @@ onUnmounted(() => {
         :bullet-format-command="bulletFormatCommand"
         :tool="tool"
         :selected-el="selectedEl"
+        :pending-image="pendingImage"
         @patch="emit('patch', $event)"
         @config-patch="emit('config-patch', $event)"
         @upload="emit('upload', $event)"

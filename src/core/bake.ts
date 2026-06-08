@@ -130,19 +130,46 @@ export function bakeToElements(slide: Slide): SlideElement[] {
   return els
 }
 
-/** A fresh element for the given tool, centred near a drop point. */
-export function newElement(tool: CanvasTool, rawX: number, rawY: number): SlideElement {
+/** Default dimensions for a tool, used when a create is a plain click (no drag). */
+export function defaultSize(tool: CanvasTool): { w: number; h: number } {
+  switch (tool) {
+    case 'text':
+      return { w: 320, h: 60 }
+    case 'image':
+      return { w: 320, h: 220 }
+    case 'rect':
+    default:
+      return { w: 240, h: 160 }
+  }
+}
+
+/** A fresh element for the given tool, occupying an explicit rectangle (the area
+ *  the user dragged out — top-left `x,y`, size `w,h`). `src` fills an image box. */
+export function newElementRect(tool: CanvasTool, rawX: number, rawY: number, rawW: number, rawH: number, src?: string): SlideElement {
   const x = Math.round(rawX)
   const y = Math.round(rawY)
+  const w = Math.max(8, Math.round(rawW))
+  const h = Math.max(8, Math.round(rawH))
   switch (tool) {
     case 'text':
       // a text box = a box with transparent fill & stroke
-      return { type: 'box', x: x - 160, y: y - 30, w: 320, h: 60, rotation: 0, content: 'Text', font: 'body', size: 32, fill: 'transparent', stroke: 'transparent' }
+      return { type: 'box', x, y, w, h, rotation: 0, content: 'Text', font: 'body', size: 32, fill: 'transparent', stroke: 'transparent' }
+    case 'image':
+      return { type: 'box', x, y, w, h, rotation: 0, src: src ?? '', fit: 'cover', fill: 'transparent', stroke: 'transparent' }
     case 'rect':
-      return { type: 'box', x: x - 120, y: y - 80, w: 240, h: 160, rotation: 0, fill: '#7fc7ff', stroke: '#7fc7ff', strokeWidth: 2, radius: 8 }
-    case 'arrow':
-      return { type: 'arrow', x: x - 120, y, w: 240, h: 0, rotation: 0, stroke: '#e6ecf2', strokeWidth: 3 }
+      return { type: 'box', x, y, w, h, rotation: 0, fill: '#7fc7ff', stroke: '#7fc7ff', strokeWidth: 2, radius: 8 }
     default:
-      return { type: 'box', x: x - 120, y: y - 80, w: 240, h: 160, rotation: 0, fill: '#7fc7ff' }
+      return { type: 'box', x, y, w, h, rotation: 0, fill: '#7fc7ff' }
   }
+}
+
+/** An arrow built from a drag vector: it runs from the start point (tail) to the
+ *  end point (head), encoded as a zero-height box of length = distance, rotated to
+ *  the drag angle around its centre (matching the renderer + rotate handle). */
+export function newArrow(x0: number, y0: number, x1: number, y1: number): SlideElement {
+  const len = Math.max(8, Math.hypot(x1 - x0, y1 - y0))
+  const angle = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI
+  const cx = (x0 + x1) / 2
+  const cy = (y0 + y1) / 2
+  return { type: 'arrow', x: Math.round(cx - len / 2), y: Math.round(cy), w: Math.round(len), h: 0, rotation: Math.round(angle), stroke: '#e6ecf2', strokeWidth: 3 }
 }

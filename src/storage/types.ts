@@ -18,8 +18,9 @@ export interface StorageBackend {
   loadDeck(file?: string): Promise<Deck>
   saveDeck(file: string | undefined, deck: Deck): Promise<void>
   saveSlide(file: string | undefined, index: number, slide: Deck['slides'][number]): Promise<void>
-  /** Returns a URL/data-URL to reference the uploaded image from a slide. */
-  uploadAsset(filename: string, dataUrl: string): Promise<string>
+  /** Returns a URL/data-URL to reference the uploaded image from a slide. The
+   *  active deck `file` lets a backend store assets in that deck's own folder. */
+  uploadAsset(file: string | undefined, filename: string, dataUrl: string): Promise<string>
   /** Save the deck under a new name; returns the new file id. */
   saveAs(name: string, deck: Deck): Promise<string>
   /** Create a fresh deck; returns the new file id. */

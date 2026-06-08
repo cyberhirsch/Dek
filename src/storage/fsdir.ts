@@ -203,7 +203,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       deck.slides[index] = mapImages(slide, (v) => urlToPath.get(v) ?? v)
       await writeMd(deck)
     },
-    async uploadAsset(filename, dataUrl) {
+    async uploadAsset(_file, filename, dataUrl) {
       const folder = assetsFolderFor(mdBase(md))
       const ad = await dir.getDirectoryHandle(folder, { create: true })
       const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '.png'

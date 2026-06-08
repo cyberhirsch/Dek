@@ -79,7 +79,7 @@ export const browserBackend: StorageBackend = {
     await idbSet(PREFIX + file, rec)
   },
 
-  async uploadAsset(_filename, dataUrl) {
+  async uploadAsset(_file, _filename, dataUrl) {
     // Inline the image; nothing else to do.
     return dataUrl
   },

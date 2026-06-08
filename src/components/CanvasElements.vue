@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from '../core/types'
-import { inlineMd, parseContent, htmlToInline } from '../render/inline'
-import { newElement } from '../core/bake'
+import { inlineMd, htmlToInline } from '../render/inline'
+import { newElementRect, newArrow, defaultSize } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
+import BoxText from './BoxText.vue'
 
 const STAGE_W = 1280
 
@@ -14,6 +15,8 @@ const props = defineProps<{
   editable?: boolean
   tool?: CanvasTool
   selected?: number | null
+  /** URL for the image tool — dragging out a rectangle places this picture. */
+  pendingImage?: string
 }>()
 
 const emit = defineEmits<{
@@ -90,16 +93,54 @@ function textStyle(el: BoxElement) {
 }
 
 // ── selection / creation ──
+// Creating any element is click-the-top-left + drag-out-the-size. We record the
+// down point, track the pointer, and on release build the element from the dragged
+// rectangle (or, if it was just a click, a sensible default size at that point).
+const createDraft = ref<{ tool: CanvasTool; x0: number; y0: number; x1: number; y1: number } | null>(null)
+const createRect = computed(() => {
+  const c = createDraft.value
+  if (!c) return null
+  return { x: Math.min(c.x0, c.x1), y: Math.min(c.y0, c.y1), w: Math.abs(c.x1 - c.x0), h: Math.abs(c.y1 - c.y0) }
+})
+
 function onBackgroundDown(e: PointerEvent) {
   if (!props.editable) return
   if (props.tool && props.tool !== 'select') {
+    e.preventDefault()
     const p = toStage(e)
-    emit('create', newElement(props.tool, p.x, p.y))
-    emit('tool-reset')
+    createDraft.value = { tool: props.tool, x0: p.x, y0: p.y, x1: p.x, y1: p.y }
+    window.addEventListener('pointermove', onCreateMove)
+    window.addEventListener('pointerup', onCreateUp)
     return
   }
   emit('update:selected', null)
   if (editing.value != null) commitEdit()
+}
+function onCreateMove(e: PointerEvent) {
+  if (!createDraft.value) return
+  const p = toStage(e)
+  createDraft.value = { ...createDraft.value, x1: p.x, y1: p.y }
+}
+function onCreateUp() {
+  window.removeEventListener('pointermove', onCreateMove)
+  window.removeEventListener('pointerup', onCreateUp)
+  const c = createDraft.value
+  createDraft.value = null
+  if (!c) return
+  const dragged = Math.hypot(c.x1 - c.x0, c.y1 - c.y0) > 6
+  let el: SlideElement
+  if (c.tool === 'arrow') {
+    el = dragged ? newArrow(c.x0, c.y0, c.x1, c.y1) : newArrow(c.x0, c.y0, c.x0 + 240, c.y0)
+  } else {
+    const d = defaultSize(c.tool)
+    const x = dragged ? Math.min(c.x0, c.x1) : c.x0
+    const y = dragged ? Math.min(c.y0, c.y1) : c.y0
+    const w = dragged ? Math.abs(c.x1 - c.x0) : d.w
+    const h = dragged ? Math.abs(c.y1 - c.y0) : d.h
+    el = newElementRect(c.tool, x, y, w, h, props.pendingImage)
+  }
+  emit('create', el)
+  emit('tool-reset')
 }
 
 function onElementDown(e: PointerEvent, i: number) {
@@ -310,15 +351,12 @@ defineExpose({ commitEdit })
           @keydown.escape.prevent="commitEdit"
           v-html="inlineMd(asBox(el).content)"
         />
-        <div v-else class="el-text-body" :style="textStyle(asBox(el))">
-          <div
-            v-for="(row, ri) in parseContent(asBox(el).content)"
-            :key="ri"
-            class="el-line"
-            :class="{ bullet: row.bullet }"
-            v-html="inlineMd(row.text)"
-          />
-        </div>
+        <BoxText
+          v-else
+          :content="asBox(el).content"
+          :base-size="asBox(el).size ?? 28"
+          :style="textStyle(asBox(el))"
+        />
       </template>
 
       <!-- arrow -->
@@ -380,6 +418,16 @@ defineExpose({ commitEdit })
         />
       </template>
     </div>
+
+    <!-- drag-to-create preview -->
+    <div
+      v-if="createDraft && createDraft.tool !== 'arrow' && createRect"
+      class="create-ghost"
+      :style="{ left: createRect.x + 'px', top: createRect.y + 'px', width: createRect.w + 'px', height: createRect.h + 'px' }"
+    />
+    <svg v-else-if="createDraft" class="create-ghost-arrow" viewBox="0 0 1280 720" preserveAspectRatio="none">
+      <line :x1="createDraft.x0" :y1="createDraft.y0" :x2="createDraft.x1" :y2="createDraft.y1" />
+    </svg>
   </div>
 </template>
 
@@ -391,6 +439,29 @@ defineExpose({ commitEdit })
 }
 .canvas-layer.creating {
   cursor: crosshair;
+}
+/* drag-to-create ghost */
+.create-ghost {
+  position: absolute;
+  border: 1.5px dashed #7fc7ff;
+  background: rgba(127, 199, 255, 0.1);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 6;
+}
+.create-ghost-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+}
+.create-ghost-arrow line {
+  stroke: #7fc7ff;
+  stroke-width: 3;
+  stroke-dasharray: 6 5;
 }
 .el {
   position: absolute;

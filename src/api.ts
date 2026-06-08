@@ -89,7 +89,7 @@ export async function saveDeck(config: DeckConfig, slides: Slide[]): Promise<voi
 }
 
 export async function uploadImage(filename: string, dataUrl: string): Promise<string> {
-  return (await active()).uploadAsset(filename, dataUrl)
+  return (await active()).uploadAsset(currentFile, filename, dataUrl)
 }
 
 export async function saveAs(name: string, config: DeckConfig, slides: Slide[]): Promise<string> {

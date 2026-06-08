@@ -40,8 +40,8 @@ export const serverBackend: StorageBackend = {
     if (!r.ok) throw new Error((await r.json()).error ?? 'save failed')
   },
 
-  async uploadAsset(filename, dataUrl) {
-    const r = await fetch('/api/upload', {
+  async uploadAsset(file, filename, dataUrl) {
+    const r = await fetch(`/api/upload${q(file)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename, dataUrl }),

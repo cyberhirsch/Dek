@@ -61,8 +61,8 @@ export interface TextItem {
 
 export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram'
 
-/** The active canvas tool. 'text' and 'rect' both create a `box`. */
-export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow'
+/** The active canvas tool. 'text', 'rect' and 'image' all create a `box`. */
+export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow' | 'image'
 
 export interface ElementBase {
   type: ElementType

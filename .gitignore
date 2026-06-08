@@ -13,3 +13,5 @@ dist
 # …but the tutorial screenshots used by deck.example.md are committed.
 !/public/Assets/tutorial/
 # (deck.example.md is committed as a runnable starting point)
+# Each deck's dedicated "<name> Assets/" folder (created next to its .md) is local.
+*\ Assets/

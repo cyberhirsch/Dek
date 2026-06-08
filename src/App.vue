@@ -41,6 +41,8 @@ const bulletFormatCommand = ref(0)
 // ── canvas (free elements) ──
 const activeTool = ref<CanvasTool>('select')
 const selectedEl = ref<number | null>(null)
+// URL of an image waiting to be placed by the image tool (set by Insert image).
+const pendingImage = ref('')
 watch(current, () => {
   selectedEl.value = null
   activeTool.value = 'select'
@@ -428,6 +430,7 @@ function onCreateElement(el: SlideElement) {
     bakeCurrentToFreeform(el)
   }
   activeTool.value = 'select'
+  pendingImage.value = ''
 }
 function onUpdateElements(els: SlideElement[]) {
   patchSlide({ elements: els })
@@ -446,15 +449,12 @@ async function onSetElementImage(file: File) {
   const url = await fileToUrl(file)
   onUpdateElement({ src: url, fit: 'cover' })
 }
-/** Insert a new image as a box on the canvas (bakes to freeform if needed). */
+/** Insert an image: upload it, then arm the image tool so the next click-drag on
+ *  the canvas places it at the dragged position and size. */
 async function onInsertImage(file: File) {
   const url = await fileToUrl(file)
-  const el: SlideElement = {
-    type: 'box',
-    x: 480, y: 230, w: 320, h: 220, rotation: 0,
-    src: url, fit: 'cover', fill: 'transparent', stroke: 'transparent',
-  }
-  onCreateElement(el)
+  pendingImage.value = url
+  activeTool.value = 'image'
 }
 /** Patch the currently-selected element (from the top bar's style controls). */
 function onUpdateElement(p: ElementPatch) {
@@ -648,7 +648,11 @@ function autoGroup() {
   let name: string | null = null
   for (const s of deck.value.slides) {
     if (s.layout === 'section') name = ((s.title ?? '') as string).trim() || 'Section'
+    // Slides under a section take its name; slides before the first section are
+    // ungrouped — clear any stale group so removing/moving a leading section
+    // also removes the group it used to define.
     if (name) s.group = name
+    else delete s.group
   }
   void saveWholeDeck()
 }
@@ -782,13 +786,14 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
           :tool="activeTool"
           :selected-el="selectedEl"
+          :pending-image="pendingImage"
           @patch="patchSlide"
           @config-patch="patchConfig"
           @upload="onUpload"
           @update:elements="onUpdateElements"
           @update:selected-el="selectedEl = $event"
           @create-element="onCreateElement"
-          @tool-reset="activeTool = 'select'"
+          @tool-reset="((activeTool = 'select'), (pendingImage = ''))"
         />
       </div>
       <div v-else-if="error" class="msg err">{{ error }}</div>

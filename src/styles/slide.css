@@ -234,9 +234,11 @@
 .l-text-image .cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 56px;
+  gap: 32px;
   flex: 1;
-  align-items: center;
+  /* Top-align every ratio so the image's top edge sits just under the heading
+     and lines up regardless of aspect ratio. */
+  align-items: start;
 }
 .l-text-image.side-right .text-col {
   order: 1;
@@ -267,25 +269,46 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
   background: rgba(255, 255, 255, 0.03);
 }
+/* For the narrower ratios the frame doesn't fill its column, so pin it to the
+   column's left edge (margin-right auto) — that keeps the image's top-left corner
+   aligned with the 16:9 frame instead of drifting to the column centre. */
 .l-text-image.ratio-1x1 .frame-img {
   aspect-ratio: 1 / 1;
   width: auto;
   max-width: 100%;
+  max-height: 460px;
+  margin: 0 auto 0 0;
 }
 .l-text-image.ratio-9x16 .frame-img {
   aspect-ratio: 9 / 16;
   width: auto;
   max-width: 100%;
+  /* shorter cap so a portrait frame clears the heading above and the footer
+     below instead of colliding with the lower text */
+  max-height: 460px;
+  margin: 0 auto 0 0;
 }
 /* The text column grows/shrinks inversely to the image's width: a wide 16:9
    image takes more room (less text), a tall 9:16 image takes little (much more
    text). The image is whichever track `side` ordered second/first, so each
    ratio needs a left- and right-side variant. (1:1 keeps the base 1fr 1fr.) */
 .l-text-image.ratio-16x9.side-right .cols {
-  grid-template-columns: 1fr 1.5fr; /* text | image */
+  grid-template-columns: 1fr 2.4fr; /* text | image — mirrors the freeform 302 / 726 */
 }
 .l-text-image.ratio-16x9.side-left .cols {
-  grid-template-columns: 1.5fr 1fr; /* image | text */
+  grid-template-columns: 2.4fr 1fr; /* image | text */
+}
+/* Match the freeform reference: a big image with a slim text column beside it
+   (not a centred 50/50 split) and slightly smaller body. */
+.l-text-image.ratio-16x9 .text-col .dek-list {
+  gap: 14px;
+}
+.l-text-image.ratio-16x9 .text-col .dek-list li {
+  font-size: 21px;
+  padding-left: 28px;
+}
+.l-text-image.ratio-16x9 .text-col .dek-list li::before {
+  font-size: 15px;
 }
 .l-text-image.ratio-9x16.side-right .cols {
   grid-template-columns: 1.9fr 1fr; /* text | image */
