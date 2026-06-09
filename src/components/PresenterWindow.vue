@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // Root of the standalone presenter popup (opened with ?view=presenter so it can
-// live on a second monitor). It loads the deck itself and stays in sync with the
-// main window over a BroadcastChannel: it receives the current slide index and
-// sends navigation back, so advancing in either window moves both.
+// live on a second monitor). The deck is handed to it by the main window over a
+// BroadcastChannel — it must NOT reload the deck itself, because a File-System-
+// opened deck's handle lives only in the main window (reloading would show the
+// wrong/default deck). It receives the deck + current index and sends navigation
+// back, so advancing in either window moves both.
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { Deck } from '../core/types'
-import { fetchDeck } from '../api'
+import { parseDeck } from '../core/deck'
 import Presenter from './Presenter.vue'
 
 const deck = ref<Deck | null>(null)
@@ -14,8 +16,18 @@ const error = ref<string | null>(null)
 const bc = new BroadcastChannel('dek-presenter')
 
 bc.onmessage = (e: MessageEvent) => {
-  const m = e.data as { type?: string; index?: number }
-  if (m?.type === 'state' && typeof m.index === 'number') current.value = m.index
+  const m = e.data as { type?: string; index?: number; deckText?: string }
+  if (!m) return
+  if (m.type === 'deck' && typeof m.deckText === 'string') {
+    try {
+      deck.value = parseDeck(m.deckText)
+      if (typeof m.index === 'number') current.value = m.index
+    } catch (err) {
+      error.value = (err as Error).message
+    }
+  } else if (m.type === 'state' && typeof m.index === 'number') {
+    current.value = m.index
+  }
 }
 function setCurrent(i: number) {
   current.value = i
@@ -28,14 +40,9 @@ function closeWin() {
   window.close()
 }
 
-onMounted(async () => {
+onMounted(() => {
   document.title = 'Dek · Presenter'
-  try {
-    deck.value = await fetchDeck()
-  } catch (e) {
-    error.value = (e as Error).message
-  }
-  // Ask the main window for the current slide so we open on the right one.
+  // Ask the main window for the deck + current slide; it replies with `deck`.
   bc.postMessage({ type: 'hello' })
   window.addEventListener('pagehide', bye)
 })

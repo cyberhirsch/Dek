@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
-import { blankSlide } from './core/deck'
+import { blankSlide, serializeDeck } from './core/deck'
 import { convertLayout } from './core/convert'
 import { analyzeDeck } from './core/analyze'
 import {
@@ -76,10 +76,71 @@ presenterBC.onmessage = (e: MessageEvent) => {
   const m = e.data as { type?: string; index?: number }
   if (!m) return
   if (m.type === 'nav' && typeof m.index === 'number') current.value = m.index
-  else if (m.type === 'hello') presenterBC.postMessage({ type: 'state', index: current.value })
+  // The popup can't reach a File-System-opened deck (the handle lives only in
+  // this window), so hand it the actual deck rather than letting it reload one.
+  else if (m.type === 'hello') sendPresenterDeck()
   else if (m.type === 'bye') presenterWin.value = null
 }
+/** A File-System-opened deck's images are `blob:` URLs scoped to THIS window, so
+ *  the popup (a separate document) can't load them. Inline those as data URLs
+ *  before sending. http(s)/data URLs are already cross-window safe — left as-is. */
+async function inlineBlobImages(d: Deck): Promise<Deck> {
+  const cache = new Map<string, string>()
+  async function conv(u?: string): Promise<string | undefined> {
+    if (!u || !u.startsWith('blob:')) return u
+    if (cache.has(u)) return cache.get(u)
+    try {
+      const blob = await (await fetch(u)).blob()
+      const data = await new Promise<string>((res) => {
+        const fr = new FileReader()
+        fr.onload = () => res(fr.result as string)
+        fr.readAsDataURL(blob)
+      })
+      cache.set(u, data)
+      return data
+    } catch {
+      return u
+    }
+  }
+  const slides = await Promise.all(
+    d.slides.map(async (s) => {
+      const n: Slide = { ...s }
+      if (typeof n.image === 'string') n.image = await conv(n.image)
+      if (typeof n.poster === 'string') n.poster = await conv(n.poster)
+      if (Array.isArray(n.portraits)) n.portraits = await Promise.all(n.portraits.map((p) => (typeof p === 'string' ? conv(p) : p) as Promise<string>))
+      if (Array.isArray(n.items)) {
+        n.items = await Promise.all(
+          n.items.map(async (it) =>
+            it && typeof it === 'object' && 'image' in it ? { ...it, image: (await conv((it as { image: string }).image)) ?? '' } : it,
+          ),
+        )
+      }
+      if (Array.isArray(n.elements)) {
+        n.elements = await Promise.all(
+          n.elements.map(async (el) => {
+            const e = { ...el } as SlideElement & { src?: string; poster?: string }
+            if (typeof e.src === 'string') e.src = await conv(e.src)
+            if (typeof e.poster === 'string') e.poster = await conv(e.poster)
+            return e as SlideElement
+          }),
+        )
+      }
+      return n
+    }),
+  )
+  return { config: d.config, slides }
+}
+/** Push the current deck + slide to the presenter popup. */
+async function sendPresenterDeck() {
+  if (!deck.value) return
+  const d = await inlineBlobImages(deck.value)
+  presenterBC.postMessage({ type: 'deck', deckText: serializeDeck(d), index: current.value })
+}
 watch(current, (i) => presenterBC.postMessage({ type: 'state', index: i }))
+// Keep the popup's deck current when a different deck is loaded or edited.
+watch(deck, () => {
+  if (presenterWin.value && !presenterWin.value.closed) sendPresenterDeck()
+})
 function openPresenter() {
   if (presenterWin.value && !presenterWin.value.closed) {
     presenterWin.value.focus()
@@ -212,17 +273,19 @@ function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
 }
 async function onOpenFile() {
+  error.value = ''
   try {
     applyDeck(await openLocalFile())
   } catch (e) {
-    if (!isAbort(e)) error.value = (e as Error).message
+    if (!isAbort(e)) error.value = `Open file failed: ${(e as Error).message}`
   }
 }
 async function onOpenFolder() {
+  error.value = ''
   try {
     applyDeck(await openLocalFolder())
   } catch (e) {
-    if (!isAbort(e)) error.value = (e as Error).message
+    if (!isAbort(e)) error.value = `Open folder failed: ${(e as Error).message}`
   }
 }
 async function onOpenDeck(file: string) {
@@ -866,6 +929,13 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @close="presenterOpen = false"
     />
     <ExportView v-if="deck && exportOpen" :deck="deck" @close="exportOpen = false" />
+
+    <!-- Surface errors even when a deck is loaded (open/save failures used to be
+         silent because the error message only rendered on the no-deck screen). -->
+    <div v-if="deck && error" class="toast err" @click="error = ''">
+      <span>{{ error }}</span>
+      <button class="toast-x" title="Dismiss">✕</button>
+    </div>
   </div>
 </template>
 
@@ -901,6 +971,36 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
 }
 .msg.err {
   color: #f87171;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 80vw;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.toast.err {
+  background: rgba(60, 18, 18, 0.97);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+.toast-x {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.7;
 }
 .notes-bar {
   flex: none;
