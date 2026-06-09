@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'save-as': []
   'new-deck': []
   'open-deck': [file: string]
+  import: [file: File]
   'update:tool': [t: CanvasTool]
   insert: [what: 'video' | 'diagram' | 'table']
   'update-element': [p: ElementPatch]
@@ -131,6 +132,7 @@ const themeSwatches = computed(() => {
         @new="emit('new-deck')"
         @open="emit('open-deck', $event)"
         @export="emit('export')"
+        @import="emit('import', $event)"
       />
       <span class="div" />
       <label class="chk"><input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />auto</label>

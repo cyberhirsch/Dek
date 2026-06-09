@@ -15,3 +15,5 @@ dist
 # (deck.example.md is committed as a runnable starting point)
 # Each deck's dedicated "<name> Assets/" folder (created next to its .md) is local.
 *\ Assets/
+# Sample presentations used to test the importer — private lecture content.
+/import-samples/

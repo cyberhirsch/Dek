@@ -15,6 +15,7 @@ import {
   openLocalFolder,
   saveLocalFolderAs,
 } from './api'
+import { importFile, rehomeImages } from './import'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
@@ -313,6 +314,25 @@ async function onNewDeck() {
     applyDeck(await fetchDeck())
   } catch (e) {
     error.value = (e as Error).message
+  }
+}
+const importing = ref('')
+async function onImportFile(file: File) {
+  error.value = ''
+  try {
+    importing.value = `Reading ${file.name}…`
+    const { deck: imported, name } = await importFile(file)
+    importing.value = `Importing ${imported.slides.length} slides…`
+    // New deck first (sets the active file), so images land in its own folder.
+    await newDeck(name)
+    await rehomeImages(imported, (n, dataUrl) => uploadImage(n, dataUrl))
+    applyDeck(imported)
+    await saveWholeDeck()
+    editMode.value = true
+  } catch (e) {
+    error.value = `Import failed: ${(e as Error).message}`
+  } finally {
+    importing.value = ''
   }
 }
 
@@ -819,6 +839,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @save-as="onSaveAs"
       @new-deck="onNewDeck"
       @open-deck="onOpenDeck"
+      @import="onImportFile"
     />
 
     <div class="body">
@@ -900,6 +921,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @save-as="onSaveAs"
         @new="onNewDeck"
         @open="onOpenDeck"
+        @import="onImportFile"
+        @export="exportOpen = true"
       />
     </div>
     <div v-if="deck && !editMode" class="hud present-chrome" :class="{ 'ui-hidden': uiHidden }">
@@ -935,6 +958,15 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     <div v-if="deck && error" class="toast err" @click="error = ''">
       <span>{{ error }}</span>
       <button class="toast-x" title="Dismiss">✕</button>
+    </div>
+
+    <!-- import progress (blocks while a large deck is parsed/rehomed) -->
+    <div v-if="importing" class="import-overlay">
+      <div class="import-card">
+        <div class="import-spinner" />
+        <div>{{ importing }}</div>
+        <div class="import-sub">Large decks can take a moment.</div>
+      </div>
     </div>
   </div>
 </template>
@@ -1001,6 +1033,46 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   cursor: pointer;
   font-size: 12px;
   opacity: 0.7;
+}
+.import-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 6, 8, 0.8);
+  backdrop-filter: blur(4px);
+}
+.import-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 36px;
+  border-radius: 14px;
+  background: rgba(18, 20, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6ecf2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.import-sub {
+  font-size: 11px;
+  color: rgba(230, 236, 242, 0.45);
+}
+.import-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(127, 199, 255, 0.25);
+  border-top-color: #7fc7ff;
+  animation: dek-spin 0.8s linear infinite;
+}
+@keyframes dek-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .notes-bar {
   flex: none;

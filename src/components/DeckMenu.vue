@@ -11,9 +11,21 @@ const emit = defineEmits<{
   new: []
   open: [file: string]
   export: []
+  import: [file: File]
 }>()
 
 const open = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
+function pickImport() {
+  open.value = false
+  importInput.value?.click()
+}
+function onImportPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  if (f) emit('import', f)
+  input.value = ''
+}
 const decks = ref<DeckRef[]>([])
 const fs = supportsFS()
 const dir = supportsDir()
@@ -61,11 +73,14 @@ function exportDeck() {
       <span class="caret">▾</span>
     </button>
 
+    <input ref="importInput" type="file" accept=".pptx" style="display: none" @change="onImportPick" />
+
     <template v-if="open">
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
           <button @click="newDeck">＋ New deck…</button>
+          <button @click="pickImport">⬇ Import (PowerPoint)…</button>
           <button v-if="dir" @click="openFolder">📁 Open folder…</button>
           <button v-if="fs" @click="openFile">📄 Open file…</button>
           <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>
