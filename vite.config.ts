@@ -60,6 +60,19 @@ function slug(name: string): string {
   )
 }
 
+/** A decks/ filename that doesn't clobber an existing deck (…, -2, -3). */
+function uniqueDeckPath(name: string): { fileName: string; dest: string } {
+  const base = slug(name)
+  let fileName = `${base}.md`
+  let dest = path.join(DECKS_DIR, fileName)
+  let k = 2
+  while (fs.existsSync(dest)) {
+    fileName = `${base}-${k++}.md`
+    dest = path.join(DECKS_DIR, fileName)
+  }
+  return { fileName, dest }
+}
+
 function deckTitle(p: string): string | undefined {
   try {
     return parseDeck(fs.readFileSync(p, 'utf-8')).config.deck
@@ -161,8 +174,7 @@ function dekApi() {
               slides: Slide[]
             }
             fs.mkdirSync(DECKS_DIR, { recursive: true })
-            const fileName = `${slug(name)}.md`
-            const dest = path.join(DECKS_DIR, fileName)
+            const { fileName, dest } = uniqueDeckPath(name)
             const cfg = { ...config, deck: name || config.deck }
             fs.writeFileSync(dest, serializeDeck({ config: cfg, slides }), 'utf-8')
             return json(res, 200, { ok: true, file: `decks/${fileName}` })
@@ -172,8 +184,7 @@ function dekApi() {
           if (url === '/api/new' && req.method === 'POST') {
             const { name } = JSON.parse(await readBody(req)) as { name: string }
             fs.mkdirSync(DECKS_DIR, { recursive: true })
-            const fileName = `${slug(name)}.md`
-            const dest = path.join(DECKS_DIR, fileName)
+            const { fileName, dest } = uniqueDeckPath(name)
             fs.writeFileSync(dest, serializeDeck(emptyDeck(name)), 'utf-8')
             return json(res, 200, { ok: true, file: `decks/${fileName}` })
           }

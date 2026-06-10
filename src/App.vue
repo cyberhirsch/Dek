@@ -321,7 +321,9 @@ async function onImportFile(file: File) {
   error.value = ''
   try {
     importing.value = `Reading ${file.name}…`
-    const { deck: imported, name } = await importFile(file)
+    const { deck: imported, name } = await importFile(file, (done, total) => {
+      importing.value = `Rendering page ${done} / ${total}…`
+    })
     importing.value = `Importing ${imported.slides.length} slides…`
     // New deck first (sets the active file), so images land in its own folder.
     await newDeck(name)

@@ -1,15 +1,23 @@
 // Import entry point: dispatch a picked file to the right parser, and a helper to
 // move embedded (data-URL) images into the deck's real storage after import.
 import type { Deck, BoxElement, GalleryItem } from '../core/types'
-import { importPptx, type ImportResult } from './pptx'
+import type { ImportResult } from './pptx'
 
 export type { ImportResult }
 
-export async function importFile(file: File): Promise<ImportResult> {
+/** Parse a picked .pptx / .pdf into a deck. The parsers (and their heavy deps —
+ *  JSZip, pdf.js) are loaded on demand so the editor bundle stays lean. */
+export async function importFile(file: File, onProgress?: (done: number, total: number) => void): Promise<ImportResult> {
   const ext = file.name.toLowerCase().split('.').pop() ?? ''
-  if (ext === 'pptx') return importPptx(await file.arrayBuffer(), file.name)
-  // pdf → phase 2
-  throw new Error(`Unsupported file type ".${ext}". PowerPoint (.pptx) is supported; export Keynote/Slides to PowerPoint, or wait for PDF import.`)
+  if (ext === 'pptx') {
+    const { importPptx } = await import('./pptx')
+    return importPptx(await file.arrayBuffer(), file.name)
+  }
+  if (ext === 'pdf') {
+    const { importPdf } = await import('./pdf')
+    return importPdf(await file.arrayBuffer(), file.name, onProgress)
+  }
+  throw new Error(`Unsupported file type ".${ext}". Import PowerPoint (.pptx) or PDF — export Keynote/Google Slides to PowerPoint first.`)
 }
 
 /**

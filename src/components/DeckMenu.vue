@@ -73,14 +73,14 @@ function exportDeck() {
       <span class="caret">▾</span>
     </button>
 
-    <input ref="importInput" type="file" accept=".pptx" style="display: none" @change="onImportPick" />
+    <input ref="importInput" type="file" accept=".pptx,.pdf" style="display: none" @change="onImportPick" />
 
     <template v-if="open">
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
           <button @click="newDeck">＋ New deck…</button>
-          <button @click="pickImport">⬇ Import (PowerPoint)…</button>
+          <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
           <button v-if="dir" @click="openFolder">📁 Open folder…</button>
           <button v-if="fs" @click="openFile">📄 Open file…</button>
           <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>

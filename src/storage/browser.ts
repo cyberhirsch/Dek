@@ -41,6 +41,16 @@ async function seedIfEmpty() {
   await idbSet(PREFIX + DEFAULT, rec)
 }
 
+/** A deck filename that doesn't clobber an existing stored deck (…, -2, -3). */
+async function uniqueFile(name: string): Promise<string> {
+  const keys = await idbKeys()
+  const base = slug(name)
+  let file = `${base}.md`
+  let k = 2
+  while (keys.includes(PREFIX + file)) file = `${base}-${k++}.md`
+  return file
+}
+
 async function get(file: string): Promise<Stored | undefined> {
   return idbGet<Stored>(PREFIX + file)
 }
@@ -85,14 +95,14 @@ export const browserBackend: StorageBackend = {
   },
 
   async saveAs(name, deck) {
-    const file = `${slug(name)}.md`
+    const file = await uniqueFile(name)
     const cfg = { ...deck.config, deck: name || deck.config.deck }
     await idbSet(PREFIX + file, plain({ file, name, deck: { ...deck, config: cfg } }) satisfies Stored)
     return file
   },
 
   async newDeck(name) {
-    const file = `${slug(name)}.md`
+    const file = await uniqueFile(name)
     const deck = emptyDeck(name)
     await idbSet(PREFIX + file, { file, name: name || 'Untitled', deck } satisfies Stored)
     return file
