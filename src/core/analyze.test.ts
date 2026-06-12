@@ -69,4 +69,43 @@ describe('analyzeDeck', () => {
       ]),
     )
   })
+
+  it('flags on-disk files no slide references as orphans', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/Deck Assets/used.jpg' }],
+    }
+
+    const a = analyzeDeck(deck, ['used.jpg', 'stale.png', 'old-logo.svg'])
+
+    const orphans = a.assets.filter((x) => x.kind === 'orphan')
+    expect(orphans.map((o) => o.filename).sort()).toEqual(['old-logo.svg', 'stale.png'])
+    expect(a.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'asset', severity: 'info', field: 'stale.png', slide: 0 }),
+      ]),
+    )
+  })
+
+  it('matches references to disk files by basename (no false orphans)', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'gallery', items: [{ image: '/Deck Assets/a.jpg' }, { image: 'b.png' }] }],
+    }
+
+    const a = analyzeDeck(deck, ['a.jpg', 'b.png'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+  })
+
+  it('reports no orphans when the disk listing is omitted', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/Deck Assets/used.jpg' }],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+  })
 })

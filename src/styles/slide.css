@@ -179,6 +179,28 @@
   border-bottom: 1px solid rgba(230, 236, 242, 0.12);
   padding-bottom: 16px;
   margin-bottom: 36px;
+  flex-shrink: 0;
+}
+/* The text list must not overflow its layout column. flex: 1 + min-height: 0
+   lets it fill the remaining space; overflow: hidden clips instead of pushing
+   out of the slide frame. */
+.l-text > .dek-list,
+.l-text > .editable-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.l-text-image .text-col {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.l-text-image .text-col > .dek-list,
+.l-text-image .text-col > .editable-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .dek-list {
   list-style: none;
@@ -478,10 +500,15 @@
 .l-gallery h1 {
   margin-bottom: 28px;
 }
+.gallery-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
 .gallery-grid {
   display: grid;
   gap: 24px;
-  flex: 1;
+  height: 100%;
 }
 .gallery-cell {
   display: flex;
@@ -536,18 +563,29 @@
   background: rgba(248, 113, 113, 0.8);
 }
 .gallery-add {
-  border: 1px dashed rgba(127, 199, 255, 0.4);
-  border-radius: 10px;
-  background: rgba(127, 199, 255, 0.04);
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px dashed rgba(127, 199, 255, 0.5);
+  background: rgba(127, 199, 255, 0.06);
   color: rgba(127, 199, 255, 0.7);
-  font-family: var(--dek-font-body);
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
-  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+.gallery-wrap:hover .gallery-add {
+  opacity: 1;
 }
 .gallery-add:hover {
-  background: rgba(127, 199, 255, 0.1);
+  background: rgba(127, 199, 255, 0.18);
   color: var(--dek-accent);
 }
 

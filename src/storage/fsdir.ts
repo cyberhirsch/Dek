@@ -16,6 +16,7 @@ type DirHandle = {
   name: string
   getFileHandle(name: string, opts?: { create?: boolean }): Promise<FileHandle>
   getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<DirHandle>
+  removeEntry(name: string, opts?: { recursive?: boolean }): Promise<void>
   values(): AsyncIterable<FileHandle | DirHandle>
 }
 
@@ -225,6 +226,22 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async newDeck() {
       return md
+    },
+    async listAssets() {
+      try {
+        const ad = await dir.getDirectoryHandle(assetsFolderFor(mdBase(md)))
+        const out: string[] = []
+        for await (const h of ad.values()) {
+          if (!isDir(h)) out.push(h.name)
+        }
+        return out
+      } catch {
+        return [] // no assets folder yet
+      }
+    },
+    async deleteAsset(filename) {
+      const ad = await dir.getDirectoryHandle(assetsFolderFor(mdBase(md)))
+      await ad.removeEntry(filename)
     },
   }
 }

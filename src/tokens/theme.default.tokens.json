@@ -1,0 +1,17 @@
+{
+  "$description": "Editorial Dark — the canonical Dek theme. Near-black ground, off-white text, light italic serif headings over a technical mono body, one blue accent (amber strictly secondary).",
+  "name": "Editorial Dark",
+  "color": {
+    "bg": "#070809",
+    "text": "#e6ecf2",
+    "accent": "#7fc7ff",
+    "accent2": "#ffb474"
+  },
+  "font": {
+    "heading": "Cormorant Garamond",
+    "headingFallback": "serif",
+    "body": "JetBrains Mono",
+    "bodyFallback": "monospace"
+  },
+  "glow": true
+}

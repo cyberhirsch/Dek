@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
-import { blankSlide, serializeDeck } from './core/deck'
+import { blankSlide } from './core/deck'
 import { convertLayout } from './core/convert'
+import { newElementRect } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import {
   fetchDeck,
@@ -14,18 +15,24 @@ import {
   openLocalFile,
   openLocalFolder,
   saveLocalFolderAs,
+  listDeckAssets,
+  deleteDeckAsset,
 } from './api'
-import { importFile, rehomeImages } from './import'
+import { useUndo } from './composables/useUndo'
+import { usePresenterSync } from './composables/usePresenterSync'
+import { useImport } from './composables/useImport'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
 import Overview from './components/Overview.vue'
 import Presenter from './components/Presenter.vue'
 import ExportView from './components/ExportView.vue'
+import ImportReview from './components/ImportReview.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import SourcePane from './components/SourcePane.vue'
+import ContextMenu, { type CtxEntry } from './components/ContextMenu.vue'
 import type { CanvasTool, ElementPatch, BoxElement } from './core/types'
 import { parseContent, rowsToContent } from './render/inline'
 
@@ -41,16 +48,21 @@ const bulletFormatCommand = ref(0)
 
 // ── canvas (free elements) ──
 const activeTool = ref<CanvasTool>('select')
-const selectedEl = ref<number | null>(null)
+// Selected element indices in selection order; the last one is the "primary"
+// element whose styles the top bar displays (patches apply to the whole set).
+const selectedEls = ref<number[]>([])
 // URL of an image waiting to be placed by the image tool (set by Insert image).
 const pendingImage = ref('')
 watch(current, () => {
-  selectedEl.value = null
+  selectedEls.value = []
   activeTool.value = 'select'
 })
+const primaryEl = computed(() =>
+  selectedEls.value.length ? selectedEls.value[selectedEls.value.length - 1] : null,
+)
 const selectedElement = computed(() => {
-  if (!deck.value || selectedEl.value == null) return null
-  return deck.value.slides[current.value]?.elements?.[selectedEl.value] ?? null
+  if (!deck.value || primaryEl.value == null) return null
+  return deck.value.slides[current.value]?.elements?.[primaryEl.value] ?? null
 })
 
 // Track whether the slide navigator was the last thing clicked. Delete then
@@ -67,101 +79,36 @@ const presenterOpen = ref(false) // in-app overlay fallback when a popup is bloc
 const exportOpen = ref(false)
 const reviewOpen = ref(false)
 
-// ── presenter popup (a separate window for a second monitor) ──
-// Opens the app with ?view=presenter and keeps it in sync over a BroadcastChannel:
-// it sends the current index on change, answers the popup's hello, and accepts
-// navigation back so advancing in either window moves both.
-const presenterWin = ref<Window | null>(null)
-const presenterBC = new BroadcastChannel('dek-presenter')
-presenterBC.onmessage = (e: MessageEvent) => {
-  const m = e.data as { type?: string; index?: number }
-  if (!m) return
-  if (m.type === 'nav' && typeof m.index === 'number') current.value = m.index
-  // The popup can't reach a File-System-opened deck (the handle lives only in
-  // this window), so hand it the actual deck rather than letting it reload one.
-  else if (m.type === 'hello') sendPresenterDeck()
-  else if (m.type === 'bye') presenterWin.value = null
-}
-/** A File-System-opened deck's images are `blob:` URLs scoped to THIS window, so
- *  the popup (a separate document) can't load them. Inline those as data URLs
- *  before sending. http(s)/data URLs are already cross-window safe — left as-is. */
-async function inlineBlobImages(d: Deck): Promise<Deck> {
-  const cache = new Map<string, string>()
-  async function conv(u?: string): Promise<string | undefined> {
-    if (!u || !u.startsWith('blob:')) return u
-    if (cache.has(u)) return cache.get(u)
-    try {
-      const blob = await (await fetch(u)).blob()
-      const data = await new Promise<string>((res) => {
-        const fr = new FileReader()
-        fr.onload = () => res(fr.result as string)
-        fr.readAsDataURL(blob)
-      })
-      cache.set(u, data)
-      return data
-    } catch {
-      return u
-    }
+// Presenter popup (a separate window for a second monitor) — see usePresenterSync.
+const { openPresenter } = usePresenterSync({ deck, current, editMode, presenterOpen })
+
+// Files in the deck's on-disk assets folder (folder backends only). Fed into the
+// analysis so the Review panel can surface — and delete — orphaned images.
+const diskAssets = ref<string[]>([])
+async function refreshDiskAssets() {
+  try {
+    diskAssets.value = await listDeckAssets()
+  } catch {
+    diskAssets.value = []
   }
-  const slides = await Promise.all(
-    d.slides.map(async (s) => {
-      const n: Slide = { ...s }
-      if (typeof n.image === 'string') n.image = await conv(n.image)
-      if (typeof n.poster === 'string') n.poster = await conv(n.poster)
-      if (Array.isArray(n.portraits)) n.portraits = await Promise.all(n.portraits.map((p) => (typeof p === 'string' ? conv(p) : p) as Promise<string>))
-      if (Array.isArray(n.items)) {
-        n.items = await Promise.all(
-          n.items.map(async (it) =>
-            it && typeof it === 'object' && 'image' in it ? { ...it, image: (await conv((it as { image: string }).image)) ?? '' } : it,
-          ),
-        )
-      }
-      if (Array.isArray(n.elements)) {
-        n.elements = await Promise.all(
-          n.elements.map(async (el) => {
-            const e = { ...el } as SlideElement & { src?: string; poster?: string }
-            if (typeof e.src === 'string') e.src = await conv(e.src)
-            if (typeof e.poster === 'string') e.poster = await conv(e.poster)
-            return e as SlideElement
-          }),
-        )
-      }
-      return n
-    }),
-  )
-  return { config: d.config, slides }
 }
-/** Push the current deck + slide to the presenter popup. */
-async function sendPresenterDeck() {
-  if (!deck.value) return
-  const d = await inlineBlobImages(deck.value)
-  presenterBC.postMessage({ type: 'deck', deckText: serializeDeck(d), index: current.value })
-}
-watch(current, (i) => presenterBC.postMessage({ type: 'state', index: i }))
-// Keep the popup's deck current when a different deck is loaded or edited.
-watch(deck, () => {
-  if (presenterWin.value && !presenterWin.value.closed) sendPresenterDeck()
-})
-function openPresenter() {
-  if (presenterWin.value && !presenterWin.value.closed) {
-    presenterWin.value.focus()
-    return
-  }
-  const url = new URL(location.href)
-  url.searchParams.set('view', 'presenter')
-  const w = window.open(url.toString(), 'dek-presenter', 'popup,width=1100,height=700')
-  if (!w) {
-    presenterOpen.value = true // popup blocked → fall back to the in-app overlay
-    return
-  }
-  presenterWin.value = w
-  if (editMode.value) editMode.value = false // the main window becomes the audience view
-}
-const analysis = computed(() => (deck.value ? analyzeDeck(deck.value) : null))
+const analysis = computed(() => (deck.value ? analyzeDeck(deck.value, diskAssets.value) : null))
 const reviewCount = computed(() => {
   const c = analysis.value?.counts
   return c ? c.error + c.warning + c.info : 0
 })
+function toggleReview() {
+  reviewOpen.value = !reviewOpen.value
+  if (reviewOpen.value) void refreshDiskAssets() // freshen the orphan list on open
+}
+async function onDeleteAsset(filename: string) {
+  try {
+    await deleteDeckAsset(filename)
+    await refreshDiskAssets()
+  } catch (e) {
+    error.value = `Delete failed: ${(e as Error).message}`
+  }
+}
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
   else document.exitFullscreen?.()
@@ -187,64 +134,19 @@ watch(editMode, (on) => {
 const selected = ref<number[]>([0])
 let anchor = 0
 
-// ── undo / redo history ──
-interface Snap {
-  config: DeckConfig
-  slides: Slide[]
-  index: number
-}
-const past = ref<Snap[]>([])
-const future = ref<Snap[]>([])
-let lastSnapKey = ''
-let lastSnapTime = 0
-const canUndo = computed(() => past.value.length > 0)
-const canRedo = computed(() => future.value.length > 0)
-
-function cloneState(): Snap {
-  return {
-    config: JSON.parse(JSON.stringify(deck.value!.config)),
-    slides: JSON.parse(JSON.stringify(deck.value!.slides)),
-    index: current.value,
-  }
-}
-/** Record a checkpoint before a mutation. `coalesce` merges rapid same-key edits
- *  (e.g. typing) into a single undo step. */
-function snap(key: string, coalesce = false) {
-  if (!deck.value) return
-  const now = Date.now()
-  if (coalesce && key === lastSnapKey && now - lastSnapTime < 800) {
-    lastSnapTime = now
-    return
-  }
-  past.value.push(cloneState())
-  if (past.value.length > 80) past.value.shift()
-  future.value = []
-  lastSnapKey = key
-  lastSnapTime = now
-}
-function applySnap(s: Snap) {
-  deck.value!.config = s.config
-  deck.value!.slides = s.slides
-  current.value = Math.min(s.index, s.slides.length - 1)
-  selected.value = [current.value]
-  anchor = current.value
-  lastSnapKey = ''
-  void saveWholeDeck()
-}
-function undo() {
-  if (!past.value.length) return
-  future.value.push(cloneState())
-  applySnap(past.value.pop()!)
-}
-function redo() {
-  if (!future.value.length) return
-  past.value.push(cloneState())
-  applySnap(future.value.pop()!)
-}
+// ── undo / redo history (see useUndo) ──
+const { canUndo, canRedo, snap, undo, redo, reset: resetUndo } = useUndo({
+  deck,
+  current,
+  selected,
+  setAnchor: (n) => (anchor = n),
+  save: () => void saveWholeDeck(),
+})
 
 onMounted(async () => {
   try {
     deck.value = await fetchDeck()
+    void refreshDiskAssets()
   } catch (e) {
     error.value = (e as Error).message
   }
@@ -257,7 +159,6 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', resetIdle)
   window.removeEventListener('pointerdown', trackClick, true)
   if (idleTimer) clearTimeout(idleTimer)
-  presenterBC.close()
 })
 
 // ── deck files: open / save-as / new / switch ──
@@ -266,9 +167,9 @@ function applyDeck(d: Deck) {
   current.value = 0
   selected.value = [0]
   anchor = 0
-  past.value = []
-  future.value = []
+  resetUndo()
   saveStatus.value = 'saved'
+  void refreshDiskAssets()
 }
 function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
@@ -316,27 +217,12 @@ async function onNewDeck() {
     error.value = (e as Error).message
   }
 }
-const importing = ref('')
-async function onImportFile(file: File) {
-  error.value = ''
-  try {
-    importing.value = `Reading ${file.name}…`
-    const { deck: imported, name } = await importFile(file, (done, total) => {
-      importing.value = `Importing page ${done} / ${total}…`
-    })
-    importing.value = `Importing ${imported.slides.length} slides…`
-    // New deck first (sets the active file), so images land in its own folder.
-    await newDeck(name)
-    await rehomeImages(imported, (n, dataUrl) => uploadImage(n, dataUrl))
-    applyDeck(imported)
-    await saveWholeDeck()
-    editMode.value = true
-  } catch (e) {
-    error.value = `Import failed: ${(e as Error).message}`
-  } finally {
-    importing.value = ''
-  }
-}
+const { importing, pending: pendingImport, onImportFile, commitImport, cancelImport } = useImport({
+  applyDeck,
+  save: saveWholeDeck,
+  setError: (m) => (error.value = m),
+  onImported: () => (editMode.value = true),
+})
 
 function enterEdit() {
   editMode.value = true
@@ -373,15 +259,27 @@ function onKey(e: KeyboardEvent) {
     if (typing) return
     e.preventDefault()
     redo()
+  } else if (editMode.value && mod && !typing && e.key.toLowerCase() === 'c' && selectedEls.value.length) {
+    e.preventDefault()
+    copySelectedElements()
+  } else if (editMode.value && mod && !typing && e.key.toLowerCase() === 'v' && elementClipboard.els.length) {
+    e.preventDefault()
+    pasteElements()
+  } else if (editMode.value && mod && !typing && e.key.toLowerCase() === 'd' && selectedEls.value.length) {
+    e.preventDefault()
+    duplicateSelectedElements()
+  } else if (editMode.value && mod && !typing && (e.key === ']' || e.key === '[') && selectedEls.value.length) {
+    e.preventDefault()
+    reorderSelectedElements(e.key === ']' ? 1 : -1)
   } else if (e.key === 'Escape' && editMode.value) {
     if (typing) ae!.blur()
-    else if (selectedEl.value != null) {
-      selectedEl.value = null
+    else if (selectedEls.value.length) {
+      selectedEls.value = []
       activeTool.value = 'select'
     } else editMode.value = false
   } else if (
     editMode.value &&
-    selectedEl.value != null &&
+    selectedEls.value.length > 0 &&
     !typing &&
     (e.key === 'Delete' || e.key === 'Backspace')
   ) {
@@ -389,7 +287,7 @@ function onKey(e: KeyboardEvent) {
     deleteSelectedElement()
   } else if (
     editMode.value &&
-    selectedEl.value == null &&
+    selectedEls.value.length === 0 &&
     navFocused.value &&
     !typing &&
     e.key === 'Delete'
@@ -484,38 +382,107 @@ function changeLayout(id: LayoutId) {
   // in `stash` (reversible), so nothing is lost and nothing renders twice.
   snap('layout')
   deck.value.slides[current.value] = convertLayout(s, id)
-  selectedEl.value = null
+  selectedEls.value = []
   scheduleSlideSave()
 }
 
 // ── canvas element ops ──
-/** Convert the current slide into a freeform canvas, baking its layout fields
- *  into elements (and optionally appending a freshly-created one). */
-function bakeCurrentToFreeform(extra?: SlideElement) {
-  if (!deck.value) return
+/** Append elements to the current slide, selecting them. A semantic layout is
+ *  first converted to a freeform canvas (its content baked into movable
+ *  elements) unless it already carries overlay elements — then we just add. */
+function appendElements(els: SlideElement[]) {
+  if (!deck.value || !els.length) return
   const s = deck.value.slides[current.value]
-  const fresh = convertLayout(s, 'freeform')
-  if (!fresh.elements) fresh.elements = []
-  if (extra) fresh.elements.push(extra)
-  snap('bake-freeform')
-  deck.value.slides[current.value] = fresh
-  selectedEl.value = extra ? fresh.elements.length - 1 : null
-  scheduleSlideSave()
+  if (s.layout === 'freeform' || (s.elements && s.elements.length)) {
+    const next = [...(s.elements ?? []), ...els]
+    patchSlide({ elements: next })
+    selectedEls.value = els.map((_, k) => next.length - els.length + k)
+  } else {
+    const fresh = convertLayout(s, 'freeform')
+    fresh.elements = [...(fresh.elements ?? []), ...els]
+    snap('bake-freeform')
+    deck.value.slides[current.value] = fresh
+    selectedEls.value = els.map((_, k) => fresh.elements!.length - els.length + k)
+    scheduleSlideSave()
+  }
 }
 function onCreateElement(el: SlideElement) {
-  if (!deck.value) return
-  const s = deck.value.slides[current.value]
-  if (s.layout === 'freeform') {
-    const els = [...(s.elements ?? []), el]
-    patchSlide({ elements: els })
-    selectedEl.value = els.length - 1
-  } else {
-    // Any semantic layout converts to a freeform canvas, baking its content
-    // (text, images, video, diagram) into movable elements first.
-    bakeCurrentToFreeform(el)
-  }
+  appendElements([el])
   activeTool.value = 'select'
   pendingImage.value = ''
+}
+
+// ── element clipboard / duplicate / z-order ──
+const cloneEls = (els: SlideElement[]): SlideElement[] => JSON.parse(JSON.stringify(els))
+function currentSelectedElements(): SlideElement[] {
+  const els = deck.value?.slides[current.value]?.elements ?? []
+  return selectedEls.value.flatMap((i) => (els[i] ? [els[i]] : []))
+}
+// Module-level so the clipboard survives slide switches (paste across slides).
+const elementClipboard: { els: SlideElement[]; slide: number; pastes: number } = { els: [], slide: -1, pastes: 0 }
+function copySelectedElements() {
+  const els = currentSelectedElements()
+  if (!els.length) return
+  elementClipboard.els = cloneEls(els)
+  elementClipboard.slide = current.value
+  elementClipboard.pastes = 0
+}
+function pasteElements(inPlace = false) {
+  if (!elementClipboard.els.length) return
+  // Pasting onto the source slide cascades each paste; another slide (or an
+  // explicit "Paste In Place") pastes at the original coordinates.
+  const sameSlide = current.value === elementClipboard.slide
+  const off = inPlace ? 0 : sameSlide ? 24 * ++elementClipboard.pastes : 0
+  appendElements(cloneEls(elementClipboard.els).map((el) => ({ ...el, x: el.x + off, y: el.y + off })))
+}
+function cutSelectedElements() {
+  copySelectedElements()
+  deleteSelectedElement()
+}
+/** Move the selected elements to the very front or back of the paint order,
+ *  preserving their relative order. */
+function reorderSelectedTo(where: 'front' | 'back') {
+  if (!deck.value || !selectedEls.value.length) return
+  const s = deck.value.slides[current.value]
+  if (!s.elements) return
+  const sel = new Set(selectedEls.value)
+  const picked = s.elements.filter((_, i) => sel.has(i))
+  const rest = s.elements.filter((_, i) => !sel.has(i))
+  const next = where === 'front' ? [...rest, ...picked] : [...picked, ...rest]
+  patchSlide({ elements: next })
+  const start = where === 'front' ? rest.length : 0
+  selectedEls.value = picked.map((_, k) => start + k)
+}
+function duplicateSelectedElements() {
+  const els = currentSelectedElements()
+  if (!els.length) return
+  appendElements(cloneEls(els).map((el) => ({ ...el, x: el.x + 24, y: el.y + 24 })))
+}
+/** Move the selected elements one step forward (+1) or back (−1) in paint order,
+ *  preserving their relative order; a block at the edge stays put. */
+function reorderSelectedElements(dir: 1 | -1) {
+  if (!deck.value || !selectedEls.value.length) return
+  const s = deck.value.slides[current.value]
+  if (!s.elements) return
+  const els = [...s.elements]
+  const isSel = els.map((_, i) => selectedEls.value.includes(i))
+  if (dir === 1) {
+    for (let i = els.length - 2; i >= 0; i--) {
+      if (isSel[i] && !isSel[i + 1]) {
+        ;[els[i], els[i + 1]] = [els[i + 1], els[i]]
+        ;[isSel[i], isSel[i + 1]] = [isSel[i + 1], isSel[i]]
+      }
+    }
+  } else {
+    for (let i = 1; i < els.length; i++) {
+      if (isSel[i] && !isSel[i - 1]) {
+        ;[els[i], els[i - 1]] = [els[i - 1], els[i]]
+        ;[isSel[i], isSel[i - 1]] = [isSel[i - 1], isSel[i]]
+      }
+    }
+  }
+  patchSlide({ elements: els })
+  selectedEls.value = isSel.flatMap((v, i) => (v ? [i] : []))
 }
 function onUpdateElements(els: SlideElement[]) {
   patchSlide({ elements: els })
@@ -527,12 +494,53 @@ async function fileToUrl(file: File): Promise<string> {
     r.onload = () => res(r.result as string)
     r.readAsDataURL(file)
   })
-  return uploadImage(file.name, dataUrl)
+  const url = await uploadImage(file.name, dataUrl)
+  void refreshDiskAssets() // a new file landed in the assets folder
+  return url
 }
-/** Add / replace the selected box's image (it becomes an image-carrying box). */
-async function onSetElementImage(file: File) {
+/** Replace the image on a specific canvas box element (via the in-frame replace button). */
+async function onElementImage(index: number, file: File) {
+  if (!deck.value) return
   const url = await fileToUrl(file)
-  onUpdateElement({ src: url, fit: 'cover' })
+  const s = deck.value.slides[current.value]
+  if (!s.elements) return
+  const els = s.elements.map((el, i) =>
+    i === index ? ({ ...el, src: url, fit: 'cover' } as SlideElement) : el,
+  )
+  patchSlide({ elements: els })
+}
+/** A file was dropped on the canvas (from Explorer / desktop / another window):
+ *  onto a box → set that box's image; onto empty canvas → new image box, sized
+ *  proportionally to the image and centred on the drop point. */
+async function onDropImage(
+  file: File,
+  target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number },
+) {
+  if (!deck.value) return
+  const url = await fileToUrl(file)
+  if (target.kind === 'box') {
+    const s = deck.value.slides[current.value]
+    if (!s.elements) return
+    const els = s.elements.map((el, i) =>
+      i === target.index ? ({ ...el, src: url, fit: 'cover' } as SlideElement) : el,
+    )
+    patchSlide({ elements: els })
+    return
+  }
+  // Read natural dimensions so the new box keeps the image's aspect ratio.
+  const dims = await new Promise<{ w: number; h: number }>((res) => {
+    const img = new Image()
+    img.onload = () => res({ w: img.naturalWidth || 400, h: img.naturalHeight || 300 })
+    img.onerror = () => res({ w: 400, h: 300 })
+    img.src = url
+  })
+  const scale = Math.min(1, 480 / dims.w)
+  const w = Math.round(dims.w * scale)
+  const h = Math.round(dims.h * scale)
+  // Centre on the drop point, clamped inside the 1280×720 stage.
+  const x = Math.max(0, Math.min(1280 - w, target.x - w / 2))
+  const y = Math.max(0, Math.min(720 - h, target.y - h / 2))
+  onCreateElement(newElementRect('image', x, y, w, h, url))
 }
 /** Insert an image: upload it, then arm the image tool so the next click-drag on
  *  the canvas places it at the dragged position and size. */
@@ -541,20 +549,30 @@ async function onInsertImage(file: File) {
   pendingImage.value = url
   activeTool.value = 'image'
 }
-/** Patch the currently-selected element (from the top bar's style controls). */
+/** Patch every selected element (top-bar style controls apply to the whole selection). */
 function onUpdateElement(p: ElementPatch) {
-  if (!deck.value || selectedEl.value == null) return
+  if (!deck.value || !selectedEls.value.length) return
   const s = deck.value.slides[current.value]
   if (!s.elements) return
-  const els = s.elements.map((el, i) => (i === selectedEl.value ? ({ ...el, ...p } as SlideElement) : el))
+  const sel = new Set(selectedEls.value)
+  const els = s.elements.map((el, i) => (sel.has(i) ? ({ ...el, ...p } as SlideElement) : el))
+  patchSlide({ elements: els })
+}
+/** Patch one element by index (for ops that only make sense on a single target). */
+function patchElementAt(index: number, p: ElementPatch) {
+  if (!deck.value) return
+  const s = deck.value.slides[current.value]
+  if (!s.elements?.[index]) return
+  const els = s.elements.map((el, i) => (i === index ? ({ ...el, ...p } as SlideElement) : el))
   patchSlide({ elements: els })
 }
 function deleteSelectedElement() {
-  if (!deck.value || selectedEl.value == null) return
+  if (!deck.value || !selectedEls.value.length) return
   const s = deck.value.slides[current.value]
   if (!s.elements) return
-  patchSlide({ elements: s.elements.filter((_, i) => i !== selectedEl.value) })
-  selectedEl.value = null
+  const sel = new Set(selectedEls.value)
+  patchSlide({ elements: s.elements.filter((_, i) => !sel.has(i)) })
+  selectedEls.value = []
 }
 function onInsert(what: 'video' | 'diagram' | 'table') {
   if (!deck.value) return
@@ -577,6 +595,166 @@ function onInsert(what: 'video' | 'diagram' | 'table') {
 }
 function toggleSelectedBullets() {
   bulletFormatCommand.value += 1
+}
+
+// ── context menu ──────────────────────────────────────────────────────────────
+// A single floating menu whose contents depend on what was right-clicked: empty
+// canvas, one element, an image box, a multi-selection, or a navigator thumbnail.
+// Every entry reuses an action already wired for the keyboard/top-bar paths.
+const ctxMenu = ref<{ x: number; y: number; items: CtxEntry[] } | null>(null)
+function closeCtx() {
+  ctxMenu.value = null
+}
+// A hidden input drives "Replace Image…" from the menu (the in-frame button has
+// its own input down in CanvasElements; the menu can't reach that one).
+const ctxImgInput = ref<HTMLInputElement | null>(null)
+const ctxImgIdx = ref<number | null>(null)
+function replaceImageAt(index: number) {
+  ctxImgIdx.value = index
+  ctxImgInput.value?.click()
+}
+function onCtxImgPick(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
+  if (f && f.type.startsWith('image/') && ctxImgIdx.value != null) onElementImage(ctxImgIdx.value, f)
+  ctxImgIdx.value = null
+}
+
+function canvasItems(sx: number, sy: number): CtxEntry[] {
+  return [
+    { label: 'Paste', hint: 'Ctrl+V', disabled: !elementClipboard.els.length, action: () => pasteElements() },
+    { divider: true },
+    { label: 'Add Text Box', action: () => appendElements([newElementRect('text', sx, sy, 320, 80)]) },
+    { label: 'Add Shape', action: () => appendElements([newElementRect('rect', sx, sy, 240, 160)]) },
+  ]
+}
+function elementItems(index: number): CtxEntry[] {
+  const el = deck.value?.slides[current.value]?.elements?.[index]
+  const items: CtxEntry[] = [
+    { label: 'Cut', hint: 'Ctrl+X', action: cutSelectedElements },
+    { label: 'Copy', hint: 'Ctrl+C', action: copySelectedElements },
+    { label: 'Paste In Place', disabled: !elementClipboard.els.length, action: () => pasteElements(true) },
+    { label: 'Duplicate', hint: 'Ctrl+D', action: duplicateSelectedElements },
+    { label: 'Delete', hint: 'Del', action: deleteSelectedElement },
+    { divider: true },
+    { label: 'Bring Forward', hint: 'Ctrl+]', action: () => reorderSelectedElements(1) },
+    { label: 'Bring to Front', action: () => reorderSelectedTo('front') },
+    { label: 'Send Backward', hint: 'Ctrl+[', action: () => reorderSelectedElements(-1) },
+    { label: 'Send to Back', action: () => reorderSelectedTo('back') },
+  ]
+  if (el?.type === 'box' && (el as BoxElement).src) {
+    const b = el as BoxElement
+    items.push(
+      { divider: true },
+      { label: 'Fit: Cover', check: (b.fit ?? 'cover') === 'cover', action: () => patchElementAt(index, { fit: 'cover' }) },
+      { label: 'Fit: Contain', check: b.fit === 'contain', action: () => patchElementAt(index, { fit: 'contain' }) },
+      { label: 'Replace Image…', action: () => replaceImageAt(index) },
+      { label: 'Remove Image', action: () => patchElementAt(index, { src: undefined, fit: undefined, focus: undefined }) },
+    )
+  }
+  return items
+}
+function multiItems(): CtxEntry[] {
+  return [
+    { label: 'Cut', hint: 'Ctrl+X', action: cutSelectedElements },
+    { label: 'Copy', hint: 'Ctrl+C', action: copySelectedElements },
+    { label: 'Duplicate', hint: 'Ctrl+D', action: duplicateSelectedElements },
+    { label: 'Delete', hint: 'Del', action: deleteSelectedElement },
+    { divider: true },
+    { label: 'Bring Forward', hint: 'Ctrl+]', action: () => reorderSelectedElements(1) },
+    { label: 'Send Backward', hint: 'Ctrl+[', action: () => reorderSelectedElements(-1) },
+  ]
+}
+function thumbItems(index: number): CtxEntry[] {
+  const last = (deck.value?.slides.length ?? 1) - 1
+  return [
+    { label: 'Duplicate Slide', action: () => { focusSlide(index); duplicateSlide() } },
+    { label: 'Insert Slide Before', action: () => insertSlideAt(index) },
+    { label: 'Insert Slide After', action: () => insertSlideAt(index + 1) },
+    { divider: true },
+    { label: 'Delete Slide', disabled: last < 1, action: () => { focusSlide(index); removeSlide() } },
+    { divider: true },
+    { label: 'Move to Top', disabled: index === 0, action: () => moveSlideTo(index, 0) },
+    { label: 'Move to Bottom', disabled: index === last, action: () => moveSlideTo(index, last) },
+  ]
+}
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }) {
+  if (!editMode.value) return
+  if (p.kind === 'link') {
+    ctxMenu.value = { x: p.x, y: p.y, items: linkItems(p.url ?? '') }
+    return
+  }
+  if (p.kind === 'text') {
+    ctxMenu.value = { x: p.x, y: p.y, items: textItems() }
+    return
+  }
+  if (p.index < 0) {
+    ctxMenu.value = { x: p.x, y: p.y, items: canvasItems(p.sx, p.sy) }
+    return
+  }
+  // Right-clicking an element outside the current selection selects just it.
+  if (!selectedEls.value.includes(p.index)) selectedEls.value = [p.index]
+  const items = selectedEls.value.length > 1 ? multiItems() : elementItems(p.index)
+  ctxMenu.value = { x: p.x, y: p.y, items }
+}
+
+// ── text / link menu actions (operate on the box being text-edited) ──
+// The menu keeps the contenteditable's focus + selection (its items use
+// mousedown.prevent), so these run against the live DOM selection. The box
+// re-serialises to Markdown — links included — when editing commits on blur.
+function currentLinkEl(): HTMLAnchorElement | null {
+  const n = window.getSelection()?.anchorNode
+  const host = n?.nodeType === 1 ? (n as HTMLElement) : n?.parentElement
+  return host?.closest('a') ?? null
+}
+function addLinkToSelection() {
+  const sel = window.getSelection()
+  const range = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null
+  const url = window.prompt('Link URL:', 'https://')
+  if (!url) return
+  if (sel && range) {
+    sel.removeAllRanges() // prompt() can drop the selection; put it back first
+    sel.addRange(range)
+  }
+  document.execCommand('createLink', false, url)
+}
+function textItems(): CtxEntry[] {
+  return [
+    { label: 'Bold', hint: 'Ctrl+B', action: () => onFormat('bold') },
+    { label: 'Italic', hint: 'Ctrl+I', action: () => onFormat('italic') },
+    { label: 'Underline', action: () => onFormat('underline') },
+    { label: 'Strikethrough', action: () => onFormat('strike') },
+    { divider: true },
+    { label: 'Add Link…', action: addLinkToSelection },
+  ]
+}
+function linkItems(url: string): CtxEntry[] {
+  return [
+    { label: 'Open Link', disabled: !url || url === '#', action: () => window.open(url, '_blank', 'noopener') },
+    {
+      label: 'Edit Link…',
+      action: () => {
+        const a = currentLinkEl()
+        const next = window.prompt('Link URL:', url || 'https://')
+        if (next != null && a) a.setAttribute('href', next)
+      },
+    },
+    {
+      label: 'Remove Link',
+      action: () => {
+        const a = currentLinkEl()
+        const parent = a?.parentNode
+        if (!a || !parent) return
+        while (a.firstChild) parent.insertBefore(a.firstChild, a)
+        parent.removeChild(a)
+      },
+    },
+  ]
+}
+function onSlideContextMenu(p: { x: number; y: number; index: number }) {
+  if (!editMode.value) return
+  ctxMenu.value = { x: p.x, y: p.y, items: thumbItems(p.index) }
 }
 
 // ── text formatting (works on whatever text is being edited) ──
@@ -625,14 +803,15 @@ function onFormat(kind: 'bold' | 'italic' | 'underline' | 'strike' | 'bullet') {
     onUpdateElement({ [kind]: !b[kind] } as ElementPatch)
   }
 }
-/** Toggle `- ` bullets across all lines of the selected box's content. */
+/** Toggle `- ` bullets across all lines of the primary selected box's content. */
 function toggleBoxBullets() {
   const b = selectedElement.value
-  if (selectedEl.value == null || b?.type !== 'box') return
+  if (primaryEl.value == null || b?.type !== 'box') return
   const rows = parseContent((b as BoxElement).content)
   if (!rows.length) return
   const allBullets = rows.every((r) => r.bullet)
-  onUpdateElement({ content: rowsToContent(rows.map((r) => ({ ...r, bullet: !allBullets }))) })
+  // Content is per-box: patch only the primary, not the whole selection.
+  patchElementAt(primaryEl.value, { content: rowsToContent(rows.map((r) => ({ ...r, bullet: !allBullets }))) })
 }
 
 // ── selection ──
@@ -681,6 +860,29 @@ function removeSlide() {
   current.value = Math.min(Math.min(...kill), deck.value.slides.length - 1)
   selected.value = [current.value]
   anchor = current.value
+  void saveWholeDeck()
+}
+/** Make `index` the sole current/selected slide (used before single-slide ops). */
+function focusSlide(index: number) {
+  current.value = index
+  selected.value = [index]
+  anchor = index
+}
+/** Insert a fresh blank slide at `index` and focus it. */
+function insertSlideAt(index: number) {
+  if (!deck.value) return
+  snap('add')
+  deck.value.slides.splice(index, 0, blankSlide('text'))
+  focusSlide(index)
+  void saveWholeDeck()
+}
+/** Move a single slide from `from` to `to`, keeping the rest in order. */
+function moveSlideTo(from: number, to: number) {
+  if (!deck.value || from === to) return
+  snap('reorder')
+  const [s] = deck.value.slides.splice(from, 1)
+  deck.value.slides.splice(to, 0, s)
+  focusSlide(to)
   void saveWholeDeck()
 }
 
@@ -827,15 +1029,15 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @update:tool="activeTool = $event"
       @insert="onInsert"
       @update-element="onUpdateElement"
-      @set-image="onSetElementImage"
       @insert-image="onInsertImage"
+      @z-order="reorderSelectedElements"
       @undo="undo"
       @redo="redo"
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
       @close="editMode = false"
       @export="exportOpen = true"
-      @review="reviewOpen = !reviewOpen"
+      @review="toggleReview"
       @open-file="onOpenFile"
       @open-folder="onOpenFolder"
       @save-as="onSaveAs"
@@ -861,6 +1063,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @remove="removeSlide"
         @group="groupSelected"
         @autogroup="autoGroup"
+        @contextmenu-slide="onSlideContextMenu"
       />
 
       <div v-if="deck" class="stage-wrap">
@@ -871,15 +1074,18 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :bullet-format-command="bulletFormatCommand"
           :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
           :tool="activeTool"
-          :selected-el="selectedEl"
+          :selected-el="selectedEls"
           :pending-image="pendingImage"
           @patch="patchSlide"
           @config-patch="patchConfig"
           @upload="onUpload"
           @update:elements="onUpdateElements"
-          @update:selected-el="selectedEl = $event"
+          @update:selected-el="selectedEls = $event"
           @create-element="onCreateElement"
           @tool-reset="((activeTool = 'select'), (pendingImage = ''))"
+          @element-image="onElementImage"
+          @drop-image="onDropImage"
+          @ctxmenu="onCanvasContextMenu"
         />
       </div>
       <div v-else-if="error" class="msg err">{{ error }}</div>
@@ -900,6 +1106,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :current="current"
       @jump="jumpToSlide"
       @close="reviewOpen = false"
+      @delete-asset="onDeleteAsset"
     />
 
     <!-- edit-mode speaker-notes strip -->
@@ -955,12 +1162,25 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     />
     <ExportView v-if="deck && exportOpen" :deck="deck" @close="exportOpen = false" />
 
+    <!-- right-click menu (contents depend on what was clicked) -->
+    <ContextMenu v-if="ctxMenu" :x="ctxMenu.x" :y="ctxMenu.y" :items="ctxMenu.items" @close="closeCtx" />
+    <input ref="ctxImgInput" type="file" accept="image/*" style="display: none" @change="onCtxImgPick" />
+
     <!-- Surface errors even when a deck is loaded (open/save failures used to be
          silent because the error message only rendered on the no-deck screen). -->
     <div v-if="deck && error" class="toast err" @click="error = ''">
       <span>{{ error }}</span>
       <button class="toast-x" title="Dismiss">✕</button>
     </div>
+
+    <!-- import review: correct detected layouts before the deck is saved -->
+    <ImportReview
+      v-if="pendingImport"
+      :deck="pendingImport.deck"
+      :name="pendingImport.name"
+      @commit="commitImport"
+      @cancel="cancelImport"
+    />
 
     <!-- import progress (blocks while a large deck is parsed/rehomed) -->
     <div v-if="importing" class="import-overlay">

@@ -12,7 +12,7 @@ const props = defineProps<{
   bulletFormatCommand?: number
   navEnabled?: boolean
   tool?: CanvasTool
-  selectedEl?: number | null
+  selectedEl?: number[]
   pendingImage?: string
 }>()
 const emit = defineEmits<{
@@ -21,9 +21,12 @@ const emit = defineEmits<{
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
   'update:elements': [els: SlideElement[]]
-  'update:selectedEl': [i: number | null]
+  'update:selectedEl': [sel: number[]]
   'create-element': [el: SlideElement]
   'tool-reset': []
+  'element-image': [index: number, file: File]
+  'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)
@@ -170,6 +173,9 @@ onUnmounted(() => {
         @update:selected-el="emit('update:selectedEl', $event)"
         @create-element="emit('create-element', $event)"
         @tool-reset="emit('tool-reset')"
+        @element-image="(i, f) => emit('element-image', i, f)"
+        @drop-image="(f, t) => emit('drop-image', f, t)"
+        @ctxmenu="emit('ctxmenu', $event)"
       />
     </div>
   </div>

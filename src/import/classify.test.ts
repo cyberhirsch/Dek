@@ -109,4 +109,41 @@ describe('classifySlide', () => {
     expect(s.layout).toBe('section')
     expect(s.title).toBe('')
   })
+
+  it('title + single picture but no body → text-image (was freeform)', () => {
+    const s = run([
+      text([para('Node Graph', { sizePt: 32 })], { ph: 'title' }),
+      pic({ x: 700, y: 220, w: 480, h: 320 }),
+    ])
+    expect(s.layout).toBe('text-image')
+    expect(s.title).toBe('Node Graph')
+    expect(s.content ?? '').toBe('')
+  })
+
+  it('untitled bullet block (continuation slide) → text with empty title', () => {
+    const s = run([
+      text([para('keep nodes labelled', { bullet: true, sizePt: 16 }), para('cache before review', { bullet: true, sizePt: 16 })], { y: 250 }),
+    ])
+    expect(s.layout).toBe('text')
+    expect(s.title).toBe('')
+    expect(s.content).toContain('- keep nodes labelled')
+  })
+
+  it('three scattered untitled blocks stay freeform', () => {
+    const s = run([
+      text([para('alpha', { sizePt: 14 })], { x: 80, y: 200, w: 200 }),
+      text([para('beta', { sizePt: 14 })], { x: 500, y: 350, w: 200 }),
+      text([para('gamma', { sizePt: 14 })], { x: 900, y: 500, w: 200 }),
+    ])
+    expect(s.layout).toBe('freeform')
+  })
+
+  it('PDF-style title: no placeholder, <24pt, top of page, larger than body', () => {
+    const s = run([
+      text([para('Schedule', { sizePt: 20 })], { x: 110, y: 80, w: 600, h: 40 }),
+      text([para('Monday: shoot', { sizePt: 12, bullet: true }), para('Tuesday: edit', { sizePt: 12, bullet: true })], { y: 300 }),
+    ])
+    expect(s.layout).toBe('text')
+    expect(s.title).toBe('Schedule')
+  })
 })

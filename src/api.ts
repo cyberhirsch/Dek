@@ -92,6 +92,18 @@ export async function uploadImage(filename: string, dataUrl: string): Promise<st
   return (await active()).uploadAsset(currentFile, filename, dataUrl)
 }
 
+/** Filenames in the active deck's on-disk assets folder, or [] if the backend has
+ *  no real folder (orphan detection then stays off). */
+export async function listDeckAssets(): Promise<string[]> {
+  const b = await active()
+  return b.listAssets ? b.listAssets() : []
+}
+
+export async function deleteDeckAsset(filename: string): Promise<void> {
+  const b = await active()
+  await b.deleteAsset?.(filename)
+}
+
 export async function saveAs(name: string, config: DeckConfig, slides: Slide[]): Promise<string> {
   override = null
   const file = await (await ensureBase()).saveAs(name, { config, slides })

@@ -21,6 +21,18 @@ function splitBlocks(raw: string): string[] {
     .filter((b) => b.length > 0)
 }
 
+/** Parse one `---` block, tagging any YAML error with which block failed so a
+ *  malformed deck reports e.g. "slide 12: bad indentation…" instead of a bare,
+ *  position-less YAML exception. */
+function parseBlock(block: string, label: string): unknown {
+  try {
+    return YAML.parse(block) ?? {}
+  } catch (e) {
+    const detail = (e as Error).message?.split('\n')[0] ?? String(e)
+    throw new Error(`${label}: ${detail}`)
+  }
+}
+
 export function parseDeck(raw: string): Deck {
   const blocks = splitBlocks(raw)
   if (blocks.length === 0) {
@@ -29,7 +41,7 @@ export function parseDeck(raw: string): Deck {
 
   // Heuristic: the first block is config UNLESS it already declares a layout
   // (lets a deck omit the global block entirely).
-  const first = YAML.parse(blocks[0]) ?? {}
+  const first = parseBlock(blocks[0], 'deck config')
   let config: DeckConfig
   let slideBlocks: string[]
   if (first && typeof first === 'object' && 'layout' in first) {
@@ -41,7 +53,7 @@ export function parseDeck(raw: string): Deck {
   }
 
   const slides: Slide[] = slideBlocks.map((b, i) => {
-    const obj = (YAML.parse(b) ?? {}) as Slide
+    const obj = parseBlock(b, `slide ${i + 1}`) as Slide
     if (!obj.layout) obj.layout = 'freeform'
     // Migrate old layout names (bullets → text, …) so older decks still load.
     const alias = LAYOUT_ALIASES[obj.layout as string]

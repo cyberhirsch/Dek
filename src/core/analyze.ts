@@ -12,7 +12,7 @@ export interface DeckIssue {
   message: string
 }
 
-export type AssetKind = 'local' | 'remote' | 'data' | 'blob' | 'unknown'
+export type AssetKind = 'local' | 'remote' | 'data' | 'blob' | 'unknown' | 'orphan'
 
 export interface AssetUse {
   slide: number
@@ -24,6 +24,9 @@ export interface AssetRef {
   kind: AssetKind
   uses: AssetUse[]
   approxBytes?: number
+  /** Basename on disk — set for `local` (derived from ref) and `orphan` (the
+   *  unreferenced file). Used to match against the folder listing and to delete. */
+  filename?: string
 }
 
 export interface DeckAnalysis {
@@ -161,12 +164,21 @@ function approxDataBytes(ref: string): number | undefined {
   return Math.round((payload.length * 3) / 4)
 }
 
+/** The on-disk filename a ref points at (its last path segment), or undefined for
+ *  data/blob/empty refs that don't correspond to a file. */
+function basename(ref: string): string | undefined {
+  const base = ref.split('/').pop()
+  return base && !ref.startsWith('data:') && !ref.startsWith('blob:') ? base : undefined
+}
+
 function addAsset(map: Map<string, AssetRef>, ref: unknown, slide: number, field: string) {
   if (typeof ref !== 'string' || !ref.trim()) return
   const key = ref
   let rec = map.get(key)
   if (!rec) {
-    rec = { ref: key, kind: assetKind(key), uses: [], approxBytes: approxDataBytes(key) }
+    const kind = assetKind(key)
+    rec = { ref: key, kind, uses: [], approxBytes: approxDataBytes(key) }
+    if (kind === 'local') rec.filename = basename(key)
     map.set(key, rec)
   }
   rec.uses.push({ slide, field })
@@ -207,7 +219,19 @@ function assetIssues(assets: AssetRef[], issues: DeckIssue[]) {
   }
 }
 
-export function analyzeDeck(deck: Deck): DeckAnalysis {
+/** Files on disk that no slide references (by basename) become `orphan` assets:
+ *  candidates for cleanup. Matching is by filename only, so a renamed/moved deck
+ *  that still points at the same basename won't false-positive. */
+function orphanAssets(referenced: AssetRef[], diskFiles: string[]): AssetRef[] {
+  const used = new Set(referenced.map((a) => a.filename).filter((f): f is string => !!f))
+  return diskFiles
+    .filter((f) => !used.has(f))
+    .map((f) => ({ ref: f, kind: 'orphan' as const, uses: [], filename: f }))
+}
+
+const ASSET_ORDER: Record<AssetKind, number> = { orphan: 0, data: 1, remote: 2, local: 3, blob: 4, unknown: 5 }
+
+export function analyzeDeck(deck: Deck, diskFiles?: string[]): DeckAnalysis {
   const issues: DeckIssue[] = []
   const assetMap = new Map<string, AssetRef>()
 
@@ -216,11 +240,15 @@ export function analyzeDeck(deck: Deck): DeckAnalysis {
     collectAssets(slide, index, assetMap)
   })
 
-  const assets = [...assetMap.values()].sort((a, b) => {
-    const ak = a.kind === 'data' ? 0 : a.kind === 'remote' ? 1 : 2
-    const bk = b.kind === 'data' ? 0 : b.kind === 'remote' ? 1 : 2
+  const referenced = [...assetMap.values()]
+  const orphans = diskFiles ? orphanAssets(referenced, diskFiles) : []
+  for (const o of orphans) {
+    issue(issues, 0, 'info', 'asset', `Unused asset "${o.filename}" in the folder.`, o.filename)
+  }
+
+  const assets = [...referenced, ...orphans].sort((a, b) => {
     return (
-      ak - bk ||
+      ASSET_ORDER[a.kind] - ASSET_ORDER[b.kind] ||
       (a.uses[0]?.slide ?? 0) - (b.uses[0]?.slide ?? 0) ||
       a.ref.slice(0, 120).localeCompare(b.ref.slice(0, 120))
     )

@@ -25,4 +25,10 @@ export interface StorageBackend {
   saveAs(name: string, deck: Deck): Promise<string>
   /** Create a fresh deck; returns the new file id. */
   newDeck(name: string): Promise<string>
+  /** List filenames present in this deck's on-disk assets folder. Only backends
+   *  with a real folder (File System Access) implement this; others omit it, and
+   *  the UI then skips orphan detection. */
+  listAssets?(): Promise<string[]>
+  /** Delete a single file from the assets folder by name. */
+  deleteAsset?(filename: string): Promise<void>
 }

@@ -110,6 +110,12 @@ export interface BoxElement extends ElementBase {
   italic?: boolean
   underline?: boolean
   strike?: boolean
+  /** Line-height multiplier (default 1.25). Baking sets the layout CSS values
+   *  (1.05 headings, 1.45 body) so conversion keeps the rendered look. */
+  lineHeight?: number
+  /** Gap between content lines in em (default 0.4). Baked lists use ~0.7 to
+   *  match the layouts' 18px list gap. */
+  lineGap?: number
 }
 
 export interface ArrowElement extends ElementBase {

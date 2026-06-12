@@ -19,6 +19,7 @@ const emit = defineEmits<{
   remove: []
   group: []
   autogroup: []
+  'contextmenu-slide': [p: { x: number; y: number; index: number }]
 }>()
 
 // Build navigator rows: a header before each maximal contiguous run sharing a
@@ -232,6 +233,7 @@ function toggleCollapseAll() {
         @dragstart="onDragStart(e.index)"
         @dragover="onSlideDragOver($event, e.index)"
         @click="emit('select', { index: e.index, shift: $event.shiftKey, meta: $event.metaKey || $event.ctrlKey })"
+        @contextmenu.prevent="emit('contextmenu-slide', { x: $event.clientX, y: $event.clientY, index: e.index })"
       >
         <div v-if="dropBefore === e.index" class="drop-line top" />
         <span class="num">{{ e.index + 1 }}</span>

@@ -1,7 +1,14 @@
-// Minimal, safe inline markdown: **bold**, *italic*, <u>underline</u>, `code`.
-// Escapes HTML first so deck content can't inject markup, then re-allows the one
-// underline tag (<u>) since no standard Markdown has underline. `freeform` is the
-// only fully-raw-HTML path.
+// Minimal, safe inline markdown: **bold**, *italic*, <u>underline</u>, `code`,
+// and [text](url) links. Escapes HTML first so deck content can't inject markup,
+// then re-allows the one underline tag (<u>) since no standard Markdown has
+// underline. `freeform` is the only fully-raw-HTML path.
+
+/** Only http(s) and mailto links are emitted; anything else (javascript:, data:…)
+ *  is neutralised to a non-navigating anchor so deck content can't smuggle script. */
+function safeHref(url: string): string {
+  return /^(https?:\/\/|mailto:)/i.test(url) ? url.replace(/"/g, '%22') : '#'
+}
+
 export function inlineMd(src: string | undefined): string {
   if (!src) return ''
   const esc = src
@@ -11,6 +18,12 @@ export function inlineMd(src: string | undefined): string {
   return esc
     .replace(/&lt;u&gt;/g, '<u>')
     .replace(/&lt;\/u&gt;/g, '</u>')
+    // links before emphasis so the visible text can still carry **bold** etc.
+    .replace(
+      /\[([^\]]+)\]\(([^)\s]+)\)/g,
+      (_m, text: string, url: string) =>
+        `<a href="${safeHref(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`,
+    )
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/~~([^~]+)~~/g, '<s>$1</s>')
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
@@ -33,6 +46,10 @@ function serializeNode(node: Node): string {
   // Block elements (a contenteditable wraps new lines in <div>/<p>) become line breaks.
   if (tag === 'div' || tag === 'p') return inner + '\n'
   if (!inner.trim()) return inner // don't wrap whitespace-only spans in markers
+  if (tag === 'a') {
+    const href = eln.getAttribute('href') || ''
+    return href && href !== '#' ? `[${inner}](${href})` : inner
+  }
   const style = eln.getAttribute('style') ?? ''
   const bold = tag === 'b' || tag === 'strong' || /font-weight\s*:\s*(bold|[6-9]00)/i.test(style)
   const italic = tag === 'i' || tag === 'em' || /font-style\s*:\s*italic/i.test(style)

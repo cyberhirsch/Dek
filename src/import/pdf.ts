@@ -54,24 +54,38 @@ function extractText(items: Array<{ str?: string; transform?: number[]; width?: 
   }
   for (const l of lines) l.text = joinRuns(l.runs)
 
-  // group vertically-close, horizontally-overlapping lines into blocks
+  // Group vertically-close, horizontally-overlapping lines into blocks. Each
+  // line is matched against every open block (nearest wins), not just the last
+  // one — on a two-column slide the reading order interleaves columns, and a
+  // last-block-only scan would shatter both columns into one-line fragments
+  // (which then classify as freeform).
   interface Block { lines: Line[]; x0: number; x1: number; topBase: number; botBase: number; size: number }
   const blocks: Block[] = []
   for (const l of lines) {
     if (!l.text) continue
-    const last = blocks[blocks.length - 1]
-    const gap = last ? last.botBase - l.base : Infinity
-    const overlap = last && !(l.x1 < last.x0 - 5 || l.x0 > last.x1 + 5)
-    if (last && gap >= 0 && gap < Math.max(last.size, l.size) * 1.9 && overlap) {
-      last.lines.push(l)
-      last.botBase = l.base
-      last.x0 = Math.min(last.x0, l.x0)
-      last.x1 = Math.max(last.x1, l.x1)
-      last.size = Math.max(last.size, l.size)
+    let best: Block | null = null
+    let bestGap = Infinity
+    for (const b of blocks) {
+      const gap = b.botBase - l.base // ≥ 0: lines arrive top → bottom
+      const overlap = !(l.x1 < b.x0 - 5 || l.x0 > b.x1 + 5)
+      if (gap >= 0 && gap < Math.max(b.size, l.size) * 1.9 && overlap && gap < bestGap) {
+        best = b
+        bestGap = gap
+      }
+    }
+    if (best) {
+      best.lines.push(l)
+      best.botBase = Math.min(best.botBase, l.base)
+      best.x0 = Math.min(best.x0, l.x0)
+      best.x1 = Math.max(best.x1, l.x1)
+      best.size = Math.max(best.size, l.size)
     } else {
       blocks.push({ lines: [l], x0: l.x0, x1: l.x1, topBase: l.base, botBase: l.base, size: l.size })
     }
   }
+  // Reading order: left column(s) before right, top before bottom within each.
+  const colOf = (b: Block) => (b.x0 > pageW * 0.55 ? 1 : 0)
+  blocks.sort((a, b) => colOf(a) - colOf(b) || b.topBase - a.topBase)
 
   return blocks.map((b) => {
     const centered = Math.abs((b.x0 + b.x1) / 2 - pageW / 2) < pageW * 0.08 && b.x1 - b.x0 < pageW * 0.85

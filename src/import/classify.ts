@@ -46,7 +46,7 @@ function headingText(t: TextShape): string {
 const area = (s: Shape) => s.w * s.h
 const STAGE_AREA = STAGE_W * STAGE_H
 /** A picture that fills most of the stage (full-bleed background). */
-const isFullBleed = (p: PicShape) => area(p) > STAGE_AREA * 0.6
+const isFullBleed = (p: PicShape) => area(p) > STAGE_AREA * 0.55
 
 function textToElement(t: TextShape, ptToPx: number): BoxElement {
   const maxPt = Math.max(0, ...t.paras.map((p) => p.sizePt))
@@ -108,11 +108,20 @@ export function classifySlide(shapes: Shape[], ctx: ClassifyCtx): Slide {
   const titleShape =
     texts.find((t) => t.ph === 'title' || t.ph === 'ctrTitle') ??
     [...texts].sort((a, b) => Math.max(0, ...b.paras.map((p) => p.sizePt)) - Math.max(0, ...a.paras.map((p) => p.sizePt)))[0]
-  // Only treat the picked shape as a heading if it's a title placeholder or set
-  // in large type — otherwise a slide whose single text is a small caption would
-  // wrongly become a "title".
+  // Only treat the picked shape as a heading if it's a title placeholder, set in
+  // large type, or — for PDF sources that carry no placeholder roles — sits in
+  // the top quarter of the page and is clearly larger than the median body text.
+  // Otherwise a slide whose single text is a small caption would become a "title".
   const titlePt = titleShape ? Math.max(0, ...titleShape.paras.map((p) => p.sizePt)) : 0
-  const hasRealTitle = !!titleShape && (titleShape.ph === 'title' || titleShape.ph === 'ctrTitle' || titlePt >= 24)
+  const allPts = texts.flatMap((t) => t.paras.filter((p) => p.md.length > 0).map((p) => p.sizePt)).sort((a, b) => a - b)
+  const medianPt = allPts.length ? allPts[Math.floor(allPts.length / 2)] : 0
+  const nearTop = !!titleShape && titleShape.y < STAGE_H * 0.25
+  const hasRealTitle =
+    !!titleShape &&
+    (titleShape.ph === 'title' ||
+      titleShape.ph === 'ctrTitle' ||
+      titlePt >= 24 ||
+      (nearTop && titlePt >= Math.max(16, medianPt * 1.25)))
   const bodies = texts.filter((t) => t !== titleShape || !hasRealTitle)
   const subtitle = bodies.find((t) => t.ph === 'subTitle')
   const title = hasRealTitle && titleShape ? headingText(titleShape) : ''
@@ -129,11 +138,11 @@ export function classifySlide(shapes: Shape[], ctx: ClassifyCtx): Slide {
 
   // ── statement / quote (no images) ──
   // A citation line is a strong signal; otherwise a short, centred, large block of
-  // 2–4 lines (single line = section, handled below).
+  // 2–5 lines (single line = section, handled below).
   if (
     pics.length === 0 &&
     noBullets &&
-    (hasCite || (centered && nonEmptyLines >= 2 && nonEmptyLines <= 4 && totalLen < 300 && maxPt >= 24))
+    (hasCite || (centered && nonEmptyLines >= 2 && nonEmptyLines <= 5 && totalLen < 360 && maxPt >= 24))
   ) {
     const { text, cite } = statementParts(texts)
     if (text) return withNotes({ layout: 'statement', text, cite }, notes)
@@ -178,7 +187,9 @@ export function classifySlide(shapes: Shape[], ctx: ClassifyCtx): Slide {
   }
 
   // ── title + body (+ optional single image) ──
-  if (title && bodies.length >= 1 && pics.length <= 1) {
+  // A heading with one picture is a text-image slide even when there's no body
+  // text yet — "heading + picture" was a common freeform fallback before.
+  if (title && pics.length <= 1 && (bodies.length >= 1 || pics.length === 1)) {
     const content = bodies.map((b) => parasToContent(b.paras)).filter(Boolean).join('\n')
     if (pics.length === 1) {
       const p = pics[0]
@@ -193,6 +204,14 @@ export function classifySlide(shapes: Shape[], ctx: ClassifyCtx): Slide {
   // ── single image, no usable text ──
   if (pics.length === 1 && bodies.length === 0 && !title) {
     return withNotes({ layout: 'image-full', image: pics[0].src, title: '', caption: '', focus: { x: 0, y: 0, scale: 1 } }, notes)
+  }
+
+  // ── untitled body text (continuation slides: bullets with no heading) ──
+  // One or two coherent text blocks read fine as a text slide; more scattered
+  // blocks keep their positions in freeform instead.
+  if (!title && pics.length === 0 && bodies.length >= 1 && bodies.length <= 2) {
+    const content = bodies.map((b) => parasToContent(b.paras)).filter(Boolean).join('\n')
+    if (content) return withNotes({ layout: 'text', title: '', content }, notes)
   }
 
   // ── everything else: faithful freeform ──

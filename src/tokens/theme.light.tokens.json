@@ -1,0 +1,17 @@
+{
+  "$description": "Editorial Light — placeholder for a future light theme. Same structure as theme.default; values are a first sketch, not yet tuned or exposed in the UI.",
+  "name": "Editorial Light",
+  "color": {
+    "bg": "#f7f6f2",
+    "text": "#1c2026",
+    "accent": "#2563eb",
+    "accent2": "#c2570c"
+  },
+  "font": {
+    "heading": "Cormorant Garamond",
+    "headingFallback": "serif",
+    "body": "JetBrains Mono",
+    "bodyFallback": "monospace"
+  },
+  "glow": false
+}

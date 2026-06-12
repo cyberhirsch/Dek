@@ -1,0 +1,29 @@
+{
+  "$description": "Theme-independent design tokens: geometry, spacing, type scale, element defaults. These never change per theme — colors and fonts live in the theme.*.tokens.json files.",
+  "stage": { "w": 1280, "h": 720 },
+  "pad": { "x": 110, "y": 70 },
+  "radius": {
+    "element": 8,
+    "frame": 10
+  },
+  "type": {
+    "scale": [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 96],
+    "roles": {
+      "coverTitle": 200,
+      "section": 110,
+      "statement": 56,
+      "heading": 48,
+      "subheading": 40,
+      "body": 28,
+      "bodyCompact": 26,
+      "textBox": 32,
+      "caption": 22,
+      "byline": 20,
+      "label": 18
+    }
+  },
+  "element": {
+    "box": { "strokeAlpha": 0.5, "strokeWidth": 1 },
+    "arrow": { "strokeWidth": 3 }
+  }
+}

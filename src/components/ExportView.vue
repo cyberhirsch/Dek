@@ -74,6 +74,9 @@ const EXPORT_PRES_JS = `
 `
 const stack = ref<HTMLElement | null>(null)
 const rendered = ref(0)
+// Handout mode: each page shows a slide thumbnail + its speaker notes.
+const mode = ref<'slides' | 'handout'>('slides')
+const HANDOUT_SCALE = 400 / 1280
 const visibleSlides = computed(() => props.deck.slides.slice(0, rendered.value))
 const progress = computed(() => {
   if (!props.deck.slides.length) return 100
@@ -107,6 +110,19 @@ async function renderAll() {
 async function printPdf() {
   await renderAll()
   window.print()
+}
+
+async function printHandout() {
+  await renderAll()
+  mode.value = 'handout'
+  await nextTick()
+  // Override the slide @page rule so handout pages print landscape.
+  const pageStyle = document.createElement('style')
+  pageStyle.textContent = '@page { size: letter landscape; margin: 0.3in 0.4in; }'
+  document.head.appendChild(pageStyle)
+  window.print()
+  document.head.removeChild(pageStyle)
+  mode.value = 'slides'
 }
 
 /** Collect every CSS rule the page has loaded into one string. */
@@ -166,18 +182,17 @@ async function inlineMedia(root: HTMLElement): Promise<string> {
   return clone.innerHTML
 }
 
-async function downloadHtml() {
-  await renderAll()
-  await nextTick()
+/** Assemble the standalone presentation HTML document around already-prepared
+ *  slide markup (media either inlined as data URLs or rewritten to asset paths). */
+function buildHtmlDoc(slidesHtml: string): string {
   const css = collectCss()
-  const slidesHtml = stack.value ? await inlineMedia(stack.value) : ''
   const fontLink =
     '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">'
   const styleVars = Object.entries(vars.value)
     .map(([k, v]) => `${k}:${v}`)
     .join(';')
   const notesJson = JSON.stringify(props.deck.slides.map((s) => s.notes ?? '')).replace(/</g, '\\u003c')
-  const html = `<!doctype html>
+  return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(props.deck.config.deck ?? 'Deck')}</title>
@@ -194,13 +209,91 @@ ${EXPORT_PRES_CSS}
 <script>window.__DEK_NOTES=${notesJson};<\/script>
 <script>${EXPORT_PRES_JS}<\/script>
 </body></html>`
+}
 
-  const blob = new Blob([html], { type: 'text/html' })
+function deckSlug(): string {
+  return (props.deck.config.deck ?? 'deck').replace(/[^a-z0-9]+/gi, '_')
+}
+function triggerDownload(blob: Blob, filename: string) {
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `${(props.deck.config.deck ?? 'deck').replace(/[^a-z0-9]+/gi, '_')}.html`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+async function downloadHtml() {
+  await renderAll()
+  await nextTick()
+  const slidesHtml = stack.value ? await inlineMedia(stack.value) : ''
+  const html = buildHtmlDoc(slidesHtml)
+  triggerDownload(new Blob([html], { type: 'text/html' }), `${deckSlug()}.html`)
+}
+
+/** Pick a file extension for a fetched asset from its MIME type, falling back to
+ *  the URL's own extension. */
+function assetExt(blob: Blob, url: string): string {
+  const byType: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/avif': 'avif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+  }
+  if (blob.type && byType[blob.type]) return byType[blob.type]
+  const m = url.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i)
+  return m ? m[1].toLowerCase() : 'bin'
+}
+
+/** ZIP export: index.html alongside an assets/ folder, so media-heavy decks stay
+ *  openable (a single all-inlined .html can grow past what a browser will load). */
+async function downloadZip() {
+  await renderAll()
+  await nextTick()
+  if (!stack.value) return
+  const { default: JSZip } = await import('jszip')
+  const zip = new JSZip()
+  const assets = zip.folder('assets')!
+  const clone = stack.value.cloneNode(true) as HTMLElement
+  const cache = new Map<string, string>() // original url -> assets/<name>
+  let n = 0
+  async function toAsset(url: string): Promise<string | null> {
+    // Leave data: URLs inline — they carry no external file to bundle.
+    if (!url || url.startsWith('data:')) return null
+    if (cache.has(url)) return cache.get(url)!
+    try {
+      const blob = await (await fetch(url)).blob()
+      const rel = `assets/asset-${n++}.${assetExt(blob, url)}`
+      assets.file(rel.slice('assets/'.length), blob)
+      cache.set(url, rel)
+      return rel
+    } catch {
+      return null
+    }
+  }
+  await Promise.all(
+    Array.from(clone.querySelectorAll('img')).map(async (img) => {
+      const u = img.getAttribute('src')
+      if (!u) return
+      const r = await toAsset(u)
+      if (r) img.setAttribute('src', r)
+    }),
+  )
+  await Promise.all(
+    Array.from(clone.querySelectorAll<HTMLElement>('[style*="url("]')).map(async (el) => {
+      const s = el.getAttribute('style') ?? ''
+      const m = s.match(/url\(["']?([^"')]+)["']?\)/)
+      if (!m) return
+      const r = await toAsset(m[1])
+      if (r) el.setAttribute('style', s.replace(m[1], r))
+    }),
+  )
+  zip.file('index.html', buildHtmlDoc(clone.innerHTML))
+  const blob = await zip.generateAsync({ type: 'blob' })
+  triggerDownload(blob, `${deckSlug()}.zip`)
 }
 
 function escapeHtml(s: string) {
@@ -224,14 +317,34 @@ onUnmounted(() => {
       </div>
       <div class="actions">
         <button @click="printPdf">⎙ Print / Save as PDF</button>
+        <button @click="printHandout">⎙ Print Handout (notes)</button>
         <button @click="downloadHtml">⤓ Download HTML</button>
+        <button @click="downloadZip">⤓ Download ZIP (HTML + assets)</button>
         <button class="close" @click="emit('close')">Close</button>
       </div>
     </div>
 
-    <div ref="stack" class="dek-export">
+    <!-- normal slide-per-page export -->
+    <div v-if="mode === 'slides'" ref="stack" class="dek-export">
       <div v-for="(s, i) in visibleSlides" :key="i" class="print-page">
         <SlideView :slide="s" :config="deck.config" :index="i" :total="deck.slides.length" />
+      </div>
+    </div>
+
+    <!-- handout: slide thumbnail (themed) + speaker notes on each page -->
+    <div v-else class="dek-handout">
+      <div v-for="(s, i) in deck.slides" :key="i" class="handout-page">
+        <div class="handout-left">
+          <div class="handout-thumb" :style="{ width: '400px', height: Math.round(400 * 720 / 1280) + 'px', ...vars }">
+            <div :style="{ width: '1280px', height: '720px', transform: `scale(${HANDOUT_SCALE})`, transformOrigin: 'top left' }">
+              <SlideView :slide="s" :config="deck.config" :index="i" :total="deck.slides.length" />
+            </div>
+          </div>
+          <div class="handout-slide-num">{{ i + 1 }} / {{ deck.slides.length }}</div>
+        </div>
+        <div class="handout-right">
+          <div class="handout-notes">{{ s.notes || '' }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -306,6 +419,58 @@ onUnmounted(() => {
   flex: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
+/* ── handout ── */
+.dek-handout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+}
+.handout-page {
+  display: flex;
+  gap: 24px;
+  background: #fff;
+  color: #111;
+  width: 960px;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  align-items: flex-start;
+}
+.handout-left {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.handout-thumb {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  flex-shrink: 0;
+}
+.handout-slide-num {
+  font-size: 11px;
+  color: #888;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+}
+.handout-right {
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+.handout-notes {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #222;
+  white-space: pre-wrap;
+  font-family: 'JetBrains Mono', monospace;
+}
 </style>
 
 <style>
@@ -344,6 +509,19 @@ onUnmounted(() => {
   @page {
     size: 1280px 720px;
     margin: 0;
+  }
+  /* handout mode: hide the normal export, show handout pages */
+  .dek-handout {
+    display: block !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  .dek-handout .handout-page {
+    page-break-after: always;
+    break-after: page;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
   }
 }
 </style>

@@ -19,7 +19,7 @@ const props = defineProps<{
   editable?: boolean
   bulletFormatCommand?: number
   tool?: CanvasTool
-  selectedEl?: number | null
+  selectedEl?: number[]
   pendingImage?: string
 }>()
 
@@ -28,9 +28,12 @@ const emit = defineEmits<{
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
   'update:elements': [els: SlideElement[]]
-  'update:selectedEl': [i: number | null]
+  'update:selectedEl': [sel: number[]]
   'create-element': [el: SlideElement]
   'tool-reset': []
+  'element-image': [index: number, file: File]
+  'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -248,16 +251,18 @@ watch(
     <div v-else-if="slide.layout === 'gallery'" class="dek-pad l-gallery">
       <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Title (optional)" @update:model-value="patch({ title: $event })" />
       <h1 v-else-if="slide.title">{{ slide.title }}</h1>
-      <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${editable ? Math.min(Math.max(galleryItems.length + 1, 1), 4) : galleryCols}, 1fr)` }">
-        <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
-          <div class="frame">
-            <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
-            <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
+      <div class="gallery-wrap">
+        <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
+          <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
+            <div class="frame">
+              <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
+              <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
+            </div>
+            <EditableText v-if="editable" class="label" :model-value="it.label" placeholder="label" @update:model-value="setGalleryLabel(i, $event)" />
+            <div v-else-if="it.label" class="label">{{ it.label }}</div>
           </div>
-          <EditableText v-if="editable" class="label" :model-value="it.label" placeholder="label" @update:model-value="setGalleryLabel(i, $event)" />
-          <div v-else-if="it.label" class="label">{{ it.label }}</div>
         </div>
-        <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋<br />add image</button>
+        <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋</button>
       </div>
     </div>
 
@@ -299,6 +304,9 @@ watch(
       @update:selected="emit('update:selectedEl', $event)"
       @create="emit('create-element', $event)"
       @tool-reset="emit('tool-reset')"
+      @element-image="(idx, f) => emit('element-image', idx, f)"
+      @drop-image="(f, t) => emit('drop-image', f, t)"
+      @ctxmenu="emit('ctxmenu', $event)"
     />
   </div>
 </template>

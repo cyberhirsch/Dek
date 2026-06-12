@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
+import { TYPE_SCALE } from '../core/defaults'
+import { DEFAULT_THEME } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
 import ColorPicker from './ColorPicker.vue'
 
@@ -38,26 +40,20 @@ const emit = defineEmits<{
   insert: [what: 'video' | 'diagram' | 'table']
   'update-element': [p: ElementPatch]
   'toggle-source': []
-  /** Set the selected box's image (file picked in the bar). */
-  'set-image': [f: File]
   /** Insert a new image as a box on the canvas. */
   'insert-image': [f: File]
+  /** Move the selected element(s) forward (+1) or back (−1) in paint order. */
+  'z-order': [dir: 1 | -1]
 }>()
 
-// One hidden file input drives both "add image to box" and "insert image".
 const imgInput = ref<HTMLInputElement | null>(null)
-let imgMode: 'set' | 'insert' = 'set'
-function pickImage(mode: 'set' | 'insert') {
-  imgMode = mode
+function pickImage() {
   imgInput.value?.click()
 }
 function onImgPick(e: Event) {
   const input = e.target as HTMLInputElement
   const f = input.files?.[0]
-  if (f && f.type.startsWith('image/')) {
-    if (imgMode === 'set') emit('set-image', f)
-    else emit('insert-image', f)
-  }
+  if (f && f.type.startsWith('image/')) emit('insert-image', f)
   input.value = ''
 }
 
@@ -77,9 +73,6 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
   diagram: 'Diagram',
   freeform: 'Freeform',
 }
-const statusText = computed(() =>
-  props.saveStatus === 'saving' ? 'saving…' : props.saveStatus === 'unsaved' ? 'unsaved' : 'saved',
-)
 
 // ── canvas tools ──
 const insertOpen = ref(false)
@@ -111,11 +104,28 @@ const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.s
 function upd(p: ElementPatch) {
   emit('update-element', p)
 }
+
+// The theme's resolved default text color — what a box with no explicit `color`
+// actually renders as (CanvasElements falls back to var(--dek-text)). Passing it
+// as the picker's display value keeps the swatch honest instead of blank.
+const themeDefaultText = computed(() => props.deck.config.theme?.text ?? DEFAULT_THEME.color.text)
+
+// Font size steps through the token type scale rather than ±1, so the buttons
+// move between sizes that actually read as distinct. The field stays free-type.
+function stepFontSize(dir: 1 | -1) {
+  const cur = box.value?.size ?? 28
+  const next =
+    dir > 0
+      ? (TYPE_SCALE.find((s) => s > cur) ?? cur)
+      : ([...TYPE_SCALE].reverse().find((s) => s < cur) ?? cur)
+  upd({ size: next })
+}
 // Swatches offered in the color picker: the deck theme's own colors first, then
 // a couple of neutral anchors. De-duped, falling back to the built-in defaults.
 const themeSwatches = computed(() => {
   const t = props.deck.config.theme ?? {}
-  const list = [t.text, t.accent, t.accent2, t.bg, '#e6ecf2', '#070809', '#ffffff', '#000000']
+  const d = DEFAULT_THEME.color
+  const list = [t.text, t.accent, t.accent2, t.bg, d.text, d.bg, '#ffffff', '#000000']
   return [...new Set(list.filter((c): c is string => !!c).map((c) => c.toLowerCase()))]
 })
 </script>
@@ -135,10 +145,11 @@ const themeSwatches = computed(() => {
         @import="emit('import', $event)"
       />
       <span class="div" />
-      <label class="chk"><input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />auto</label>
-      <button class="save" :class="saveStatus" @click="emit('save')">
-        <span class="dot" :class="saveStatus" />{{ statusText }}
-      </button>
+      <label class="chk-auto">
+        <input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />
+        autosave
+        <span class="save-led" :class="saveStatus" />
+      </label>
       <div class="seg">
         <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
         <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
@@ -167,7 +178,7 @@ const themeSwatches = computed(() => {
         <button class="icon-btn" :class="{ on: tool === 'arrow' }" title="Arrow" @click="pickTool('arrow')">
           <svg viewBox="0 0 24 24" width="15" height="15"><line x1="3" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" /><path d="M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
         </button>
-        <button class="icon-btn" title="Insert image" @click="pickImage('insert')">
+        <button class="icon-btn" title="Insert image" @click="pickImage()">
           <svg viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="8.5" cy="10" r="1.5" fill="currentColor" /><path d="M5 17l5-5 4 4 2-2 3 3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
         </button>
         <input ref="imgInput" type="file" accept="image/*" style="display: none" @change="onImgPick" />
@@ -208,23 +219,30 @@ const themeSwatches = computed(() => {
             fallback="#7fc7ff"
             @update:model-value="upd({ stroke: $event, strokeWidth: box.strokeWidth || 2 })"
           />
-          <input class="num" type="number" min="0" max="40" title="Stroke width" :value="box.strokeWidth ?? 0" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
-          <input class="num" type="number" min="0" max="200" title="Corner radius" :value="box.radius ?? 0" @input="upd({ radius: +($event.target as HTMLInputElement).value })" />
-          <button class="mini img" :title="box.src ? 'Replace image' : 'Add image'" @click="pickImage('set')">
-            <svg viewBox="0 0 24 24" width="13" height="13"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="8.5" cy="10" r="1.5" fill="currentColor" /><path d="M5 17l5-5 4 4 2-2 3 3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-          </button>
-          <button v-if="box.src" class="mini" title="Remove image" @click="upd({ src: '' })">∅</button>
+          <div class="num-spin" title="Stroke width">
+            <button class="spin-btn" @mousedown.prevent="upd({ strokeWidth: Math.max(0, (box.strokeWidth ?? 0) - 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+            <input class="spin-val" type="number" min="0" max="40" :value="box.strokeWidth ?? 0" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
+            <button class="spin-btn" @mousedown.prevent="upd({ strokeWidth: Math.min(40, (box.strokeWidth ?? 0) + 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          </div>
+          <div class="num-spin" title="Corner radius">
+            <button class="spin-btn" @mousedown.prevent="upd({ radius: Math.max(0, (box.radius ?? 0) - 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+            <input class="spin-val" type="number" min="0" max="200" :value="box.radius ?? 0" @input="upd({ radius: +($event.target as HTMLInputElement).value })" />
+            <button class="spin-btn" @mousedown.prevent="upd({ radius: Math.min(200, (box.radius ?? 0) + 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          </div>
         </div>
         <span class="div" />
         <div class="seg style-seg">
           <select class="sel font" title="Font" :value="box.font ?? 'body'" @change="upd({ font: ($event.target as HTMLSelectElement).value })">
             <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
           </select>
-          <input class="num" type="number" min="8" max="400" title="Font size" :value="box.size ?? 28" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
-          <input class="num" type="number" min="100" max="900" step="100" title="Font weight" :value="box.weight ?? (box.bold ? 700 : 400)" @input="upd({ weight: +($event.target as HTMLInputElement).value })" />
+          <div class="num-step" title="Font size">
+            <button class="step-btn" title="Smaller" @mousedown.prevent="stepFontSize(-1)">−</button>
+            <input class="step-val" type="number" min="8" max="400" :value="box.size ?? 28" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
+            <button class="step-btn" title="Larger" @mousedown.prevent="stepFontSize(1)">+</button>
+          </div>
           <ColorPicker
             title="Text color"
-            :model-value="box.color"
+            :model-value="box.color ?? themeDefaultText"
             :swatches="themeSwatches"
             fallback="#e6ecf2"
             @update:model-value="upd({ color: $event })"
@@ -271,7 +289,24 @@ const themeSwatches = computed(() => {
             fallback="#e6ecf2"
             @update:model-value="upd({ stroke: $event })"
           />
-          <input class="num" type="number" min="1" max="40" title="Thickness" :value="arrow.strokeWidth ?? 3" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
+          <div class="num-spin" title="Thickness">
+            <button class="spin-btn" @mousedown.prevent="upd({ strokeWidth: Math.max(1, (arrow.strokeWidth ?? 3) - 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+            <input class="spin-val" type="number" min="1" max="40" :value="arrow.strokeWidth ?? 3" @input="upd({ strokeWidth: +($event.target as HTMLInputElement).value })" />
+            <button class="spin-btn" @mousedown.prevent="upd({ strokeWidth: Math.min(40, (arrow.strokeWidth ?? 3) + 1) })"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </template>
+
+      <!-- any selected element: z-order -->
+      <template v-if="selectedElement">
+        <span class="div" />
+        <div class="seg style-seg">
+          <button class="icon-btn" title="Bring forward (Ctrl+])" @click="emit('z-order', 1)">
+            <svg viewBox="0 0 24 24" width="14" height="14"><rect x="8" y="4" width="12" height="12" rx="1.5" fill="currentColor" opacity="0.9" /><rect x="4" y="9" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" /></svg>
+          </button>
+          <button class="icon-btn" title="Send backward (Ctrl+[)" @click="emit('z-order', -1)">
+            <svg viewBox="0 0 24 24" width="14" height="14"><rect x="8" y="4" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" /><rect x="4" y="9" width="11" height="11" rx="1.5" fill="currentColor" opacity="0.9" /></svg>
+          </button>
         </div>
       </template>
 
@@ -424,24 +459,29 @@ const themeSwatches = computed(() => {
   color: rgba(230, 236, 242, 0.65);
   cursor: pointer;
 }
-.save {
+.chk-auto {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e6ecf2;
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-family: inherit;
+  gap: 5px;
   font-size: 11px;
+  color: rgba(230, 236, 242, 0.65);
+  cursor: pointer;
+  user-select: none;
+}
+.chk-auto input[type='checkbox'] {
+  accent-color: #7fc7ff;
   cursor: pointer;
 }
-.save.unsaved { background: #2563eb; border-color: #2563eb; }
-.dot { width: 6px; height: 6px; border-radius: 50%; }
-.dot.saved { background: #4ade80; }
-.dot.unsaved { background: #fff; }
-.dot.saving { background: #facc15; }
+.save-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.save-led.saved { background: #4ade80; }
+.save-led.saving { background: #facc15; }
+.save-led.unsaved { background: #f87171; }
 .topbtn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -513,27 +553,84 @@ const themeSwatches = computed(() => {
 .menu button:hover { background: rgba(127, 199, 255, 0.18); color: #fff; }
 .fmt b, .fmt i, .fmt u, .fmt s { font-size: 13px; font-style: normal; }
 .fmt i { font-style: italic; }
-.num {
-  width: 42px;
-  background: #1e222b;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+/* Custom spinner for strokeWidth / radius / thickness — themed arrows on
+   transparent buttons flanking a slim editable number field. */
+.num-spin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.spin-btn {
+  background: transparent;
+  border: none;
+  color: #7fc7ff;
+  cursor: pointer;
+  padding: 1px 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  opacity: 0.75;
+}
+.spin-btn:hover { opacity: 1; }
+.spin-val {
+  width: 28px;
+  background: transparent;
+  border: none;
   color: #e6ecf2;
-  border-radius: 6px;
-  padding: 4px 5px;
   font-family: inherit;
   font-size: 11px;
+  text-align: center;
+  padding: 0;
+  /* hide native OS spinner arrows */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.spin-val::-webkit-inner-spin-button,
+.spin-val::-webkit-outer-spin-button {
+  display: none;
+}
+/* Horizontal font-size stepper: editable field flanked by minimal −/+ buttons.
+   Buttons jump through the type scale; the field accepts any typed value. */
+.num-step {
+  display: flex;
+  align-items: center;
+  background: #1e222b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.step-btn {
+  background: transparent;
+  border: none;
+  color: #7fc7ff;
+  cursor: pointer;
+  width: 18px;
+  height: 26px;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+.step-btn:hover { opacity: 1; background: rgba(127, 199, 255, 0.12); }
+.step-val {
+  width: 30px;
+  background: transparent;
+  border: none;
+  color: #e6ecf2;
+  font-family: inherit;
+  font-size: 11px;
+  text-align: center;
+  padding: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.step-val::-webkit-inner-spin-button,
+.step-val::-webkit-outer-spin-button {
+  display: none;
 }
 .sel.font { padding: 4px 6px; }
-.mini {
-  width: 20px;
-  height: 26px;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(230, 236, 242, 0.7);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.mini:hover { background: rgba(255, 255, 255, 0.1); }
 </style>

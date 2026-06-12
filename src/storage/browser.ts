@@ -5,6 +5,7 @@
 import type { Deck } from '../core/types'
 import type { DeckRef, StorageBackend } from './types'
 import { parseDeck, emptyDeck } from '../core/deck'
+import { uniqueSlug } from '../core/names'
 import { idbGet, idbKeys, idbSet } from './idb'
 // The example deck ships with the app so a fresh visitor sees something.
 import exampleRaw from '../../deck.example.md?raw'
@@ -23,16 +24,6 @@ function plain<T>(x: T): T {
   return JSON.parse(JSON.stringify(x))
 }
 
-function slug(name: string): string {
-  return (
-    (name || 'deck')
-      .trim()
-      .replace(/[^a-zA-Z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || 'deck'
-  )
-}
-
 async function seedIfEmpty() {
   const keys = await idbKeys()
   if (keys.some((k) => k.startsWith(PREFIX))) return
@@ -44,11 +35,7 @@ async function seedIfEmpty() {
 /** A deck filename that doesn't clobber an existing stored deck (…, -2, -3). */
 async function uniqueFile(name: string): Promise<string> {
   const keys = await idbKeys()
-  const base = slug(name)
-  let file = `${base}.md`
-  let k = 2
-  while (keys.includes(PREFIX + file)) file = `${base}-${k++}.md`
-  return file
+  return `${uniqueSlug(name, (s) => keys.includes(`${PREFIX}${s}.md`))}.md`
 }
 
 async function get(file: string): Promise<Stored | undefined> {

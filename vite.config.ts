@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import path from 'node:path'
 import fs from 'node:fs'
 import { parseDeck, serializeDeck, emptyDeck } from './src/core/deck'
+import { uniqueSlug } from './src/core/names'
 import type { Slide, DeckConfig } from './src/core/types'
 
 const ROOT = __dirname
@@ -50,27 +51,11 @@ function assetsFor(file: string | null): { dir: string; urlPrefix: string } {
   return { dir, urlPrefix: '/' + rel }
 }
 
-function slug(name: string): string {
-  return (
-    (name || 'deck')
-      .trim()
-      .replace(/[^a-zA-Z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || 'deck'
-  )
-}
-
 /** A decks/ filename that doesn't clobber an existing deck (…, -2, -3). */
 function uniqueDeckPath(name: string): { fileName: string; dest: string } {
-  const base = slug(name)
-  let fileName = `${base}.md`
-  let dest = path.join(DECKS_DIR, fileName)
-  let k = 2
-  while (fs.existsSync(dest)) {
-    fileName = `${base}-${k++}.md`
-    dest = path.join(DECKS_DIR, fileName)
-  }
-  return { fileName, dest }
+  const base = uniqueSlug(name, (s) => fs.existsSync(path.join(DECKS_DIR, `${s}.md`)))
+  const fileName = `${base}.md`
+  return { fileName, dest: path.join(DECKS_DIR, fileName) }
 }
 
 function deckTitle(p: string): string | undefined {

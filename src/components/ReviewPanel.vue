@@ -9,6 +9,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   jump: [index: number]
+  'delete-asset': [filename: string]
 }>()
 
 const mode = ref<'issues' | 'assets'>('issues')
@@ -20,13 +21,27 @@ const issues = computed(() =>
   ),
 )
 const assetCounts = computed(() => {
-  const out = { data: 0, remote: 0, local: 0, blob: 0, unknown: 0 }
+  const out = { data: 0, remote: 0, local: 0, blob: 0, unknown: 0, orphan: 0 }
   for (const a of props.analysis.assets) out[a.kind] += 1
   return out
 })
+const orphans = computed(() => props.analysis.assets.filter((a) => a.kind === 'orphan'))
 
 function jump(slide: number) {
   emit('jump', Math.max(0, slide - 1))
+}
+function deleteOne(a: AssetRef) {
+  if (!a.filename) return
+  if (window.confirm(`Delete "${a.filename}" from the assets folder? This cannot be undone.`)) {
+    emit('delete-asset', a.filename)
+  }
+}
+function deleteAllOrphans() {
+  const list = orphans.value
+  if (!list.length) return
+  if (window.confirm(`Delete all ${list.length} unused asset(s) from the folder? This cannot be undone.`)) {
+    for (const a of list) if (a.filename) emit('delete-asset', a.filename)
+  }
 }
 
 function issueLabel(i: DeckIssue): string {
@@ -89,20 +104,37 @@ function formatBytes(bytes?: number): string {
         <span>{{ assetCounts.local }} local</span>
         <span>{{ assetCounts.data }} embedded</span>
         <span>{{ assetCounts.remote }} remote</span>
+        <span v-if="assetCounts.orphan" class="orphan-badge">{{ assetCounts.orphan }} orphaned</span>
       </div>
-      <button
+      <button v-if="orphans.length >= 2" class="del-all" @click="deleteAllOrphans">
+        Delete all {{ orphans.length }} orphaned
+      </button>
+      <div
         v-for="asset in analysis.assets"
         :key="asset.ref"
         class="asset"
         :class="[asset.kind, { active: asset.uses.some((u) => u.slide === current + 1) }]"
-        @click="jump(asset.uses[0]?.slide ?? 1)"
       >
-        <span class="kind">{{ asset.kind }}</span>
-        <span class="body">
-          <span class="ref">{{ shortRef(asset) }}</span>
-          <span class="meta">slide #{{ asset.uses[0]?.slide }} / {{ asset.uses.length }} use{{ asset.uses.length === 1 ? '' : 's' }}</span>
-        </span>
-      </button>
+        <button
+          v-if="asset.kind !== 'orphan'"
+          class="asset-main"
+          @click="jump(asset.uses[0]?.slide ?? 1)"
+        >
+          <span class="kind">{{ asset.kind }}</span>
+          <span class="body">
+            <span class="ref">{{ shortRef(asset) }}</span>
+            <span class="meta">slide #{{ asset.uses[0]?.slide }} / {{ asset.uses.length }} use{{ asset.uses.length === 1 ? '' : 's' }}</span>
+          </span>
+        </button>
+        <div v-else class="asset-main orphan-row">
+          <span class="kind">orphan</span>
+          <span class="body">
+            <span class="ref">{{ asset.filename }}</span>
+            <span class="meta">not referenced by any slide</span>
+          </span>
+          <button class="del-btn" title="Delete this file" @click="deleteOne(asset)">Delete</button>
+        </div>
+      </div>
       <div v-if="!analysis.assets.length" class="empty">No referenced assets.</div>
     </section>
   </aside>
@@ -182,8 +214,7 @@ function formatBytes(bytes?: number): string {
   overflow-y: auto;
   padding: 0 10px 14px;
 }
-.issue,
-.asset {
+.issue {
   width: 100%;
   display: flex;
   align-items: flex-start;
@@ -198,15 +229,65 @@ function formatBytes(bytes?: number): string {
   cursor: pointer;
 }
 .issue:hover,
-.asset:hover,
-.issue.active,
-.asset.active {
+.issue.active {
   border-color: rgba(127, 199, 255, 0.6);
   background: rgba(127, 199, 255, 0.08);
 }
 .issue.error { border-left: 3px solid #f87171; }
 .issue.warning { border-left: 3px solid #facc15; }
 .issue.info { border-left: 3px solid #7fc7ff; }
+
+.asset {
+  margin: 0 0 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  overflow: hidden;
+}
+.asset.active { border-color: rgba(127, 199, 255, 0.6); }
+.asset-main {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+button.asset-main { cursor: pointer; }
+button.asset-main:hover { background: rgba(127, 199, 255, 0.08); }
+.orphan-row { align-items: center; }
+.del-btn {
+  flex: none;
+  align-self: center;
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.del-btn:hover { background: rgba(248, 113, 113, 0.26); }
+.del-all {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 7px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.del-all:hover { background: rgba(248, 113, 113, 0.2); }
+.orphan-badge {
+  color: #fca5a5 !important;
+  background: rgba(248, 113, 113, 0.16) !important;
+}
 .slide,
 .kind {
   flex: none;
@@ -245,6 +326,7 @@ function formatBytes(bytes?: number): string {
 .asset.data { border-left: 3px solid #facc15; }
 .asset.remote { border-left: 3px solid #a78bfa; }
 .asset.local { border-left: 3px solid #4ade80; }
+.asset.orphan { border-left: 3px solid #f87171; }
 .empty {
   padding: 30px 10px;
   color: rgba(230, 236, 242, 0.45);

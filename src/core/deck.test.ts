@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseDeck, serializeDeck, blankSlide, defaultConfig } from './deck'
+import { slug, uniqueSlug } from './names'
 import { LAYOUT_IDS } from './types'
 
 /** parse → serialize → parse must be idempotent on the data model. */
@@ -189,5 +190,38 @@ describe('blankSlide', () => {
       const back = parseDeck(serializeDeck(deck))
       expect(back.slides[0].layout).toBe(id)
     }
+  })
+})
+
+describe('parse errors', () => {
+  it('names the offending slide on malformed YAML', () => {
+    const raw = `---
+deck: Test
+---
+layout: text
+title: Fine
+---
+layout: text
+title: Broken
+content: [unterminated`
+    expect(() => parseDeck(raw)).toThrow(/slide 2:/)
+  })
+
+  it('tags the config block when the header is malformed', () => {
+    expect(() => parseDeck('---\ndeck: "unterminated\n')).toThrow(/deck config:/)
+  })
+})
+
+describe('slug / uniqueSlug', () => {
+  it('slugifies to filename-safe ascii', () => {
+    expect(slug('Film & Postproduktion')).toBe('Film-Postproduktion')
+    expect(slug('  ')).toBe('deck')
+    expect(slug('a'.repeat(80))).toHaveLength(60)
+  })
+
+  it('appends -2, -3 until free', () => {
+    const taken = new Set(['talk', 'talk-2'])
+    expect(uniqueSlug('talk', (s) => taken.has(s))).toBe('talk-3')
+    expect(uniqueSlug('talk', () => false)).toBe('talk')
   })
 })
