@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, Slide, SlideElement } from '../core/types'
+import type { SlideSplitTarget } from '../core/split'
 import { themeVars as buildThemeVars } from '../render/theme'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
@@ -25,6 +26,7 @@ const emit = defineEmits<{
   'create-element': [el: SlideElement]
   'tool-reset': []
   'element-image': [index: number, file: File]
+  split: [e: { index: number; target: SlideSplitTarget }]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
 }>()
@@ -174,6 +176,7 @@ onUnmounted(() => {
         @create-element="emit('create-element', $event)"
         @tool-reset="emit('tool-reset')"
         @element-image="(i, f) => emit('element-image', i, f)"
+        @split="emit('split', { index: renderIndex, target: $event })"
         @drop-image="(f, t) => emit('drop-image', f, t)"
         @ctxmenu="emit('ctxmenu', $event)"
       />

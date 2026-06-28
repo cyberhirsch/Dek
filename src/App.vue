@@ -5,6 +5,7 @@ import { blankSlide } from './core/deck'
 import { convertLayout } from './core/convert'
 import { newElementRect } from './core/bake'
 import { analyzeDeck } from './core/analyze'
+import { splitSlide, type SlideSplitTarget } from './core/split'
 import {
   fetchDeck,
   saveSlide,
@@ -850,6 +851,16 @@ function duplicateSlide() {
   selected.value = [current.value]
   void saveWholeDeck()
 }
+function splitOverflow(e: { index: number; target: SlideSplitTarget }) {
+  if (!deck.value) return
+  const result = splitSlide(deck.value.slides[e.index], e.target)
+  if (!result) return
+  snap('split')
+  deck.value.slides.splice(e.index, 1, ...result)
+  focusSlide(e.index + 1)
+  selectedEls.value = []
+  void saveWholeDeck()
+}
 function removeSlide() {
   if (!deck.value || deck.value.slides.length <= 1) return
   snap('remove')
@@ -1083,6 +1094,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           @create-element="onCreateElement"
           @tool-reset="((activeTool = 'select'), (pendingImage = ''))"
           @element-image="onElementImage"
+          @split="splitOverflow"
           @drop-image="onDropImage"
           @ctxmenu="onCanvasContextMenu"
         />

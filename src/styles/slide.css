@@ -95,6 +95,29 @@
 .l-cover {
   justify-content: center;
 }
+.l-cover .fit-cover-title {
+  width: 100%;
+  height: 220px;
+  flex: none;
+}
+.l-cover .fit-cover-subtitle {
+  width: 100%;
+  height: 76px;
+  margin-top: 8px;
+  flex: none;
+}
+.l-cover .fit-cover-byline {
+  width: 100%;
+  height: 50px;
+  margin-top: 28px;
+  flex: none;
+}
+.l-cover .fit-cover-title .fitted-text-body,
+.l-cover .fit-cover-subtitle .fitted-text-body,
+.l-cover .fit-cover-byline .fitted-text-body {
+  display: flex;
+  align-items: center;
+}
 .l-cover .mark {
   font-family: var(--dek-font-heading);
   font-style: italic;
@@ -107,10 +130,10 @@
   font-style: italic;
   font-size: 48px;
   color: var(--dek-accent);
-  margin-top: 8px;
+  margin-top: 0;
 }
 .l-cover .byline {
-  margin-top: 28px;
+  margin-top: 0;
   font-size: 20px;
   color: rgba(230, 236, 242, 0.7);
 }
@@ -120,6 +143,15 @@
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+.l-section .fit-section-title {
+  width: 100%;
+  height: 100%;
+}
+.l-section .fit-section-title .fitted-text-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .l-section h1 {
   font-size: 110px;
@@ -131,6 +163,22 @@
   justify-content: center;
   text-align: center;
 }
+.l-statement .fit-statement-text {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.l-statement .fit-statement-text .fitted-text-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.l-statement .fit-statement-cite {
+  width: 100%;
+  height: 60px;
+  margin-top: 20px;
+  flex: none;
+}
 .l-statement .text {
   font-family: var(--dek-font-heading);
   font-style: italic;
@@ -140,7 +188,7 @@
   max-width: 1000px;
 }
 .l-statement .cite {
-  margin-top: 28px;
+  margin-top: 0;
   font-size: 22px;
   color: rgba(230, 236, 242, 0.6);
 }
@@ -149,6 +197,17 @@
 .l-speaker {
   flex-direction: column;
   justify-content: center;
+}
+.l-speaker .fit-speaker-name {
+  width: 100%;
+  height: 78px;
+  flex: none;
+}
+.l-speaker .fit-speaker-role {
+  width: 100%;
+  height: 54px;
+  margin-top: 10px;
+  flex: none;
 }
 .l-speaker .portraits {
   display: flex;
@@ -171,11 +230,12 @@
 .l-speaker .role {
   font-size: 24px;
   color: rgba(230, 236, 242, 0.75);
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 /* ── Layout: bullets ───────────────────────────────────────────── */
-.l-text h1 {
+.l-text .fit-layout-title {
+  height: 92px;
   border-bottom: 1px solid rgba(230, 236, 242, 0.12);
   padding-bottom: 16px;
   margin-bottom: 36px;
@@ -185,7 +245,8 @@
    lets it fill the remaining space; overflow: hidden clips instead of pushing
    out of the slide frame. */
 .l-text > .dek-list,
-.l-text > .editable-list {
+.l-text > .editable-list,
+.l-text > .fitted-list {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -193,11 +254,13 @@
 .l-text-image .text-col {
   overflow: hidden;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
 .l-text-image .text-col > .dek-list,
-.l-text-image .text-col > .editable-list {
+.l-text-image .text-col > .editable-list,
+.l-text-image .text-col > .fitted-list {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -258,6 +321,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 32px;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   /* Top-align every ratio so the image's top edge sits just under the heading
      and lines up regardless of aspect ratio. */
   align-items: start;
@@ -274,8 +339,10 @@
 .l-text-image.side-left .text-col {
   order: 2;
 }
-.l-text-image h1 {
+.l-text-image .fit-layout-title {
+  height: 78px;
   margin-bottom: 24px;
+  flex: none;
 }
 .frame-img {
   /* Sized by aspect ratio (set per variant below), centred in its column and
@@ -365,10 +432,21 @@
 .l-image-full .overlay h1 {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
+.l-image-full .fit-image-title {
+  width: 100%;
+  height: 78px;
+  flex: none;
+}
+.l-image-full .fit-image-caption {
+  width: 100%;
+  height: 58px;
+  margin-top: 8px;
+  flex: none;
+}
 .l-image-full .overlay .cap {
   font-size: 22px;
   color: rgba(230, 236, 242, 0.85);
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 /* ── Layout: image-caption ─────────────────────────────────────── */
@@ -392,6 +470,9 @@
   padding: 6px 12px;
   border-radius: 6px;
   z-index: 3;
+  width: min(520px, 70%);
+  height: 96px;
+  overflow: hidden;
 }
 .cap.bottom-right { bottom: 80px; right: 80px; }
 .cap.bottom-left { bottom: 80px; left: 80px; }
@@ -489,16 +570,25 @@
   border-radius: 6px;
   z-index: 4;
 }
-.l-video-embed .vid-cap {
+.l-video-embed .fit-video-caption {
+  width: 100%;
+  height: 62px;
   margin-top: 14px;
+  flex: none;
+}
+.l-video-embed .vid-cap {
+  margin-top: 0;
   text-align: center;
   font-size: 20px;
   color: rgba(230, 236, 242, 0.75);
 }
 
 /* ── Layout: gallery ───────────────────────────────────────────── */
-.l-gallery h1 {
+.l-gallery .fit-gallery-title {
+  width: 100%;
+  height: 78px;
   margin-bottom: 28px;
+  flex: none;
 }
 .gallery-wrap {
   position: relative;
@@ -534,6 +624,11 @@
   font-size: 28px;
   color: var(--dek-accent);
   text-align: center;
+}
+.gallery-cell .fit-gallery-label {
+  width: 100%;
+  height: 62px;
+  flex: none;
 }
 .gallery-cell .frame {
   position: relative;
@@ -608,7 +703,9 @@
 .l-diagram {
   padding: 50px 70px;
 }
-.l-diagram h1 {
+.l-diagram .fit-diagram-title {
+  width: 100%;
+  height: 78px;
   margin-bottom: 18px;
   flex: none;
 }

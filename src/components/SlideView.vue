@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../core/types'
-import { inlineMd, parseContent, rowsToContent } from '../render/inline'
+import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
+import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
-import EditableTextList, { type EditableTextListRow } from './EditableTextList.vue'
+import FittedText from './FittedText.vue'
+import FittedTextList from './FittedTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import CanvasElements from './CanvasElements.vue'
 import type { CanvasTool } from '../core/types'
@@ -32,13 +34,14 @@ const emit = defineEmits<{
   'create-element': [el: SlideElement]
   'tool-reset': []
   'element-image': [index: number, file: File]
+  split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
 
-type TextRow = EditableTextListRow
+type TextRow = ContentRow
 
 function isGalleryItem(i: unknown): i is GalleryItem {
   return !!i && typeof i === 'object' && typeof (i as GalleryItem).image === 'string'
@@ -57,6 +60,9 @@ const galleryCols = computed(() => {
   if (typeof c === 'number') return c
   return Math.min(galleryItems.value.length || 1, 3)
 })
+const listBaseSize = computed(() =>
+  props.slide.layout === 'text-image' && (props.slide.imageRatio ?? '16:9') === '16:9' ? 21 : 26,
+)
 
 function patch(p: Partial<Slide>) {
   emit('patch', p)
@@ -124,26 +130,20 @@ watch(
 
     <!-- cover -->
     <div v-if="slide.layout === 'cover'" class="dek-pad l-cover">
-      <EditableText v-if="editable" class="mark" :model-value="slide.title" placeholder="Title" @update:model-value="patch({ title: $event })" />
-      <div v-else class="mark">{{ slide.title }}</div>
-      <EditableText v-if="editable" class="sub" :model-value="slide.subtitle" placeholder="Subtitle" @update:model-value="patch({ subtitle: $event })" />
-      <div v-else-if="slide.subtitle" class="sub">{{ slide.subtitle }}</div>
-      <EditableText v-if="editable" class="byline" :model-value="slide.byline" placeholder="Byline" @update:model-value="patch({ byline: $event })" />
-      <div v-else-if="slide.byline" class="byline">{{ slide.byline }}</div>
+      <FittedText class="fit-cover-title" content-class="mark" :model-value="slide.title" :editable="editable" placeholder="Title" :base-size="220" :min-size="56" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
+      <FittedText v-if="editable || slide.subtitle" class="fit-cover-subtitle" content-class="sub" :model-value="slide.subtitle" :editable="editable" placeholder="Subtitle" :base-size="48" :min-size="20" splittable @update:model-value="patch({ subtitle: $event })" @split="emit('split', { kind: 'field', field: 'subtitle' })" />
+      <FittedText v-if="editable || slide.byline" class="fit-cover-byline" content-class="byline" :model-value="slide.byline" :editable="editable" placeholder="Byline" :base-size="20" :min-size="11" splittable @update:model-value="patch({ byline: $event })" @split="emit('split', { kind: 'field', field: 'byline' })" />
     </div>
 
     <!-- section -->
     <div v-else-if="slide.layout === 'section'" class="dek-pad l-section">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Section" @update:model-value="patch({ title: $event })" />
-      <h1 v-else>{{ slide.title }}</h1>
+      <FittedText class="fit-section-title" content-class="section-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Section" :base-size="110" :min-size="34" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
     </div>
 
     <!-- statement -->
     <div v-else-if="slide.layout === 'statement'" class="dek-pad l-statement">
-      <EditableText v-if="editable" class="text" multiline :model-value="slide.text" placeholder="A bold statement…" @update:model-value="patch({ text: $event })" />
-      <div v-else class="text">{{ slide.text }}</div>
-      <EditableText v-if="editable" class="cite" :model-value="slide.cite" placeholder="— source (optional)" @update:model-value="patch({ cite: $event })" />
-      <div v-else-if="slide.cite" class="cite">— {{ slide.cite }}</div>
+      <FittedText class="fit-statement-text" content-class="text" :model-value="slide.text" :editable="editable" multiline placeholder="A bold statement…" :base-size="56" :min-size="24" splittable @update:model-value="patch({ text: $event })" @split="emit('split', { kind: 'field', field: 'text' })" />
+      <FittedText v-if="editable || slide.cite" class="fit-statement-cite" content-class="cite" :model-value="slide.cite" :editable="editable" prefix="— " placeholder="— source (optional)" :base-size="22" :min-size="11" splittable @update:model-value="patch({ cite: $event })" @split="emit('split', { kind: 'field', field: 'cite' })" />
     </div>
 
     <!-- speaker -->
@@ -154,32 +154,36 @@ watch(
         </div>
         <div v-if="editable && (slide.portraits ?? []).length < 3" class="frame add-frame" @click="patch({ portraits: [...(slide.portraits ?? []), ''] })">+</div>
       </div>
-      <EditableText v-if="editable" tag="h1" :model-value="slide.name" placeholder="Name" @update:model-value="patch({ name: $event })" />
-      <h1 v-else>{{ slide.name }}</h1>
-      <EditableText v-if="editable" class="role" :model-value="slide.role" placeholder="Role" @update:model-value="patch({ role: $event })" />
-      <div v-else-if="slide.role" class="role">{{ slide.role }}</div>
+      <FittedText class="fit-speaker-name" content-class="speaker-name" tag="h1" :model-value="slide.name" :editable="editable" placeholder="Name" :base-size="64" :min-size="26" splittable @update:model-value="patch({ name: $event })" @split="emit('split', { kind: 'field', field: 'name' })" />
+      <FittedText v-if="editable || slide.role" class="fit-speaker-role" content-class="role" :model-value="slide.role" :editable="editable" placeholder="Role" :base-size="24" :min-size="12" splittable @update:model-value="patch({ role: $event })" @split="emit('split', { kind: 'field', field: 'role' })" />
     </div>
 
     <!-- text -->
     <div v-else-if="slide.layout === 'text'" class="dek-pad l-text">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Heading" @update:model-value="patch({ title: $event })" />
-      <h1 v-else>{{ slide.title }}</h1>
-      <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
-      <ul v-else class="dek-list">
-        <li v-for="(it, i) in textItems" :key="i" :class="{ plain: !it.bullet }" v-html="inlineMd(it.text)" />
-      </ul>
+      <FittedText class="fit-layout-title" content-class="layout-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Heading" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
+      <FittedTextList
+        :rows="textItems"
+        :editable="editable"
+        :format-command="bulletFormatCommand"
+        :base-size="listBaseSize"
+        @update:rows="setRows"
+        @split="emit('split', { kind: 'field', field: 'content' })"
+      />
     </div>
 
     <!-- text-image -->
     <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x')]">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Heading" @update:model-value="patch({ title: $event })" />
-      <h1 v-else>{{ slide.title }}</h1>
+      <FittedText class="fit-layout-title" content-class="layout-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Heading" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="cols">
         <div class="text-col">
-          <EditableTextList v-if="editable" :rows="textItems" :format-command="bulletFormatCommand" @update:rows="setRows" />
-          <ul v-else class="dek-list">
-            <li v-for="(it, i) in textItems" :key="i" :class="{ plain: !it.bullet }" v-html="inlineMd(it.text)" />
-          </ul>
+          <FittedTextList
+            :rows="textItems"
+            :editable="editable"
+            :format-command="bulletFormatCommand"
+            :base-size="listBaseSize"
+            @update:rows="setRows"
+            @split="emit('split', { kind: 'field', field: 'content' })"
+          />
         </div>
         <div class="img-col">
           <div class="frame-img">
@@ -195,10 +199,8 @@ watch(
         <FramedImage :src="slide.image" :focus="slide.focus" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
       <div v-if="slide.title || slide.caption || editable" class="overlay">
-        <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Overlay title (optional)" @update:model-value="patch({ title: $event })" />
-        <h1 v-else-if="slide.title">{{ slide.title }}</h1>
-        <EditableText v-if="editable" class="cap" :model-value="slide.caption" placeholder="Caption (optional)" @update:model-value="patch({ caption: $event })" />
-        <div v-else-if="slide.caption" class="cap">{{ slide.caption }}</div>
+        <FittedText v-if="editable || slide.title" class="fit-image-title" content-class="image-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Overlay title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
+        <FittedText v-if="editable || slide.caption" class="fit-image-caption" content-class="cap" :model-value="slide.caption" :editable="editable" placeholder="Caption (optional)" :base-size="22" :min-size="11" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
       </div>
     </div>
 
@@ -207,8 +209,7 @@ watch(
       <div class="frame">
         <FramedImage :src="slide.image" :focus="slide.focus" fit="contain" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
-      <EditableText v-if="editable" class="cap" :class="slide.captionPos ?? 'bottom-right'" :model-value="slide.caption" placeholder="Caption / credit" @update:model-value="patch({ caption: $event })" />
-      <div v-else-if="slide.caption" class="cap" :class="slide.captionPos ?? 'bottom-right'">{{ slide.caption }}</div>
+      <FittedText v-if="editable || slide.caption" class="fit-photo-caption cap" :class="slide.captionPos ?? 'bottom-right'" content-class="photo-caption" :model-value="slide.caption" :editable="editable" placeholder="Caption / credit" :base-size="18" :min-size="10" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
     </div>
 
     <!-- video-embed -->
@@ -243,14 +244,12 @@ watch(
           </div>
         </template>
       </div>
-      <EditableText v-if="editable" class="vid-cap" :model-value="slide.caption" placeholder="Caption (optional)" @update:model-value="patch({ caption: $event })" />
-      <div v-else-if="slide.caption" class="vid-cap">{{ slide.caption }}</div>
+      <FittedText v-if="editable || slide.caption" class="fit-video-caption" content-class="vid-cap" :model-value="slide.caption" :editable="editable" placeholder="Caption (optional)" :base-size="20" :min-size="11" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
     </div>
 
     <!-- gallery -->
     <div v-else-if="slide.layout === 'gallery'" class="dek-pad l-gallery">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Title (optional)" @update:model-value="patch({ title: $event })" />
-      <h1 v-else-if="slide.title">{{ slide.title }}</h1>
+      <FittedText v-if="editable || slide.title" class="fit-gallery-title" content-class="gallery-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="gallery-wrap">
         <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
@@ -258,8 +257,7 @@ watch(
               <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
             </div>
-            <EditableText v-if="editable" class="label" :model-value="it.label" placeholder="label" @update:model-value="setGalleryLabel(i, $event)" />
-            <div v-else-if="it.label" class="label">{{ it.label }}</div>
+            <FittedText v-if="editable || it.label" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />
           </div>
         </div>
         <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋</button>
@@ -268,8 +266,7 @@ watch(
 
     <!-- diagram (Mermaid) -->
     <div v-else-if="slide.layout === 'diagram'" class="dek-pad l-diagram">
-      <EditableText v-if="editable" tag="h1" :model-value="slide.title" placeholder="Title (optional)" @update:model-value="patch({ title: $event })" />
-      <h1 v-else-if="slide.title">{{ slide.title }}</h1>
+      <FittedText v-if="editable || slide.title" class="fit-diagram-title" content-class="diagram-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="diagram-stage">
         <MermaidDiagram :code="slide.code" />
       </div>
@@ -305,6 +302,7 @@ watch(
       @create="emit('create-element', $event)"
       @tool-reset="emit('tool-reset')"
       @element-image="(idx, f) => emit('element-image', idx, f)"
+      @split-element="emit('split', { kind: 'element', index: $event })"
       @drop-image="(f, t) => emit('drop-image', f, t)"
       @ctxmenu="emit('ctxmenu', $event)"
     />

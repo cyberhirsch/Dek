@@ -30,6 +30,7 @@ const emit = defineEmits<{
   'tool-reset': []
   /** User picked a replacement image file for a box element at the given index. */
   'element-image': [index: number, file: File]
+  'split-element': [index: number]
   /** An image file was dropped on the canvas: either onto a box (set its image)
    *  or onto empty background (create a new image box at the drop point). */
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
@@ -651,6 +652,8 @@ defineExpose({ commitEdit })
           :content="asBox(el).content"
           :base-size="asBox(el).size ?? 28"
           :style="textStyle(asBox(el))"
+          :editable="editable"
+          @split="emit('split-element', i)"
         />
       </template>
 
