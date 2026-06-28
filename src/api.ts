@@ -7,7 +7,7 @@ import { serverBackend } from './storage/server'
 import { browserBackend } from './storage/browser'
 import { fsBackend, pickOpen, supportsFS } from './storage/fs'
 import {
-  directoryContainsFile,
+  directoryForFile,
   ensureCanonicalAssets,
   fsDirBackend,
   pickDir,
@@ -143,11 +143,12 @@ export async function openLocalFile(): Promise<Deck> {
     }
     let dir = await rememberedDirectoryForFile(handle)
     if (!dir) {
-      dir = await pickDir(handle)
-      if (!(await directoryContainsFile(dir, handle))) {
-        throw new Error(`Select the folder containing "${handle.name}".`)
+      const root = await pickDir(handle)
+      dir = await directoryForFile(root, handle)
+      if (!dir) {
+        throw new Error(`Select the folder containing "${handle.name}" or one of its parent folders.`)
       }
-      await rememberDirectory(dir)
+      await rememberDirectory(root)
     }
 
     let missing = await ensureCanonicalAssets(dir, handle.name, localRefs)

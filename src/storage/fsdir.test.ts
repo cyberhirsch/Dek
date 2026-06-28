@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FileHandle } from './fs'
-import { ensureCanonicalAssets, type DirHandle } from './fsdir'
+import { directoryForFile, ensureCanonicalAssets, type DirHandle } from './fsdir'
 
 class MockFileHandle implements FileHandle {
   private data = new Blob()
@@ -54,6 +54,17 @@ class MockDirHandle implements DirHandle {
     this.dirs.delete(name)
   }
 
+  async resolve(possibleDescendant: FileHandle): Promise<string[] | null> {
+    for (const [name, file] of this.files) {
+      if (await file.isSameEntry(possibleDescendant)) return [name]
+    }
+    for (const [name, dir] of this.dirs) {
+      const path = await dir.resolve(possibleDescendant)
+      if (path) return [name, ...path]
+    }
+    return null
+  }
+
   async *values(): AsyncIterable<FileHandle | DirHandle> {
     yield* this.files.values()
     yield* this.dirs.values()
@@ -61,6 +72,15 @@ class MockDirHandle implements DirHandle {
 }
 
 describe('canonical Assets folders', () => {
+  it('derives the deck folder from a broader permission root', async () => {
+    const root = new MockDirHandle('Lectures')
+    const subject = (await root.getDirectoryHandle('Open Source & AI', { create: true })) as MockDirHandle
+    const deckDir = (await subject.getDirectoryHandle('dek', { create: true })) as MockDirHandle
+    const deckFile = await deckDir.getFileHandle('Open Source & AI dek.md', { create: true })
+
+    expect(await directoryForFile(root, deckFile)).toBe(deckDir)
+  })
+
   it('copies a legacy shared image into the folder matching the selected file', async () => {
     const parent = new MockDirHandle('dek')
     const legacy = (await parent.getDirectoryHandle('Open Source & AI dek Assets', { create: true })) as MockDirHandle

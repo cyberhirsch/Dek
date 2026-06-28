@@ -64,24 +64,42 @@ export async function rememberDirectory(dir: DirHandle): Promise<void> {
   await idbSet(DIR_CACHE, [dir, ...keep].slice(0, 12))
 }
 
-export async function directoryContainsFile(dir: DirHandle, file: FileHandle): Promise<boolean> {
+async function filePathWithin(dir: DirHandle, file: FileHandle): Promise<string[] | null> {
   try {
     const path = await dir.resolve?.(file)
-    if (path) return path.length === 1 && path[0] === file.name
+    if (path) return path.at(-1) === file.name ? path : null
     const candidate = await dir.getFileHandle(file.name)
-    return candidate.isSameEntry ? candidate.isSameEntry(file) : true
+    const same = candidate.isSameEntry ? await candidate.isSameEntry(file) : true
+    return same ? [file.name] : null
   } catch {
-    return false
+    return null
+  }
+}
+
+async function directoryAtPath(root: DirHandle, path: string[]): Promise<DirHandle> {
+  let dir = root
+  for (const segment of path) dir = await dir.getDirectoryHandle(segment)
+  return dir
+}
+
+/** Resolve a selected file to its immediate parent within a granted folder tree. */
+export async function directoryForFile(root: DirHandle, file: FileHandle): Promise<DirHandle | null> {
+  const path = await filePathWithin(root, file)
+  if (!path) return null
+  try {
+    return await directoryAtPath(root, path.slice(0, -1))
+  } catch {
+    return null
   }
 }
 
 export async function rememberedDirectoryForFile(file: FileHandle): Promise<DirHandle | null> {
   const saved = (await idbGet<DirHandle[]>(DIR_CACHE)) ?? []
-  for (const dir of saved) {
+  for (const root of saved) {
     try {
-      const path = await dir.resolve?.(file)
-      if (!path || path.length !== 1 || path[0] !== file.name) continue
-      if (await ensureDirectoryPermission(dir)) return dir
+      const path = await filePathWithin(root, file)
+      if (!path || !(await ensureDirectoryPermission(root))) continue
+      return await directoryAtPath(root, path.slice(0, -1))
     } catch {
       /* stale or unrelated handle */
     }
