@@ -199,11 +199,8 @@ async function onOpenDeck(file: string) {
 }
 async function onSaveAs() {
   if (!deck.value) return
-  const currentName = deck.value.config.deck ?? 'deck'
-  const name = window.prompt('Save deck as:', currentName)?.trim()
-  if (!name) return
   try {
-    applyDeck(await saveLocalFolderAs(name, deck.value.config, deck.value.slides))
+    applyDeck(await saveLocalFolderAs(deck.value.config.deck ?? 'deck', deck.value.config, deck.value.slides))
     saveStatus.value = 'saved'
   } catch (e) {
     if (!isAbort(e)) error.value = (e as Error).message

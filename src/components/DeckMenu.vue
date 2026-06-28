@@ -85,7 +85,9 @@ function exportDeck() {
           <button v-if="fs" title="Opens the deck and its matching Assets folder" @click="openFile">
             📄 Open file…
           </button>
-          <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>
+          <button v-if="dir" title="Saves a Markdown file with a matching Assets folder" @click="saveAs">
+            ⤓ Save As…
+          </button>
           <button @click="exportDeck">⇪ Export (PDF / HTML)…</button>
         </div>
         <div v-if="decks.length" class="dm-grp">

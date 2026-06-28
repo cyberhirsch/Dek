@@ -16,7 +16,7 @@ export type FileHandle = {
   requestPermission?(o: { mode: string }): Promise<string>
 }
 
-const w = window as unknown as {
+const w = globalThis as unknown as {
   showOpenFilePicker?: (o?: unknown) => Promise<FileHandle[]>
   showSaveFilePicker?: (o?: unknown) => Promise<FileHandle>
 }
@@ -35,7 +35,12 @@ export async function pickOpen(): Promise<FileHandle> {
 }
 
 export async function pickSave(suggestedName: string): Promise<FileHandle> {
-  return w.showSaveFilePicker!({ suggestedName, types: MD_TYPES })
+  return w.showSaveFilePicker!({
+    id: 'dek-deck',
+    suggestedName,
+    types: MD_TYPES,
+    excludeAcceptAllOption: true,
+  })
 }
 
 export async function ensurePermission(h: FileHandle, mode: 'read' | 'readwrite'): Promise<boolean> {

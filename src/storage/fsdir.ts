@@ -12,7 +12,7 @@ import {
   deckBaseName,
   mapSlideAssetRefs,
 } from './assets'
-import type { FileHandle } from './fs'
+import { pickSave, type FileHandle } from './fs'
 import { idbGet, idbSet } from './idb'
 import type { StorageBackend } from './types'
 
@@ -206,17 +206,23 @@ function assetFileName(ref: string, blob: Blob, i: number): string {
 }
 
 /**
- * Save As to a folder: pick a destination, write `<deck>.md` plus a
- * `<deck> Assets/` folder with every referenced image, then continue editing
- * there. Returns the reloaded deck (images hydrated from the new folder).
+ * Save As through the native file picker, then write the matching sibling
+ * Assets folder and continue editing there.
  */
 export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string }> {
-  const dir = await pickDir()
-  const baseName = deckBaseName(name)
-  const mdName = `${baseName}.md`
+  const suggestedName = `${deckBaseName(name) || 'deck'}.md`
+  const mdHandle = await pickSave(suggestedName)
+  const mdName = mdHandle.name
+  const baseName = deckBaseName(mdName)
+  let dir = await rememberedDirectoryForFile(mdHandle)
+  if (!dir) {
+    const root = await pickDir(mdHandle)
+    dir = await directoryForFile(root, mdHandle)
+    if (!dir) throw new Error(`Select the folder containing "${mdName}" or one of its parent folders.`)
+    await rememberDirectory(root)
+  }
   const folder = assetsFolderForFile(mdName)
   const assets = await dir.getDirectoryHandle(folder, { create: true })
-  await rememberDirectory(dir)
 
   const map = new Map<string, string>()
   let i = 0
@@ -238,8 +244,7 @@ export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend:
     config: { ...deck.config, deck: baseName || deck.config.deck },
     slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref)),
   }
-  const mh = await dir.getFileHandle(mdName, { create: true })
-  const ws = await mh.createWritable()
+  const ws = await mdHandle.createWritable()
   await ws.write(serializeDeck(saved))
   await ws.close()
 
