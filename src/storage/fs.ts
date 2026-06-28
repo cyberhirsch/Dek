@@ -7,10 +7,11 @@ import type { Deck } from '../core/types'
 import type { StorageBackend } from './types'
 
 // Picker/handle types aren't in every TS lib version — keep them loose.
-type FileHandle = {
+export type FileHandle = {
   name: string
   getFile(): Promise<File>
-  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
+  createWritable(): Promise<{ write(data: string | BufferSource | Blob): Promise<void>; close(): Promise<void> }>
+  isSameEntry?(other: FileHandle): Promise<boolean>
   queryPermission?(o: { mode: string }): Promise<string>
   requestPermission?(o: { mode: string }): Promise<string>
 }

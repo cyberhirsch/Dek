@@ -2,67 +2,189 @@
 // deck's .md AND its images (so they display), and write both back. Each deck
 // keeps its images in a sibling "<deck> Assets" folder, so several decks can
 // share one folder without clashing. Images load as object URLs for display; on
-// save we restore their original relative paths so the saved .md stays clean.
+// save every reference is normalized to the deck's exact sibling Assets folder.
 import { parseDeck, serializeDeck } from '../core/deck'
-import type { Deck, Slide } from '../core/types'
+import type { Deck } from '../core/types'
+import {
+  assetsFolderForFile,
+  canonicalAssetRef,
+  collectAssetRefs,
+  deckBaseName,
+  mapSlideAssetRefs,
+} from './assets'
+import type { FileHandle } from './fs'
+import { idbGet, idbSet } from './idb'
 import type { StorageBackend } from './types'
 
-type FileHandle = {
-  name: string
-  getFile(): Promise<File>
-  createWritable(): Promise<{ write(data: string | BufferSource | Blob): Promise<void>; close(): Promise<void> }>
-}
-type DirHandle = {
+export type DirHandle = {
   name: string
   getFileHandle(name: string, opts?: { create?: boolean }): Promise<FileHandle>
   getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<DirHandle>
   removeEntry(name: string, opts?: { recursive?: boolean }): Promise<void>
+  isSameEntry?(other: DirHandle): Promise<boolean>
+  resolve?(possibleDescendant: FileHandle): Promise<string[] | null>
+  queryPermission?(o: { mode: string }): Promise<string>
+  requestPermission?(o: { mode: string }): Promise<string>
   values(): AsyncIterable<FileHandle | DirHandle>
 }
 
-const w = window as unknown as { showDirectoryPicker?: (o?: unknown) => Promise<DirHandle> }
+function pickerWindow() {
+  return globalThis as unknown as { showDirectoryPicker?: (o?: unknown) => Promise<DirHandle> }
+}
 
 export function supportsDir(): boolean {
-  return typeof w.showDirectoryPicker === 'function'
+  return typeof pickerWindow().showDirectoryPicker === 'function'
 }
-export async function pickDir(): Promise<DirHandle> {
-  return w.showDirectoryPicker!({ mode: 'readwrite' })
+export async function pickDir(startIn?: unknown): Promise<DirHandle> {
+  return pickerWindow().showDirectoryPicker!({ mode: 'readwrite', ...(startIn ? { startIn } : {}) })
 }
 
 const isDir = (h: FileHandle | DirHandle): h is DirHandle => 'getFileHandle' in h
+const DIR_CACHE = 'fs:recent-directories'
 
-const ILLEGAL = /[/\\:*?"<>|]/g
-/** Filesystem-safe deck name (keeps spaces/hyphens; strips illegal characters). */
-function cleanName(name: string): string {
-  return (name || 'deck').replace(ILLEGAL, '').trim().slice(0, 80) || 'deck'
+async function ensureDirectoryPermission(dir: DirHandle): Promise<boolean> {
+  if (!dir.queryPermission) return true
+  if ((await dir.queryPermission({ mode: 'readwrite' })) === 'granted') return true
+  return (await dir.requestPermission?.({ mode: 'readwrite' })) === 'granted'
 }
-const assetsFolderFor = (deckName: string) => `${cleanName(deckName)} Assets`
-const mdBase = (md: string) => md.replace(/\.md$/, '')
+
+export async function rememberDirectory(dir: DirHandle): Promise<void> {
+  const saved = (await idbGet<DirHandle[]>(DIR_CACHE)) ?? []
+  const keep: DirHandle[] = []
+  for (const candidate of saved) {
+    try {
+      const same = candidate.isSameEntry
+        ? await candidate.isSameEntry(dir)
+        : candidate.name === dir.name
+      if (!same) keep.push(candidate)
+    } catch {
+      /* stale handle */
+    }
+  }
+  await idbSet(DIR_CACHE, [dir, ...keep].slice(0, 12))
+}
+
+export async function directoryContainsFile(dir: DirHandle, file: FileHandle): Promise<boolean> {
+  try {
+    const path = await dir.resolve?.(file)
+    if (path) return path.length === 1 && path[0] === file.name
+    const candidate = await dir.getFileHandle(file.name)
+    return candidate.isSameEntry ? candidate.isSameEntry(file) : true
+  } catch {
+    return false
+  }
+}
+
+export async function rememberedDirectoryForFile(file: FileHandle): Promise<DirHandle | null> {
+  const saved = (await idbGet<DirHandle[]>(DIR_CACHE)) ?? []
+  for (const dir of saved) {
+    try {
+      const path = await dir.resolve?.(file)
+      if (!path || path.length !== 1 || path[0] !== file.name) continue
+      if (await ensureDirectoryPermission(dir)) return dir
+    } catch {
+      /* stale or unrelated handle */
+    }
+  }
+  return null
+}
+
+function assetName(ref: string): string | null {
+  const raw = ref.split(/[?#]/, 1)[0].replace(/\\/g, '/').split('/').filter(Boolean).pop()
+  if (!raw) return null
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
+function pathSegments(ref: string): string[] | null {
+  const raw = ref.split(/[?#]/, 1)[0].replace(/^\.?[\\/]/, '').replace(/\\/g, '/')
+  const segments = raw.split('/').filter(Boolean)
+  if (segments.some((segment) => segment === '.' || segment === '..')) return null
+  return segments.map((segment) => {
+    try {
+      return decodeURIComponent(segment)
+    } catch {
+      return segment
+    }
+  })
+}
+
+async function fileAtPath(dir: DirHandle, ref: string): Promise<FileHandle | null> {
+  const segments = pathSegments(ref)
+  const file = segments?.pop()
+  if (!segments || !file) return null
+  try {
+    let current = dir
+    for (const segment of segments) current = await current.getDirectoryHandle(segment)
+    return await current.getFileHandle(file)
+  } catch {
+    return null
+  }
+}
+
+async function fileInSiblingAssetFolders(dir: DirHandle, name: string): Promise<FileHandle | null> {
+  for await (const handle of dir.values()) {
+    if (!isDir(handle) || !handle.name.endsWith(' Assets')) continue
+    try {
+      return await handle.getFileHandle(name)
+    } catch {
+      /* next folder */
+    }
+  }
+  return null
+}
+
+async function findSourceAsset(dir: DirHandle, ref: string): Promise<FileHandle | null> {
+  const name = assetName(ref)
+  if (!name) return null
+  const direct = await fileAtPath(dir, ref)
+  if (direct) return direct
+  try {
+    return await dir.getFileHandle(name)
+  } catch {
+    return fileInSiblingAssetFolders(dir, name)
+  }
+}
+
+async function copyFile(source: FileHandle, target: DirHandle, name: string): Promise<void> {
+  const output = await target.getFileHandle(name, { create: true })
+  const writer = await output.createWritable()
+  await writer.write(await source.getFile())
+  await writer.close()
+}
+
+export async function ensureCanonicalAssets(
+  parent: DirHandle,
+  mdName: string,
+  refs: string[],
+  externalSource?: DirHandle,
+): Promise<string[]> {
+  const target = await parent.getDirectoryHandle(assetsFolderForFile(mdName), { create: true })
+  const missing: string[] = []
+  for (const ref of refs) {
+    const name = assetName(ref)
+    if (!name) continue
+    try {
+      await target.getFileHandle(name)
+      continue
+    } catch {
+      /* copy below */
+    }
+    const source = (await findSourceAsset(parent, ref)) ?? (externalSource ? await findSourceAsset(externalSource, ref) : null)
+    if (source) await copyFile(source, target, name)
+    else missing.push(ref)
+  }
+  return missing
+}
 
 function assetFileName(ref: string, blob: Blob, i: number): string {
-  const base = ref.split('/').pop()
+  const base = assetName(ref)
   if (base && !ref.startsWith('blob:') && !ref.startsWith('data:') && /\.[a-z0-9]+$/i.test(base)) return base
   const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '')
   return `img_${i}.${ext}`
-}
-
-/** Walk the image-bearing fields of a slide, mapping each path/url through fn. */
-function mapImages(slide: Slide, fn: (v: string) => string): Slide {
-  const s: Slide = { ...slide }
-  if (typeof s.image === 'string') s.image = fn(s.image)
-  if (typeof s.poster === 'string') s.poster = fn(s.poster)
-  if (Array.isArray(s.portraits)) s.portraits = s.portraits.map((p) => (typeof p === 'string' ? fn(p) : p))
-  if (Array.isArray(s.items)) {
-    s.items = s.items.map((it) =>
-      it && typeof it === 'object' && 'image' in it ? { ...it, image: fn((it as { image: string }).image) } : it,
-    )
-  }
-  return s
-}
-function collectImageRefs(slides: Slide[]): string[] {
-  const set = new Set<string>()
-  for (const s of slides) mapImages(s, (v) => (v && set.add(v), v))
-  return [...set]
 }
 
 /**
@@ -72,13 +194,15 @@ function collectImageRefs(slides: Slide[]): string[] {
  */
 export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string }> {
   const dir = await pickDir()
-  const mdName = `${cleanName(name)}.md`
-  const folder = assetsFolderFor(name)
+  const baseName = deckBaseName(name)
+  const mdName = `${baseName}.md`
+  const folder = assetsFolderForFile(mdName)
   const assets = await dir.getDirectoryHandle(folder, { create: true })
+  await rememberDirectory(dir)
 
   const map = new Map<string, string>()
   let i = 0
-  for (const ref of collectImageRefs(deck.slides)) {
+  for (const ref of collectAssetRefs(deck.slides)) {
     try {
       const blob = await (await fetch(ref)).blob()
       const fn = assetFileName(ref, blob, i++)
@@ -86,15 +210,15 @@ export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend:
       const ws = await h.createWritable()
       await ws.write(blob)
       await ws.close()
-      map.set(ref, `/${folder}/${fn}`)
+      map.set(ref, canonicalAssetRef(mdName, fn))
     } catch {
       /* unreachable image — leave its ref as-is */
     }
   }
 
   const saved: Deck = {
-    config: { ...deck.config, deck: name || deck.config.deck },
-    slides: deck.slides.map((s) => mapImages(s, (v) => map.get(v) ?? v)),
+    config: { ...deck.config, deck: baseName || deck.config.deck },
+    slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref)),
   }
   const mh = await dir.getFileHandle(mdName, { create: true })
   const ws = await mh.createWritable()
@@ -107,49 +231,30 @@ export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend:
 
 export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend {
   let md = mdName
-  const urlToPath = new Map<string, string>() // objectURL -> original ref, for save
+  const urlToPath = new Map<string, string>() // objectURL -> canonical sibling Assets path
 
-  async function fileAtPath(ref: string): Promise<FileHandle | null> {
-    const segs = ref.replace(/^\.?\//, '').split('/').filter(Boolean)
-    const file = segs.pop()
-    if (!file) return null
+  async function resolveRef(ref: string): Promise<string | null> {
+    const name = assetName(ref)
+    if (!name) return null
     try {
-      let d = dir
-      for (const s of segs) d = await d.getDirectoryHandle(s)
-      return await d.getFileHandle(file)
+      const assets = await dir.getDirectoryHandle(assetsFolderForFile(md))
+      const file = await assets.getFileHandle(name)
+      const url = URL.createObjectURL(await file.getFile())
+      urlToPath.set(url, canonicalAssetRef(md, name))
+      return url
     } catch {
       return null
     }
-  }
-
-  async function fileByBasename(ref: string): Promise<FileHandle | null> {
-    const base = ref.split('/').pop()
-    if (!base) return null
-    for (const path of [[assetsFolderFor(mdBase(md))], ['Assets'], ['public', 'Assets'], ['assets']]) {
-      try {
-        let d = dir
-        for (const seg of path) d = await d.getDirectoryHandle(seg)
-        return await d.getFileHandle(base)
-      } catch {
-        /* next */
-      }
-    }
-    return null
-  }
-
-  async function resolveRef(ref: string): Promise<string | null> {
-    const fh = (await fileAtPath(ref)) ?? (await fileByBasename(ref))
-    if (!fh) return null
-    const url = URL.createObjectURL(await fh.getFile())
-    urlToPath.set(url, ref)
-    return url
   }
 
   async function readMd(): Promise<Deck> {
     return parseDeck(await (await dir.getFileHandle(md)).getFile().then((f) => f.text()))
   }
   async function writeMd(deck: Deck) {
-    const restored = { ...deck, slides: deck.slides.map((s) => mapImages(s, (v) => urlToPath.get(v) ?? v)) }
+    const restored = {
+      ...deck,
+      slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => urlToPath.get(ref) ?? ref)),
+    }
     const h = await dir.getFileHandle(md, { create: true })
     const ws = await h.createWritable()
     await ws.write(serializeDeck(restored))
@@ -158,11 +263,14 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
 
   async function hydrate(deck: Deck): Promise<Deck> {
     const map = new Map<string, string>()
-    for (const ref of collectImageRefs(deck.slides)) {
+    for (const ref of collectAssetRefs(deck.slides)) {
       const url = await resolveRef(ref)
       if (url) map.set(ref, url)
     }
-    return { ...deck, slides: deck.slides.map((s) => mapImages(s, (v) => map.get(v) ?? v)) }
+    return {
+      ...deck,
+      slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref)),
+    }
   }
 
   async function pickMd(file?: string) {
@@ -201,11 +309,11 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async saveSlide(_file, index, slide) {
       const deck = await readMd()
-      deck.slides[index] = mapImages(slide, (v) => urlToPath.get(v) ?? v)
+      deck.slides[index] = mapSlideAssetRefs(slide, (ref) => urlToPath.get(ref) ?? ref)
       await writeMd(deck)
     },
     async uploadAsset(_file, filename, dataUrl) {
-      const folder = assetsFolderFor(mdBase(md))
+      const folder = assetsFolderForFile(md)
       const ad = await dir.getDirectoryHandle(folder, { create: true })
       const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '.png'
       const base = (filename.replace(/\.[^.]*$/, '') || 'img').replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -216,12 +324,13 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       await ws.write(bytes)
       await ws.close()
       const url = URL.createObjectURL(bytes)
-      urlToPath.set(url, `/${folder}/${name}`)
+      urlToPath.set(url, canonicalAssetRef(md, name))
       return url
     },
     async saveAs(name, deck) {
-      md = `${cleanName(name)}.md`
-      await writeMd({ ...deck, config: { ...deck.config, deck: name || deck.config.deck } })
+      const baseName = deckBaseName(name)
+      md = `${baseName}.md`
+      await writeMd({ ...deck, config: { ...deck.config, deck: baseName || deck.config.deck } })
       return md
     },
     async newDeck() {
@@ -229,7 +338,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async listAssets() {
       try {
-        const ad = await dir.getDirectoryHandle(assetsFolderFor(mdBase(md)))
+        const ad = await dir.getDirectoryHandle(assetsFolderForFile(md))
         const out: string[] = []
         for await (const h of ad.values()) {
           if (!isDir(h)) out.push(h.name)
@@ -240,7 +349,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       }
     },
     async deleteAsset(filename) {
-      const ad = await dir.getDirectoryHandle(assetsFolderFor(mdBase(md)))
+      const ad = await dir.getDirectoryHandle(assetsFolderForFile(md))
       await ad.removeEntry(filename)
     },
   }

@@ -82,7 +82,9 @@ function exportDeck() {
           <button @click="newDeck">＋ New deck…</button>
           <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
           <button v-if="dir" @click="openFolder">📁 Open folder…</button>
-          <button v-if="fs" @click="openFile">📄 Open file…</button>
+          <button v-if="fs" title="Opens the deck and its matching Assets folder" @click="openFile">
+            📄 Open file…
+          </button>
           <button v-if="dir" @click="saveAs">⤓ Save As… (folder + images)</button>
           <button @click="exportDeck">⇪ Export (PDF / HTML)…</button>
         </div>

@@ -6,7 +6,17 @@ import type { DeckRef, StorageBackend } from './storage/types'
 import { serverBackend } from './storage/server'
 import { browserBackend } from './storage/browser'
 import { fsBackend, pickOpen, supportsFS } from './storage/fs'
-import { fsDirBackend, pickDir, saveAsFolder, supportsDir } from './storage/fsdir'
+import {
+  directoryContainsFile,
+  ensureCanonicalAssets,
+  fsDirBackend,
+  pickDir,
+  rememberedDirectoryForFile,
+  rememberDirectory,
+  saveAsFolder,
+  supportsDir,
+} from './storage/fsdir'
+import { localAssetRefs } from './storage/assets'
 
 export { supportsFS, supportsDir }
 
@@ -120,11 +130,53 @@ export async function newDeck(name: string): Promise<string> {
 
 // ── File System Access: real local files ──
 
-/** Open a local .md file via the OS picker; routes storage to that file. */
+/** Open a local .md file and, when needed, its containing asset folder. */
 export async function openLocalFile(): Promise<Deck> {
   const handle = await pickOpen()
-  override = fsBackend(handle)
-  const deck = await override.loadDeck()
+  const fileBackend = fsBackend(handle)
+  const deck = await fileBackend.loadDeck()
+  const localRefs = localAssetRefs(deck)
+
+  if (localRefs.length) {
+    if (!supportsDir()) {
+      throw new Error('Opening a deck with local images requires folder access in a Chromium browser.')
+    }
+    let dir = await rememberedDirectoryForFile(handle)
+    if (!dir) {
+      dir = await pickDir(handle)
+      if (!(await directoryContainsFile(dir, handle))) {
+        throw new Error(`Select the folder containing "${handle.name}".`)
+      }
+      await rememberDirectory(dir)
+    }
+
+    let missing = await ensureCanonicalAssets(dir, handle.name, localRefs)
+    if (missing.length) {
+      const source = await pickDir(dir)
+      missing = await ensureCanonicalAssets(dir, handle.name, missing, source)
+    }
+    if (missing.length) {
+      throw new Error(`Could not locate ${missing.length} image${missing.length === 1 ? '' : 's'}: ${missing.map((ref) => ref.split('/').pop()).join(', ')}`)
+    }
+
+    const folderBackend = fsDirBackend(dir, handle.name)
+    let hydrated: Deck
+    try {
+      hydrated = await folderBackend.loadDeck(handle.name)
+    } catch {
+      throw new Error(`Select the folder containing "${handle.name}" and its Assets folder.`)
+    }
+    const unresolved = localAssetRefs(hydrated)
+    if (unresolved.length) {
+      throw new Error(`Could not load ${unresolved.length} image${unresolved.length === 1 ? '' : 's'} from "${handle.name.replace(/\.md$/i, '')} Assets".`)
+    }
+    await folderBackend.saveDeck(handle.name, hydrated)
+    override = folderBackend
+    setCurrent(handle.name)
+    return hydrated
+  }
+
+  override = fileBackend
   setCurrent(handle.name)
   return deck
 }
@@ -132,6 +184,7 @@ export async function openLocalFile(): Promise<Deck> {
 /** Open a local folder (deck.md + Assets) so images resolve and display. */
 export async function openLocalFolder(): Promise<Deck> {
   const dir = await pickDir()
+  await rememberDirectory(dir)
   override = fsDirBackend(dir)
   const deck = await override.loadDeck()
   setCurrent(dir.name)
