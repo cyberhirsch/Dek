@@ -23,6 +23,8 @@ const props = defineProps<{
   tool?: CanvasTool
   selectedEl?: number[]
   pendingImage?: string
+  /** Present-mode step reveal — number of content rows to show (undefined = all). */
+  reveal?: number
 }>()
 
 const emit = defineEmits<{
@@ -166,6 +168,7 @@ watch(
         :editable="editable"
         :format-command="bulletFormatCommand"
         :base-size="listBaseSize"
+        :reveal="reveal"
         @update:rows="setRows"
         @split="emit('split', { kind: 'field', field: 'content' })"
       />
@@ -181,6 +184,7 @@ watch(
             :editable="editable"
             :format-command="bulletFormatCommand"
             :base-size="listBaseSize"
+            :reveal="reveal"
             @update:rows="setRows"
             @split="emit('split', { kind: 'field', field: 'content' })"
           />

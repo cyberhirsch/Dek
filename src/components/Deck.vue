@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, Slide, SlideElement } from '../core/types'
 import type { SlideSplitTarget } from '../core/split'
 import { themeVars as buildThemeVars } from '../render/theme'
+import { parseContent } from '../render/inline'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
 
@@ -50,10 +51,31 @@ let lastRender = 0
 // async, so rapid synchronous wheel events would otherwise all read a stale
 // modelValue and under-advance. We track it here and keep it in sync.
 let pendingIndex = props.modelValue
+
+// ── step reveals ──
+// A slide with `steps: true` reveals its content rows one at a time. `revealed`
+// counts how many are shown on the current slide; it resets on every slide
+// change. `revealIntent` decides whether we land on a slide fully-revealed
+// (arriving by going *back*) or collapsed (going forward / jumping).
+const revealed = ref(0)
+let revealIntent: 'start' | 'end' = 'start'
+function stepRows(index: number): number {
+  const s = props.deck.slides[index]
+  if (!s || !s.steps) return 0
+  return parseContent(s.content).length
+}
+const reveal = computed(() => {
+  if (props.editable) return undefined
+  const s = props.deck.slides[renderIndex.value]
+  return s?.steps ? revealed.value : undefined
+})
+
 watch(
   () => props.modelValue,
   (n) => {
     pendingIndex = n
+    revealed.value = revealIntent === 'end' ? stepRows(n) : 0
+    revealIntent = 'start'
     if (renderTimer) {
       clearTimeout(renderTimer)
       renderTimer = null
@@ -89,6 +111,22 @@ function go(n: number) {
   emit('update:modelValue', Math.max(0, Math.min(max, n)))
 }
 
+// One "step" forward/back: reveal or hide a build on the current slide if it has
+// any left in that direction, otherwise cross to the neighbouring slide.
+function advance(dir: 1 | -1) {
+  const rows = stepRows(props.modelValue)
+  if (dir > 0 && revealed.value < rows) {
+    revealed.value += 1
+    return
+  }
+  if (dir < 0 && revealed.value > 0) {
+    revealed.value -= 1
+    return
+  }
+  revealIntent = dir < 0 ? 'end' : 'start'
+  go(props.modelValue + dir)
+}
+
 function onKey(e: KeyboardEvent) {
   // Suspended while an overlay (overview / presenter / export) owns the keyboard.
   if (props.navEnabled === false) return
@@ -100,10 +138,17 @@ function onKey(e: KeyboardEvent) {
     if (e.key === 'PageUp') go(props.modelValue - 1)
     return
   }
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+    e.preventDefault()
+    advance(1)
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    advance(-1)
+  } else if (e.key === 'PageDown') {
+    // Page keys jump whole slides, skipping any remaining build steps.
     e.preventDefault()
     go(props.modelValue + 1)
-  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+  } else if (e.key === 'PageUp') {
     e.preventDefault()
     go(props.modelValue - 1)
   } else if (e.key === 'Home') {
@@ -131,6 +176,28 @@ function onWheel(e: WheelEvent) {
   emit('update:modelValue', pendingIndex)
 }
 
+// Present-mode: swipe left/right advances/rewinds, like a tablet's photo
+// viewer. Only the horizontal delta counts (a vertical drag is scrolling
+// intent, not a page turn) and it must clear a distance threshold so a tap
+// or a scroll flick doesn't also fire a slide change.
+const SWIPE_THRESHOLD = 50
+let touchStartX = 0
+let touchStartY = 0
+function onTouchStart(e: TouchEvent) {
+  if (props.editable || props.navEnabled === false) return
+  const t = e.touches[0]
+  touchStartX = t.clientX
+  touchStartY = t.clientY
+}
+function onTouchEnd(e: TouchEvent) {
+  if (props.editable || props.navEnabled === false) return
+  const t = e.changedTouches[0]
+  const dx = t.clientX - touchStartX
+  const dy = t.clientY - touchStartY
+  if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return
+  advance(dx < 0 ? 1 : -1)
+}
+
 let ro: ResizeObserver
 onMounted(() => {
   fit()
@@ -138,11 +205,15 @@ onMounted(() => {
   if (stage.value) ro.observe(stage.value)
   window.addEventListener('keydown', onKey)
   stage.value?.addEventListener('wheel', onWheel, { passive: false })
+  stage.value?.addEventListener('touchstart', onTouchStart, { passive: true })
+  stage.value?.addEventListener('touchend', onTouchEnd, { passive: true })
 })
 onUnmounted(() => {
   ro?.disconnect()
   window.removeEventListener('keydown', onKey)
   stage.value?.removeEventListener('wheel', onWheel)
+  stage.value?.removeEventListener('touchstart', onTouchStart)
+  stage.value?.removeEventListener('touchend', onTouchEnd)
 })
 </script>
 
@@ -168,6 +239,7 @@ onUnmounted(() => {
         :tool="tool"
         :selected-el="selectedEl"
         :pending-image="pendingImage"
+        :reveal="reveal"
         @patch="emit('patch', $event)"
         @config-patch="emit('config-patch', $event)"
         @upload="emit('upload', $event)"

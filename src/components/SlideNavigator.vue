@@ -4,7 +4,13 @@ import type { Deck, LayoutId } from '../core/types'
 import SlideThumb from './SlideThumb.vue'
 import SlideActions from './SlideActions.vue'
 
-const props = defineProps<{ deck: Deck; current: number; selected: number[] }>()
+const props = defineProps<{
+  deck: Deck
+  current: number
+  selected: number[]
+  /** Worst issue severity per slide (0-based), for the validation badge. */
+  severity?: Map<number, 'error' | 'warning'>
+}>()
 
 const nav = ref<HTMLElement | null>(null)
 const emit = defineEmits<{
@@ -238,6 +244,12 @@ function toggleCollapseAll() {
         <div v-if="dropBefore === e.index" class="drop-line top" />
         <span class="num">{{ e.index + 1 }}</span>
         <SlideThumb :slide="deck.slides[e.index]" :config="deck.config" :index="e.index" :total="total" :width="150" />
+        <span
+          v-if="severity?.get(e.index)"
+          class="badge"
+          :class="severity.get(e.index)"
+          :title="severity.get(e.index) === 'error' ? 'Has an error' : 'Has a warning'"
+        />
         <div v-if="dropBefore === e.index + 1" class="drop-line bottom" />
       </div>
     </template>
@@ -361,4 +373,16 @@ function toggleCollapseAll() {
 }
 .drop-line.top { top: 0; }
 .drop-line.bottom { bottom: 0; }
+.badge {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid #0c0d10;
+  z-index: 2;
+}
+.badge.warning { background: #facc15; }
+.badge.error { background: #f87171; }
 </style>

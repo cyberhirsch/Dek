@@ -125,6 +125,7 @@ export function defaultConfig(): DeckConfig {
       glow: true,
       fontHeading: 'Cormorant Garamond',
       fontBody: 'JetBrains Mono',
+      preset: 'default',
     },
   }
 }

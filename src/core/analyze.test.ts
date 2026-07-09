@@ -108,4 +108,88 @@ describe('analyzeDeck', () => {
 
     expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
   })
+
+  it('flags fields a layout will not render (LLM/typo protection)', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        // `subtitle` isn't a section field; `titel` is a typo for `title`.
+        { layout: 'section', title: 'S', subtitle: 'nope', titel: 'oops' } as never,
+      ],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'schema', field: 'subtitle', severity: 'warning' }),
+        expect.objectContaining({ kind: 'schema', field: 'titel', severity: 'warning' }),
+      ]),
+    )
+  })
+
+  it('does not flag universal fields (notes, group, stash, elements)', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        { layout: 'text', title: 'A', content: '- x', notes: 'hi', group: 'Intro', stash: { cite: 'z' }, elements: [] },
+      ],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
+
+  it('flags a malformed focus', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/a.jpg', focus: 'center' } as never],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'schema', field: 'focus', severity: 'warning' }),
+      ]),
+    )
+  })
+
+  it('accepts a well-formed focus', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/a.jpg', focus: { x: 0.2, y: 0.3, scale: 1.5 } }],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues.some((i) => i.field === 'focus')).toBe(false)
+  })
+
+  it('flags a referenced local image missing from the folder', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/Deck Assets/gone.jpg' }],
+    }
+
+    const a = analyzeDeck(deck, ['other.jpg'])
+
+    expect(a.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'asset', field: 'image', severity: 'warning', slide: 1 }),
+      ]),
+    )
+  })
+
+  it('does not flag missing files when there is no folder listing', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'image-full', image: '/Deck Assets/a.jpg' }],
+    }
+
+    // Empty/omitted listing is ambiguous (no folder vs. empty folder) — skip.
+    expect(analyzeDeck(deck, []).issues.some((i) => i.message.includes('not found'))).toBe(false)
+    expect(analyzeDeck(deck).issues.some((i) => i.message.includes('not found'))).toBe(false)
+  })
 })

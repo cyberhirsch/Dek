@@ -46,5 +46,6 @@ export function themePreset(id: ThemeId): DeckTheme {
     fontHeading: t.font.heading,
     fontBody: t.font.body,
     glow: t.glow,
+    preset: id,
   }
 }

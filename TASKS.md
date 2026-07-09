@@ -16,4 +16,10 @@ Sorted by difficulty / assigned model. Update this file when tasks are added, co
 
 ---
 
+## Fable — Hard
+
+*(none open)*
+
+---
+
 *Completed tasks are documented in [CHANGELOG.md](CHANGELOG.md).*

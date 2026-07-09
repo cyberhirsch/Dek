@@ -6,6 +6,8 @@ import { convertLayout } from './core/convert'
 import { newElementRect } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import { splitSlide, type SlideSplitTarget } from './core/split'
+import { fileToOptimizedDataUrl } from './core/image'
+import { themePreset, type ThemeId } from './tokens'
 import {
   fetchDeck,
   saveSlide,
@@ -18,10 +20,14 @@ import {
   saveLocalFolderAs,
   listDeckAssets,
   deleteDeckAsset,
+  externalChangePending,
+  adoptDiskBaseline,
+  DeckConflictError,
 } from './api'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
 import { useImport } from './composables/useImport'
+import { useCanvasSelection } from './composables/useCanvasSelection'
 import DeckView from './components/Deck.vue'
 import TopBar from './components/TopBar.vue'
 import SlideNavigator from './components/SlideNavigator.vue'
@@ -34,7 +40,7 @@ import DeckMenu from './components/DeckMenu.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import SourcePane from './components/SourcePane.vue'
 import ContextMenu, { type CtxEntry } from './components/ContextMenu.vue'
-import type { CanvasTool, ElementPatch, BoxElement } from './core/types'
+import type { ElementPatch, BoxElement } from './core/types'
 import { parseContent, rowsToContent } from './render/inline'
 
 const deck = ref<Deck | null>(null)
@@ -47,24 +53,9 @@ const autosave = ref(true)
 const saveStatus = ref<'saved' | 'unsaved' | 'saving'>('saved')
 const bulletFormatCommand = ref(0)
 
-// ── canvas (free elements) ──
-const activeTool = ref<CanvasTool>('select')
-// Selected element indices in selection order; the last one is the "primary"
-// element whose styles the top bar displays (patches apply to the whole set).
-const selectedEls = ref<number[]>([])
-// URL of an image waiting to be placed by the image tool (set by Insert image).
-const pendingImage = ref('')
-watch(current, () => {
-  selectedEls.value = []
-  activeTool.value = 'select'
-})
-const primaryEl = computed(() =>
-  selectedEls.value.length ? selectedEls.value[selectedEls.value.length - 1] : null,
-)
-const selectedElement = computed(() => {
-  if (!deck.value || primaryEl.value == null) return null
-  return deck.value.slides[current.value]?.elements?.[primaryEl.value] ?? null
-})
+// ── canvas (free elements): selection & active tool (see useCanvasSelection) ──
+const { activeTool, selectedEls, pendingImage, primaryEl, selectedElement } =
+  useCanvasSelection(deck, current)
 
 // Track whether the slide navigator was the last thing clicked. Delete then
 // removes the selected slide(s) when focus is on the slide list — but on the
@@ -97,6 +88,20 @@ const analysis = computed(() => (deck.value ? analyzeDeck(deck.value, diskAssets
 const reviewCount = computed(() => {
   const c = analysis.value?.counts
   return c ? c.error + c.warning + c.info : 0
+})
+// Worst issue severity per slide (0-based), for the navigator's badge. Skips the
+// info tier — only errors/warnings are worth flagging on a thumbnail; the full
+// list (including info) lives in the Review panel.
+const slideSeverity = computed(() => {
+  const rank: Record<string, number> = { error: 2, warning: 1, info: 0 }
+  const out = new Map<number, 'error' | 'warning'>()
+  for (const i of analysis.value?.issues ?? []) {
+    if (i.slide < 1 || i.severity === 'info') continue
+    const idx = i.slide - 1
+    const prev = out.get(idx)
+    if (!prev || rank[i.severity] > rank[prev]) out.set(idx, i.severity)
+  }
+  return out
 })
 function toggleReview() {
   reviewOpen.value = !reviewOpen.value
@@ -154,13 +159,16 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   window.addEventListener('mousemove', resetIdle)
   window.addEventListener('pointerdown', trackClick, true)
+  externalTimer = setInterval(() => void pollExternalChange(), 1500)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('mousemove', resetIdle)
   window.removeEventListener('pointerdown', trackClick, true)
   if (idleTimer) clearTimeout(idleTimer)
+  if (externalTimer) clearInterval(externalTimer)
 })
+let externalTimer: ReturnType<typeof setInterval> | null = null
 
 // ── deck files: open / save-as / new / switch ──
 function applyDeck(d: Deck) {
@@ -335,7 +343,8 @@ async function saveCurrentSlide() {
   try {
     await saveSlide(current.value, deck.value.slides[current.value])
     saveStatus.value = 'saved'
-  } catch {
+  } catch (e) {
+    if (e instanceof DeckConflictError) return void onSaveConflict(e.mtime, saveCurrentSlide)
     saveStatus.value = 'unsaved'
   }
 }
@@ -345,8 +354,57 @@ async function saveWholeDeck() {
   try {
     await saveDeck(deck.value.config, deck.value.slides)
     saveStatus.value = 'saved'
-  } catch {
+  } catch (e) {
+    if (e instanceof DeckConflictError) return void onSaveConflict(e.mtime, saveWholeDeck)
     saveStatus.value = 'unsaved'
+  }
+}
+
+// ── external-edit reconciliation (dev server only) ──
+// The deck file can be rewritten out from under an open browser — by an LLM
+// handed the `.md`, or a text editor. Two paths keep the three editing surfaces
+// from clobbering each other:
+//   • an idle poll adopts a purely-external change (no local edits pending);
+//   • a save rejected as a conflict (both sides changed) prompts the user.
+let resolvingConflict = false
+async function reloadDeckFromDisk() {
+  const fresh = await fetchDeck()
+  if (deck.value) snap('external-edit') // keep the pre-reload state undoable
+  deck.value = fresh
+  if (current.value > fresh.slides.length - 1) current.value = Math.max(0, fresh.slides.length - 1)
+  selected.value = [current.value]
+  saveStatus.value = 'saved'
+  void refreshDiskAssets()
+}
+async function onSaveConflict(mtime: number, retry: () => Promise<void>) {
+  if (resolvingConflict) return
+  resolvingConflict = true
+  saveStatus.value = 'unsaved'
+  try {
+    const keepMine = window.confirm(
+      'This deck was changed on disk since you loaded it (an external edit).\n\n' +
+        'OK — keep your version and overwrite the file.\n' +
+        'Cancel — discard your unsaved change and load the version on disk.',
+    )
+    if (keepMine) {
+      adoptDiskBaseline(mtime)
+      await retry()
+    } else {
+      await reloadDeckFromDisk()
+    }
+  } finally {
+    resolvingConflict = false
+  }
+}
+async function pollExternalChange() {
+  // Only adopt automatically when there's nothing local to lose: no pending
+  // save, not mid-conflict, not typing in a field, and the tab is visible.
+  if (resolvingConflict || saveStatus.value !== 'saved') return
+  if (document.hidden || isTyping(document.activeElement as HTMLElement | null)) return
+  try {
+    if (await externalChangePending()) await reloadDeckFromDisk()
+  } catch {
+    /* transient poll failure — try again next tick */
   }
 }
 
@@ -362,6 +420,9 @@ function patchConfig(p: Partial<DeckConfig>) {
   snap(`config:${Object.keys(p).join(',')}`, true)
   deck.value.config = { ...deck.value.config, ...p }
   scheduleWholeDeckSave()
+}
+function setTheme(id: ThemeId) {
+  patchConfig({ theme: themePreset(id) })
 }
 /** Apply an edit made in the raw Markdown source pane: replace the whole deck
  *  with the re-parsed result. Coalesced into one undo step per typing burst. */
@@ -489,11 +550,7 @@ function onUpdateElements(els: SlideElement[]) {
 }
 /** Upload a picked file and return its served URL. */
 async function fileToUrl(file: File): Promise<string> {
-  const dataUrl: string = await new Promise((res) => {
-    const r = new FileReader()
-    r.onload = () => res(r.result as string)
-    r.readAsDataURL(file)
-  })
+  const dataUrl = await fileToOptimizedDataUrl(file)
   const url = await uploadImage(file.name, dataUrl)
   void refreshDiskAssets() // a new file landed in the assets folder
   return url
@@ -987,11 +1044,7 @@ function renameGroup(e: { indices: number[]; name: string }) {
 // ── image upload ──
 async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }) {
   if (!deck.value) return
-  const dataUrl: string = await new Promise((res) => {
-    const r = new FileReader()
-    r.onload = () => res(r.result as string)
-    r.readAsDataURL(e.file)
-  })
+  const dataUrl = await fileToOptimizedDataUrl(e.file)
   const url = await uploadImage(e.file.name, dataUrl)
   const slide = deck.value.slides[current.value]
   if (e.field === 'image') {
@@ -1054,6 +1107,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @new-deck="onNewDeck"
       @open-deck="onOpenDeck"
       @import="onImportFile"
+      @theme="setTheme"
     />
 
     <div class="body">
@@ -1062,6 +1116,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         :deck="deck"
         :current="current"
         :selected="selected"
+        :severity="slideSeverity"
         @update:current="current = $event"
         @select="onSelect"
         @reorder="reorder"
@@ -1136,6 +1191,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     <div v-if="deck && !editMode" class="deck-menu-present present-chrome" :class="{ 'ui-hidden': uiHidden }">
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
+        :theme-id="(deck.config.theme?.preset as ThemeId | undefined) ?? 'default'"
         @open-file="onOpenFile"
         @open-folder="onOpenFolder"
         @save-as="onSaveAs"
@@ -1143,6 +1199,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @open="onOpenDeck"
         @import="onImportFile"
         @export="exportOpen = true"
+        @theme="setTheme"
       />
     </div>
     <div v-if="deck && !editMode" class="hud present-chrome" :class="{ 'ui-hidden': uiHidden }">

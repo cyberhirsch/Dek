@@ -80,6 +80,39 @@ const RULES: Record<LayoutId, LayoutRule> = {
   freeform: {},
 }
 
+// Content fields each layout actually renders (see SlideView.vue). A top-level
+// field outside this set (and the universal set below) is content the layout
+// silently drops — most often an LLM or hand-edit typo (`titel:`, `subtitle`
+// on a `section`), which is exactly what the LLM path needs surfaced.
+const KNOWN_FIELDS: Record<LayoutId, string[]> = {
+  cover: ['title', 'subtitle', 'byline'],
+  section: ['title'],
+  statement: ['text', 'cite'],
+  speaker: ['name', 'role', 'portraits'],
+  text: ['title', 'content', 'steps'],
+  'text-image': ['title', 'content', 'steps', 'image', 'side', 'imageRatio', 'focus'],
+  'image-full': ['image', 'title', 'caption', 'focus'],
+  'image-caption': ['image', 'caption', 'captionPos', 'focus'],
+  'video-embed': ['video', 'poster', 'image', 'caption'],
+  gallery: ['title', 'items', 'columns'],
+  diagram: ['title', 'code'],
+  freeform: ['body', 'elements'],
+}
+
+// Fields valid on any slide regardless of layout: the discriminator, the
+// reversible-switch stash, sidebar grouping, speaker notes, and the canvas
+// overlay (any layout may carry free-positioned elements).
+const UNIVERSAL_FIELDS = new Set(['layout', 'stash', 'group', 'notes', 'elements'])
+
+/** A well-formed `focus` is either absent or `{x, y, scale}` all numeric. A
+ *  malformed one (e.g. an LLM writing `focus: center`) silently breaks pan/zoom. */
+function isValidFocus(f: unknown): boolean {
+  if (f == null) return true
+  if (typeof f !== 'object' || Array.isArray(f)) return false
+  const o = f as Record<string, unknown>
+  return typeof o.x === 'number' && typeof o.y === 'number' && typeof o.scale === 'number'
+}
+
 const TEXT_LAYOUTS = new Set<LayoutId>(['cover', 'section', 'statement', 'text', 'text-image'])
 
 function isBlank(v: unknown): boolean {
@@ -114,6 +147,17 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   const rule = RULES[slide.layout]
   for (const field of rule.required ?? []) {
     if (isBlank(slide[field])) issue(issues, n, 'warning', 'schema', `Missing ${field}.`, field)
+  }
+
+  // Unexpected fields — content the layout won't render (typos, wrong layout).
+  const known = KNOWN_FIELDS[slide.layout]
+  for (const key of Object.keys(slide)) {
+    if (UNIVERSAL_FIELDS.has(key) || known.includes(key)) continue
+    issue(issues, n, 'warning', 'schema', `Field "${key}" isn't rendered by the ${slide.layout} layout.`, key)
+  }
+
+  if (!isValidFocus(slide.focus)) {
+    issue(issues, n, 'warning', 'schema', 'Malformed focus — expected { x, y, scale }.', 'focus')
   }
 
   if (rule.list === 'text') {
@@ -244,6 +288,19 @@ export function analyzeDeck(deck: Deck, diskFiles?: string[]): DeckAnalysis {
   const orphans = diskFiles ? orphanAssets(referenced, diskFiles) : []
   for (const o of orphans) {
     issue(issues, 0, 'info', 'asset', `Unused asset "${o.filename}" in the folder.`, o.filename)
+  }
+
+  // Referenced local file that isn't on disk = a broken image (renamed/deleted).
+  // Only run when we actually have a folder listing (a non-empty diskFiles),
+  // since an empty list is indistinguishable from "backend has no folder" and
+  // would false-flag every local image on the server/browser backends.
+  if (diskFiles && diskFiles.length) {
+    const onDisk = new Set(diskFiles)
+    for (const asset of referenced) {
+      if (asset.kind !== 'local' || !asset.filename || onDisk.has(asset.filename)) continue
+      const first = asset.uses[0]
+      if (first) issue(issues, first.slide, 'warning', 'asset', `Image "${asset.filename}" not found in the deck folder.`, first.field)
+    }
   }
 
   const assets = [...referenced, ...orphans].sort((a, b) => {

@@ -176,6 +176,9 @@ export interface Slide {
   /** Body text for `text` / `text-image`: Markdown. Lines starting with `- `
    *  render as bullets; other non-empty lines render as paragraphs. */
   content?: string
+  /** `text` / `text-image`: reveal the content rows one at a time while
+   *  presenting (arrow / space / swipe steps through them). Off by default. */
+  steps?: boolean
   // lists
   items?: Array<string | TextItem | GalleryItem>
   portraits?: string[]
@@ -216,6 +219,9 @@ export interface DeckTheme {
   glow?: boolean
   fontHeading?: string
   fontBody?: string
+  /** Which built-in preset (src/tokens) these values came from, so the UI can
+   *  show the active choice. Free-edited themes simply have no preset id. */
+  preset?: string
 }
 
 export interface DeckConfig {

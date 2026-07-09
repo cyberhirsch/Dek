@@ -2,8 +2,9 @@
 import { ref } from 'vue'
 import { listDecks, supportsFS, supportsDir } from '../api'
 import type { DeckRef } from '../storage/types'
+import type { ThemeId } from '../tokens'
 
-defineProps<{ currentName: string }>()
+defineProps<{ currentName: string; themeId?: ThemeId }>()
 const emit = defineEmits<{
   'open-file': []
   'open-folder': []
@@ -12,6 +13,7 @@ const emit = defineEmits<{
   open: [file: string]
   export: []
   import: [file: File]
+  theme: [id: ThemeId]
 }>()
 
 const open = ref(false)
@@ -64,6 +66,10 @@ function exportDeck() {
   open.value = false
   emit('export')
 }
+function setTheme(id: ThemeId) {
+  open.value = false
+  emit('theme', id)
+}
 </script>
 
 <template>
@@ -89,6 +95,13 @@ function exportDeck() {
             ⤓ Save As…
           </button>
           <button @click="exportDeck">⇪ Export (PDF / HTML)…</button>
+        </div>
+        <div class="dm-grp">
+          <div class="dm-lbl">Theme</div>
+          <button :class="{ active: (themeId ?? 'default') === 'default' }" @click="setTheme('default')">
+            ● Editorial Dark
+          </button>
+          <button :class="{ active: themeId === 'light' }" @click="setTheme('light')">○ Editorial Light</button>
         </div>
         <div v-if="decks.length" class="dm-grp">
           <div class="dm-lbl">Decks</div>
@@ -184,6 +197,9 @@ function exportDeck() {
 }
 .dm-menu button:hover {
   background: rgba(127, 199, 255, 0.12);
+}
+.dm-menu button.active {
+  color: #7fc7ff;
 }
 .dm-note {
   padding: 8px;

@@ -66,6 +66,17 @@ function deckTitle(p: string): string | undefined {
   }
 }
 
+/** Last-modified time of a deck file in ms, or 0 if it doesn't exist. Used to
+ *  detect external edits (an LLM or text editor changing `deck.md` under an open
+ *  browser) so autosave can't silently clobber them. */
+function deckMtime(p: string): number {
+  try {
+    return fs.statSync(p).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
 function listDecks() {
   const out: Array<{ file: string; name: string }> = []
   ensureDeck()
@@ -80,6 +91,17 @@ function listDecks() {
   }
   if (fs.existsSync(EXAMPLE_PATH)) out.push({ file: 'deck.example.md', name: 'Example' })
   return out
+}
+
+/** If the client's `baseMtime` is older than the file on disk, the file was
+ *  edited externally since the client last read it — return a conflict payload
+ *  (so the write is refused) instead of clobbering. A 1 ms slack absorbs float
+ *  jitter in the JSON round-trip. Undefined baseMtime skips the check (first
+ *  save of a session, or a client that doesn't track mtimes). */
+function externalEdit(p: string, baseMtime?: number): { conflict: true; mtime: number } | null {
+  if (baseMtime == null || !fs.existsSync(p)) return null
+  const cur = deckMtime(p)
+  return cur - baseMtime > 1 ? { conflict: true, mtime: cur } : null
 }
 
 function readBody(req: import('node:http').IncomingMessage): Promise<string> {
@@ -125,30 +147,45 @@ function dekApi() {
             const p = resolveDeck(file)
             if (p === DECK_PATH) ensureDeck()
             if (!fs.existsSync(p)) return json(res, 404, { error: 'deck not found' })
-            return json(res, 200, parseDeck(fs.readFileSync(p, 'utf-8')))
+            res.writeHead(200, { 'Content-Type': 'application/json', 'X-Deck-Mtime': String(deckMtime(p)) })
+            return res.end(JSON.stringify(parseDeck(fs.readFileSync(p, 'utf-8'))))
+          }
+
+          // Cheap poll for external edits: just the current on-disk mtime.
+          if (url === '/api/deck-mtime' && req.method === 'GET') {
+            return json(res, 200, { mtime: deckMtime(resolveDeck(file)) })
           }
 
           // Replace one slide by index.
           if (url === '/api/slide' && req.method === 'PUT') {
             const p = resolveDeck(file)
-            const { index, slide } = JSON.parse(await readBody(req)) as { index: number; slide: Slide }
+            const { index, slide, baseMtime } = JSON.parse(await readBody(req)) as {
+              index: number
+              slide: Slide
+              baseMtime?: number
+            }
+            const conflict = externalEdit(p, baseMtime)
+            if (conflict) return json(res, 409, conflict)
             const deck = parseDeck(fs.readFileSync(p, 'utf-8'))
             if (index < 0 || index >= deck.slides.length)
               return json(res, 400, { error: `bad index ${index}` })
             deck.slides[index] = slide
             fs.writeFileSync(p, serializeDeck(deck), 'utf-8')
-            return json(res, 200, { ok: true })
+            return json(res, 200, { ok: true, mtime: deckMtime(p) })
           }
 
           // Replace the whole deck (reorder/add/delete, whole-deck edits).
           if (url === '/api/deck' && req.method === 'PUT') {
             const p = resolveDeck(file)
-            const { config, slides } = JSON.parse(await readBody(req)) as {
+            const { config, slides, baseMtime } = JSON.parse(await readBody(req)) as {
               config: DeckConfig
               slides: Slide[]
+              baseMtime?: number
             }
+            const conflict = externalEdit(p, baseMtime)
+            if (conflict) return json(res, 409, conflict)
             fs.writeFileSync(p, serializeDeck({ config, slides }), 'utf-8')
-            return json(res, 200, { ok: true })
+            return json(res, 200, { ok: true, mtime: deckMtime(p) })
           }
 
           // Save the current deck under a new name in decks/.

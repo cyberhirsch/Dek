@@ -4,6 +4,45 @@
 
 ## [Unreleased]
 
+### Export
+
+**PowerPoint (.pptx) export** (#35)
+"Download PPTX" in the export panel writes a real `.pptx`. Every slide — semantic layout or freeform — is reduced to the same positioned stage-pixel elements the canvas uses (via `bakeToElements`), then each element is emitted as an absolutely-positioned OOXML shape: text boxes become `p:sp` with styled runs (bold/italic/underline and `[text](url)` links survive), images become embedded `p:pic` media, shapes carry fill/stroke/corner-radius, arrows become line connectors with an arrowhead, and the deck theme populates the presentation's colour/font scheme. The stage maps 1:1 to a 16:9 slide (9525 EMU/px), so shapes land where the layout rendered them. New `src/export/pptx.ts` builds the OPC package with the already-present JSZip. Video plays back as its poster still and Mermaid diagrams export as their source text (live rasterisation deferred). 12 tests cover package structure, XML well-formedness, OPC integrity (every part typed, every relationship resolves), image embedding, and the inline-run tokeniser.
+
+### Reliability
+
+**External-edit sync & conflict safety** (#27)
+The three editing paths (code, LLM, WYSIWYG) are no longer only safe one-at-a-time. `GET /api/deck` now returns the file's mtime; every save sends the mtime it was based on, and the dev server refuses (409) a write that would clobber a change made on disk since. An idle browser polls the mtime and live-reloads a purely-external edit (so handing `deck.md` to an LLM updates the open tab), while a genuine both-sides conflict prompts to keep-yours-and-overwrite or load-from-disk. Adopted changes stay undoable. Server backend only; File System Access and browser storage are unaffected.
+
+**Schema validation for the LLM path** (#28)
+The Review panel and a new amber/red badge on each navigator thumbnail now surface three classes of silent breakage: a field the slide's layout won't render (a `titel:` typo or a `subtitle` on a `section` used to just vanish), a malformed `focus` that isn't `{x, y, scale}`, and a referenced local image missing from the deck folder. Universal fields (`notes`, `group`, `stash`, `elements`) are never flagged. Six new tests.
+
+### Presenting
+
+**Step / build reveals** (#32)
+A `text` / `text-image` slide with `steps: true` reveals its content rows one at a time while presenting — arrow keys, space, and swipe step through the builds before advancing the slide (Page Up/Down still jump whole slides). Not-yet-revealed rows keep their layout box so the fitted font size and earlier rows don't shift as each appears. Presenter view shows the current slide's build count.
+
+**Touch / swipe navigation** (#29)
+Swiping left/right in present mode advances or rewinds (50px horizontal threshold; vertical drags are ignored so scrolling isn't hijacked). Present mode only — the edit-mode canvas keeps its pointer behaviour.
+
+### Design system
+
+**Light theme** (#31)
+The previously-unused Editorial Light token set is now selectable: a Theme section in the deck menu (edit and present) toggles Editorial Dark / Light per deck via the existing `themePreset()`, with the active preset recorded in `theme.preset`. Editorial Dark stays the default.
+
+### Performance
+
+**Image compression on upload** (#30)
+Images are downscaled (max 2560px, JPEG q0.85 / re-encoded PNG) before they reach `Assets/`, keeping whichever of the original and re-encoded is smaller. SVG and GIF pass through untouched. Stops full-resolution camera photos from bloating a deck; the duplicated upload FileReader boilerplate collapsed into one `fileToOptimizedDataUrl` helper.
+
+### Under the hood
+
+**Bake-fidelity geometry tests** (#33)
+`bakeToElements` mirrors exact pixel numbers from `slide.css` (#18) and nothing caught drift between them. A new suite pins the load-bearing constants — heading 64/1.05, body 26/1.45, 280px portraits, the text-image column split, image-full full-bleed, freeform passthrough — plus a finite-geometry check across every layout. (App.vue's undo/redo is already covered by `useUndo.test.ts`.)
+
+**Canvas selection extracted to a composable** (#34)
+Active-tool / selected-element / pending-image state and the slide-change reset moved out of App.vue into `useCanvasSelection`, continuing the composable split from #6.
+
 ### Canvas & editor
 
 **Inline hyperlinks + in-text right-click menu** (#26)

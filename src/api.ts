@@ -3,7 +3,13 @@
 // (File System Access) bound to that file; switching/creating decks clears it.
 import type { Deck, DeckConfig, Slide } from './core/types'
 import type { DeckRef, StorageBackend } from './storage/types'
-import { serverBackend } from './storage/server'
+import {
+  serverBackend,
+  DeckConflictError,
+  serverBaseMtime,
+  setServerBaseMtime,
+  fetchServerDeckMtime,
+} from './storage/server'
 import { browserBackend } from './storage/browser'
 import { fsBackend, pickOpen, supportsFS } from './storage/fs'
 import {
@@ -18,7 +24,7 @@ import {
 } from './storage/fsdir'
 import { localAssetRefs } from './storage/assets'
 
-export { supportsFS, supportsDir }
+export { supportsFS, supportsDir, DeckConflictError }
 
 const LS_FILE = 'dek:file'
 
@@ -98,6 +104,24 @@ export async function saveDeck(config: DeckConfig, slides: Slide[]): Promise<voi
   return (await active()).saveDeck(currentFile, { config, slides })
 }
 
+/** True when the active deck file changed on disk since we last read/wrote it —
+ *  an external LLM or text-editor edit. Only the dev-server backend tracks this
+ *  (real files); every other backend reports false. Used to live-refresh an idle
+ *  browser and to warn before an overwrite. */
+export async function externalChangePending(): Promise<boolean> {
+  if ((await active()) !== serverBackend) return false
+  const base = serverBaseMtime()
+  if (base == null) return false
+  const disk = await fetchServerDeckMtime(currentFile)
+  return disk != null && disk - base > 1
+}
+
+/** Adopt an on-disk mtime as the new baseline — used when the user chooses to
+ *  overwrite an externally-changed file, so the retried save passes the guard. */
+export function adoptDiskBaseline(mtime: number): void {
+  setServerBaseMtime(mtime)
+}
+
 export async function uploadImage(filename: string, dataUrl: string): Promise<string> {
   return (await active()).uploadAsset(currentFile, filename, dataUrl)
 }
@@ -118,6 +142,7 @@ export async function saveAs(name: string, config: DeckConfig, slides: Slide[]):
   override = null
   const file = await (await ensureBase()).saveAs(name, { config, slides })
   setCurrent(file)
+  setServerBaseMtime(undefined) // new file — let the next save re-establish the baseline
   return file
 }
 
@@ -125,6 +150,7 @@ export async function newDeck(name: string): Promise<string> {
   override = null
   const file = await (await ensureBase()).newDeck(name)
   setCurrent(file)
+  setServerBaseMtime(undefined)
   return file
 }
 

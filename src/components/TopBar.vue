@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
-import { DEFAULT_THEME } from '../tokens'
+import { DEFAULT_THEME, type ThemeId } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
 import ColorPicker from './ColorPicker.vue'
 
@@ -36,6 +36,7 @@ const emit = defineEmits<{
   'new-deck': []
   'open-deck': [file: string]
   import: [file: File]
+  theme: [id: ThemeId]
   'update:tool': [t: CanvasTool]
   insert: [what: 'video' | 'diagram' | 'table']
   'update-element': [p: ElementPatch]
@@ -136,6 +137,7 @@ const themeSwatches = computed(() => {
       <span class="brand">Dek</span>
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
+        :theme-id="(deck.config.theme?.preset as ThemeId | undefined) ?? 'default'"
         @open-file="emit('open-file')"
         @open-folder="emit('open-folder')"
         @save-as="emit('save-as')"
@@ -143,6 +145,7 @@ const themeSwatches = computed(() => {
         @open="emit('open-deck', $event)"
         @export="emit('export')"
         @import="emit('import', $event)"
+        @theme="emit('theme', $event)"
       />
       <span class="div" />
       <label class="chk-auto">

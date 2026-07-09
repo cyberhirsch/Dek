@@ -10,6 +10,10 @@ const props = withDefaults(
     formatCommand?: number
     baseSize?: number
     minSize?: number
+    /** Present-mode step reveal: show only the first `reveal` rows (the rest stay
+     *  laid out but invisible, so the fitted size doesn't jump as builds appear).
+     *  Undefined = show everything. */
+    reveal?: number
   }>(),
   {
     baseSize: 26,
@@ -109,7 +113,12 @@ watch(
         @update:rows="emit('update:rows', $event)"
       />
       <ul v-else class="dek-list">
-        <li v-for="(it, i) in rows" :key="i" :class="{ plain: !it.bullet }" v-html="inlineMd(it.text)" />
+        <li
+          v-for="(it, i) in rows"
+          :key="i"
+          :class="{ plain: !it.bullet, 'step-hidden': reveal != null && i >= reveal }"
+          v-html="inlineMd(it.text)"
+        />
       </ul>
     </div>
     <button
@@ -150,6 +159,11 @@ watch(
   line-height: 1.45;
   padding-left: 1.3em;
   overflow-wrap: anywhere;
+}
+/* Not-yet-revealed build steps: keep their layout box so the fitted font size
+   and earlier rows don't shift as each step appears — just hide the ink. */
+.fitted-list-body :deep(.dek-list li.step-hidden) {
+  visibility: hidden;
 }
 .fitted-list-body :deep(.dek-list li::before) {
   font-size: 0.7em;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck } from '../core/types'
+import { parseContent } from '../render/inline'
 import SlideThumb from './SlideThumb.vue'
 
 const props = defineProps<{ deck: Deck; current: number }>()
@@ -8,6 +9,9 @@ const emit = defineEmits<{ 'update:current': [i: number]; close: [] }>()
 
 const slide = computed(() => props.deck.slides[props.current])
 const next = computed(() => props.deck.slides[props.current + 1])
+// Build-step count for the current slide, shown so the presenter knows how many
+// clicks the audience screen still owes before the next slide.
+const stepCount = computed(() => (slide.value?.steps ? parseContent(slide.value.content).length : 0))
 
 function go(d: number) {
   const i = Math.max(0, Math.min(props.deck.slides.length - 1, props.current + d))
@@ -80,7 +84,10 @@ onUnmounted(() => {
 
     <div class="pres-body">
       <div class="main">
-        <div class="label">Current · {{ current + 1 }} / {{ deck.slides.length }}</div>
+        <div class="label">
+          Current · {{ current + 1 }} / {{ deck.slides.length }}
+          <span v-if="stepCount" class="builds">· {{ stepCount }} build{{ stepCount === 1 ? '' : 's' }}</span>
+        </div>
         <SlideThumb :slide="slide" :config="deck.config" :index="current" :total="deck.slides.length" :width="640" />
         <div class="nav">
           <button :disabled="current === 0" @click="go(-1)">← Prev</button>
@@ -221,5 +228,8 @@ onUnmounted(() => {
 .end {
   color: rgba(230, 236, 242, 0.4);
   padding: 20px 0;
+}
+.builds {
+  color: var(--dek-accent, #7fc7ff);
 }
 </style>

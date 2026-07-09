@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import { themeVars } from '../render/theme'
+import { deckToPptx } from '../export/pptx'
 import SlideView from './SlideView.vue'
 
 const props = defineProps<{ deck: Deck }>()
@@ -300,6 +301,32 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/** Fetch an image URL (server path, blob:, or data:) and return its raw bytes as
+ *  base64 for embedding in the .pptx package. */
+async function resolvePptxImage(url: string): Promise<{ base64: string; ext: string } | null> {
+  try {
+    const blob = await (await fetch(url)).blob()
+    const ext = assetExt(blob, url)
+    const base64 = await new Promise<string>((res, rej) => {
+      const fr = new FileReader()
+      fr.onload = () => {
+        const s = fr.result as string
+        res(s.slice(s.indexOf(',') + 1))
+      }
+      fr.onerror = rej
+      fr.readAsDataURL(blob)
+    })
+    return { base64, ext }
+  } catch {
+    return null
+  }
+}
+
+async function downloadPptx() {
+  const blob = await deckToPptx(props.deck, resolvePptxImage)
+  triggerDownload(blob, `${deckSlug()}.pptx`)
+}
+
 onMounted(startRender)
 watch(() => props.deck.slides.length, startRender)
 onUnmounted(() => {
@@ -320,6 +347,7 @@ onUnmounted(() => {
         <button @click="printHandout">⎙ Print Handout (notes)</button>
         <button @click="downloadHtml">⤓ Download HTML</button>
         <button @click="downloadZip">⤓ Download ZIP (HTML + assets)</button>
+        <button @click="downloadPptx">⤓ Download PPTX</button>
         <button class="close" @click="emit('close')">Close</button>
       </div>
     </div>
