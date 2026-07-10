@@ -196,15 +196,23 @@ Persistence is pluggable behind one interface (`src/storage/`):
 | `server.ts` | `npm run dev` | real files via the dev API (`deck.md`, `public/Assets/`) |
 | `browser.ts` | hosted static build | IndexedDB (`idb.ts`), seeded from `deck.example.md` |
 | `fs.ts` | "Open a single .md…" | a real local `.md` (File System Access API) |
-| `fsdir.ts` | "Open deck…" / "Save As… (folder + images)" | a folder with the `.md` + an assets subfolder |
+| `fsdir.ts` | "Open deck…" / "Save As bundle…" | a deck folder (`deck.md` + `Assets/`) |
+
+**A deck is a bundle.** `My Talk.dek/` holds `deck.md` and an `Assets/` folder — one
+object to move, copy, or zip. The name lives on the folder, so asset refs are just
+`Assets/pic.png` and renaming a deck can't orphan its images. "Save As bundle…" is a
+single directory prompt (pick or create the folder); the older layout — several decks in
+one folder, each with a name-matched `<deck> Assets/` — is still read and written, so
+existing decks need no migration.
 
 **Opening a deck.** "Open deck…" is one directory prompt: it grants the `.md`, its
-`Assets/`, and every subfolder at once, and the folder's other `.md` files then appear
-in the deck menu — no native file picker. The handle is kept in IndexedDB, so the deck
-**reopens automatically on the next visit** with no dialogs (if the browser downgraded
-the grant, a one-click "Reopen" banner re-grants it without a picker). "Open a single
-.md…" stays available, but a lone file handle can't reach its images folder, so it costs
-a second prompt.
+`Assets/`, and every subfolder at once — no native file picker. The handle is kept in
+IndexedDB, so the deck **reopens automatically on the next visit** with no dialogs (if
+the browser downgraded the grant, a one-click "Reopen" banner re-grants it without a
+picker). A grant only ever reaches *downward*, so decks outside the folder you opened
+aren't visible; opening a different one is another "Open deck…". "Open a single .md…"
+stays available, but a lone file handle can't reach its images folder, so it costs a
+second prompt.
 
 **Dev API** (in `vite.config.ts`): `GET /api/decks`, `GET|PUT /api/deck`,
 `PUT /api/slide`, `POST /api/save-as`, `POST /api/new`, `POST /api/upload`. The dev server

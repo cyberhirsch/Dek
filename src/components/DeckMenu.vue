@@ -94,8 +94,12 @@ function setTheme(id: ThemeId) {
           </button>
           <button @click="newDeck">＋ New deck…</button>
           <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
-          <button v-if="dir" title="Saves a Markdown file with a matching Assets folder" @click="saveAs">
-            ⤓ Save As…
+          <button
+            v-if="dir"
+            title="Pick or create the deck's own folder — it gets deck.md and an Assets folder inside"
+            @click="saveAs"
+          >
+            ⤓ Save As bundle…
           </button>
           <button @click="exportDeck">⇪ Export (PDF / HTML / PPTX)…</button>
         </div>

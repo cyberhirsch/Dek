@@ -6,13 +6,16 @@
 import { parseDeck, serializeDeck } from '../core/deck'
 import type { Deck } from '../core/types'
 import {
+  BUNDLE_ASSETS,
+  BUNDLE_MD,
   assetsFolderForFile,
+  bundleAssetRef,
+  bundleDeckName,
   canonicalAssetRef,
   collectAssetRefs,
-  deckBaseName,
   mapSlideAssetRefs,
 } from './assets'
-import { pickSave, type FileHandle } from './fs'
+import { type FileHandle } from './fs'
 import { idbGet, idbSet } from './idb'
 import type { StorageBackend } from './types'
 
@@ -143,6 +146,52 @@ export async function rememberedDirectoryForFile(file: FileHandle): Promise<DirH
   return null
 }
 
+async function hasDir(dir: DirHandle, name: string): Promise<boolean> {
+  try {
+    await dir.getDirectoryHandle(name)
+    return true
+  } catch {
+    return false
+  }
+}
+/** True when the folder holds any `<deck> Assets/` — the legacy workspace shape,
+ *  where several decks share a folder and each owns a name-matched assets dir. */
+async function looksLikeWorkspace(dir: DirHandle): Promise<boolean> {
+  if (!dir.values) return false
+  try {
+    for await (const h of dir.values()) {
+      if (isDir(h) && h.name.endsWith(' Assets')) return true
+    }
+  } catch {
+    /* unreadable — assume bundle */
+  }
+  return false
+}
+
+/**
+ * Which assets folder a deck uses.
+ *
+ * A bundle (`My Talk.dek/` = `deck.md` + `Assets/`) owns its folder, so its
+ * images live in a plain `Assets/`. A legacy workspace folder holds several
+ * decks side by side, each with a name-matched `<deck> Assets/` — there a plain
+ * `Assets/` would collide between decks, so the legacy name is kept.
+ *
+ * Existing folders win over convention, so decks written either way keep working.
+ */
+export async function resolveAssetsDirName(dir: DirHandle, mdName: string): Promise<string> {
+  const legacy = assetsFolderForFile(mdName)
+  if (await hasDir(dir, legacy)) return legacy
+  if (await hasDir(dir, BUNDLE_ASSETS)) return BUNDLE_ASSETS
+  if (mdName === BUNDLE_MD) return BUNDLE_ASSETS
+  // Nothing to go on but the neighbours: a sibling "<deck> Assets" means this is
+  // a shared workspace, so this deck gets its own name-matched folder too.
+  return (await looksLikeWorkspace(dir)) ? legacy : BUNDLE_ASSETS
+}
+/** The on-disk ref written for an asset, matching whichever layout is in use. */
+function assetRefFor(assetsDir: string, mdName: string, asset: string): string {
+  return assetsDir === BUNDLE_ASSETS ? bundleAssetRef(asset) : canonicalAssetRef(mdName, asset)
+}
+
 function assetName(ref: string): string | null {
   const raw = ref.split(/[?#]/, 1)[0].replace(/\\/g, '/').split('/').filter(Boolean).pop()
   if (!raw) return null
@@ -216,7 +265,7 @@ export async function ensureCanonicalAssets(
   refs: string[],
   externalSource?: DirHandle,
 ): Promise<string[]> {
-  const target = await parent.getDirectoryHandle(assetsFolderForFile(mdName), { create: true })
+  const target = await parent.getDirectoryHandle(await resolveAssetsDirName(parent, mdName), { create: true })
   const missing: string[] = []
   for (const ref of refs) {
     const name = assetName(ref)
@@ -242,23 +291,16 @@ function assetFileName(ref: string, blob: Blob, i: number): string {
 }
 
 /**
- * Save As through the native file picker, then write the matching sibling
- * Assets folder and continue editing there.
+ * Save As → a bundle. The user picks (or creates) the deck's own folder in one
+ * directory prompt; we write `deck.md` and an `Assets/` folder inside it, then
+ * keep editing there. The bundle's folder name becomes the deck's name, so
+ * there's nothing else to type and no second dialog.
  */
-export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string; dir: DirHandle; md: string }> {
-  const suggestedName = `${deckBaseName(name) || 'deck'}.md`
-  const mdHandle = await pickSave(suggestedName)
-  const mdName = mdHandle.name
-  const baseName = deckBaseName(mdName)
-  let dir = await rememberedDirectoryForFile(mdHandle)
-  if (!dir) {
-    const root = await pickDir(mdHandle)
-    dir = await directoryForFile(root, mdHandle)
-    if (!dir) throw new Error(`Select the folder containing "${mdName}" or one of its parent folders.`)
-    await rememberDirectory(root)
-  }
-  const folder = assetsFolderForFile(mdName)
-  const assets = await dir.getDirectoryHandle(folder, { create: true })
+export async function saveAsFolder(_name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string; dir: DirHandle; md: string }> {
+  const bundle = await pickDir()
+  await rememberDirectory(bundle)
+  const md = BUNDLE_MD
+  const assets = await bundle.getDirectoryHandle(BUNDLE_ASSETS, { create: true })
 
   const map = new Map<string, string>()
   let i = 0
@@ -270,36 +312,48 @@ export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend:
       const ws = await h.createWritable()
       await ws.write(blob)
       await ws.close()
-      map.set(ref, canonicalAssetRef(mdName, fn))
+      map.set(ref, bundleAssetRef(fn))
     } catch {
       /* unreachable image — leave its ref as-is */
     }
   }
 
   const saved: Deck = {
-    config: { ...deck.config, deck: baseName || deck.config.deck },
+    config: { ...deck.config, deck: bundleDeckName(bundle.name) || deck.config.deck },
     slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref)),
   }
-  const ws = await mdHandle.createWritable()
+  const h = await bundle.getFileHandle(md, { create: true })
+  const ws = await h.createWritable()
   await ws.write(serializeDeck(saved))
   await ws.close()
 
-  const backend = fsDirBackend(dir, mdName)
-  return { backend, deck: await backend.loadDeck(), dirName: dir.name, dir, md: mdName }
+  const backend = fsDirBackend(bundle, md)
+  return { backend, deck: await backend.loadDeck(md), dirName: bundle.name, dir: bundle, md }
 }
 
 export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend {
   let md = mdName
-  const urlToPath = new Map<string, string>() // objectURL -> canonical sibling Assets path
+  const urlToPath = new Map<string, string>() // objectURL -> on-disk asset path
+
+  // `Assets/` for a bundle, `<deck> Assets/` for a legacy folder. Resolved once
+  // per deck file and invalidated whenever `md` changes (see pickMd).
+  let assetsDir: string | null = null
+  async function assetsDirName(): Promise<string> {
+    if (assetsDir == null) assetsDir = await resolveAssetsDirName(dir, md)
+    return assetsDir
+  }
+  async function assetsHandle(create = false): Promise<DirHandle> {
+    return dir.getDirectoryHandle(await assetsDirName(), { create })
+  }
 
   async function resolveRef(ref: string): Promise<string | null> {
     const name = assetName(ref)
     if (!name) return null
     try {
-      const assets = await dir.getDirectoryHandle(assetsFolderForFile(md))
+      const assets = await assetsHandle()
       const file = await assets.getFileHandle(name)
       const url = URL.createObjectURL(await file.getFile())
-      urlToPath.set(url, canonicalAssetRef(md, name))
+      urlToPath.set(url, assetRefFor(await assetsDirName(), md, name))
       return url
     } catch {
       return null
@@ -332,9 +386,15 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     }
   }
 
+  function setMd(name: string) {
+    if (name === md) return
+    md = name
+    assetsDir = null // a different deck may use a different assets folder
+  }
+
   async function pickMd(file?: string) {
     if (file && file.endsWith('.md')) {
-      md = file
+      setMd(file)
       return
     }
     try {
@@ -342,7 +402,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     } catch {
       for await (const h of dir.values()) {
         if (!isDir(h) && h.name.endsWith('.md')) {
-          md = h.name
+          setMd(h.name)
           break
         }
       }
@@ -372,8 +432,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       await writeMd(deck)
     },
     async uploadAsset(_file, filename, dataUrl) {
-      const folder = assetsFolderForFile(md)
-      const ad = await dir.getDirectoryHandle(folder, { create: true })
+      const ad = await assetsHandle(true)
       const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '.png'
       const base = (filename.replace(/\.[^.]*$/, '') || 'img').replace(/[^a-zA-Z0-9_-]/g, '_')
       const name = `${base}_${Date.now()}${ext}`
@@ -383,13 +442,13 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       await ws.write(bytes)
       await ws.close()
       const url = URL.createObjectURL(bytes)
-      urlToPath.set(url, canonicalAssetRef(md, name))
+      urlToPath.set(url, assetRefFor(await assetsDirName(), md, name))
       return url
     },
     async saveAs(name, deck) {
-      const baseName = deckBaseName(name)
-      md = `${baseName}.md`
-      await writeMd({ ...deck, config: { ...deck.config, deck: baseName || deck.config.deck } })
+      // Within a bundle the deck file is always `deck.md` — the name lives on the
+      // folder — so "Save As" here only retitles the deck, never moves its assets.
+      await writeMd({ ...deck, config: { ...deck.config, deck: name || deck.config.deck } })
       return md
     },
     async newDeck() {
@@ -397,7 +456,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async listAssets() {
       try {
-        const ad = await dir.getDirectoryHandle(assetsFolderForFile(md))
+        const ad = await assetsHandle()
         const out: string[] = []
         for await (const h of ad.values()) {
           if (!isDir(h)) out.push(h.name)
@@ -408,7 +467,7 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       }
     },
     async deleteAsset(filename) {
-      const ad = await dir.getDirectoryHandle(assetsFolderForFile(md))
+      const ad = await assetsHandle()
       await ad.removeEntry(filename)
     },
   }

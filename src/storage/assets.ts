@@ -10,12 +10,33 @@ export function deckBaseName(fileName: string): string {
   return cleanDeckName(fileName.replace(/\.md$/i, ''))
 }
 
+/** Legacy layout: several decks share a folder, each with a name-matched sibling
+ *  `<deck> Assets/`. Still read, but new decks are written as bundles. */
 export function assetsFolderForFile(fileName: string): string {
   return `${deckBaseName(fileName)} Assets`
 }
 
 export function canonicalAssetRef(fileName: string, assetName: string): string {
   return `/${assetsFolderForFile(fileName)}/${assetName}`
+}
+
+// ── bundle layout ──
+// A deck is one folder — `My Talk.dek/` holding `deck.md` and `Assets/`. The
+// name lives on the folder, so asset refs carry no deck name and renaming the
+// deck can't orphan its images (the bug the legacy layout has).
+
+/** The assets subfolder inside a bundle. */
+export const BUNDLE_ASSETS = 'Assets'
+/** The conventional deck file inside a bundle. */
+export const BUNDLE_MD = 'deck.md'
+
+export function bundleAssetRef(assetName: string): string {
+  return `${BUNDLE_ASSETS}/${assetName}`
+}
+
+/** `My Talk.dek` → `My Talk` (the deck's display name). */
+export function bundleDeckName(folderName: string): string {
+  return cleanDeckName(folderName.replace(/\.dek$/i, ''))
 }
 
 export function mapSlideAssetRefs(slide: Slide, fn: (ref: string) => string): Slide {

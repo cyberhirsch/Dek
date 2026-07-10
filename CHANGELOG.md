@@ -6,6 +6,11 @@
 
 ### Opening & saving
 
+**Decks are bundles: `My Talk.dek/` = `deck.md` + `Assets/`** (#37)
+A deck is now one folder you can move, copy or zip as a unit. "Save As bundle…" takes a single directory prompt — pick or create the deck's own folder — and writes `deck.md` plus an `Assets/` folder inside it; the folder name becomes the deck's name, so there's nothing to type and no second dialog (it used to cost a save dialog *and* a folder dialog). Because the name now lives on the folder, asset refs are plain `Assets/pic.png` instead of `/My Talk Assets/pic.png` — which fixes a real bug: renaming a deck used to orphan every image, since the path it pointed at no longer existed.
+
+The legacy layout (several decks in one folder, each with a name-matched `<deck> Assets/`) is still read and written correctly — `resolveAssetsDirName` prefers an existing assets folder, and falls back to per-deck naming when a sibling `… Assets/` shows the folder is a shared workspace, so a plain `Assets/` can't collide between decks. Existing decks need no migration.
+
 **Reopen the last deck automatically; one prompt to open a folder** (#36)
 Dek used to throw away its file-system grant on every reload, so opening a deck cost a file dialog, a folder dialog, and a permission bubble *every session*. The handle (folder or lone `.md`) now lives in IndexedDB and is re-attached on startup: if the readwrite grant survived, the deck reopens with **zero dialogs**. When the browser has downgraded the grant to `prompt` — Chrome does this across sessions — a "Reopen …" banner re-grants it in one click, showing only a small allow bubble, never a picker.
 
