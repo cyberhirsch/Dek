@@ -66,6 +66,69 @@ content: |
 The config block is optional — a file whose first block already declares a
 `layout:` is treated as all slides.
 
+## How Dek reads your file
+
+You never run Dek. The file *is* the interface, so it helps to know exactly what
+happens to what you write:
+
+1. **Split.** The raw text is split on any line that is exactly `---` (trailing
+   spaces allowed). No YAML has been parsed yet — this is a plain text split.
+2. **Parse.** Each block is parsed as YAML. The first becomes the deck config
+   unless it declares a `layout:`; the rest become slides, in order.
+3. **Render.** Each slide is drawn by its layout, reading only that layout's
+   fields. Everything else is kept in the file but never shown.
+4. **Re-serialize.** When the app saves, it rewrites the whole file with
+   `YAML.stringify`. Your comments and formatting do not survive; your *fields*
+   do, including ones Dek doesn't know about.
+
+Two consequences worth internalising. Your indentation and quoting style will be
+normalised away, so don't fuss over them — but a **parse error breaks the entire
+deck**, not one slide, because step 1 happens before step 2. And because step 3
+reads only known fields, a misspelled field name doesn't error: it just silently
+never appears.
+
+If the editor is open on the file while you write it, Dek notices the change and
+reloads the deck live. So your edit lands in front of the user immediately. Save
+whole, valid files — never a half-written intermediate state.
+
+### Traps that break a deck
+
+These are the ways a well-meaning edit corrupts the file. None of them error at
+the point you write them.
+
+**A bare `---` inside a block scalar destroys the deck.** The split in step 1
+doesn't know it's inside your `content:` or `code:`. The file then fails to parse
+entirely — every slide is gone, not just this one.
+
+````yaml
+# BREAKS THE WHOLE FILE
+content: |
+  Before
+  ---
+  After
+
+# safe — indented, so it isn't at line start
+content: |
+  Before
+    ---
+  After
+````
+
+This bites with Markdown horizontal rules and with Mermaid front-matter
+(`---\ntitle: …\n---`). Indent it, or use `***` for a rule.
+
+**Don't rewrite existing image paths.** A deck stores them one of two ways —
+`Assets/pic.png` in a bundle, `/My Talk Assets/pic.png` in the older layout.
+Both are correct in their own deck. "Normalising" them breaks every image.
+
+**Only `<u>` survives as inline HTML.** Everything else is escaped and shows as
+literal text — `<b>bold</b>` renders as `<b>bold</b>`. Use `**bold**`. Links are
+restricted to `http(s):` and `mailto:`; anything else is neutralised.
+
+**Quote strings YAML would eat.** Anything containing `: `, starting with `#`,
+and every ratio: `"16:9"`, `"9:16"`. Film and paper titles hit the `: ` case
+constantly.
+
 ### Rules that keep the round-trip lossless
 
 The parser preserves what it doesn't understand, and the editor relies on that.
@@ -76,14 +139,31 @@ Break these and you silently destroy the user's work:
   parked there so switching layouts is reversible. It is not dead content.
 - **Keep `elements:` intact** unless you're deliberately editing the canvas.
 - **Every slide needs a `layout:`.** A block without one is treated as `freeform`.
-- **Quote strings that YAML would otherwise eat** — anything starting with `#`,
-  or containing `: `, and any value like `"16:9"` or `"9:16"`.
 - Use a block scalar (`content: |`) for multi-line text. Don't fold it onto one line.
 
 A field name the layout doesn't render is *dropped from the render* but kept in
 the file — so a typo like `titel:` fails silently. Check field names against the
 layout before writing. (The app surfaces these as warnings; you should not create
 them in the first place.)
+
+### Check your work before you finish
+
+You can't see the rendered slide, so verify what you can:
+
+- Every block has a `layout:`, and it's one of the twelve.
+- Every field you wrote appears in that layout's table in
+  [references/layouts.md](references/layouts.md).
+- No bare `---` inside any block scalar.
+- No ALL CAPS headings.
+- Image paths are unchanged, or point at files that exist.
+- The YAML parses. If you have a shell, this is worth the ten seconds:
+
+  ```bash
+  python3 -c "import sys,yaml; [yaml.safe_load(b) for b in sys.stdin.read().split('\n---\n')]" < deck.md
+  ```
+
+  Inside the Dek repo itself, `npx vitest run` covers the parser and the schema
+  validator, and `analyzeDeck()` reports exactly the warnings a user would see.
 
 ## The twelve layouts
 
@@ -110,9 +190,10 @@ section — consecutive slides sharing a `group` string form one run).
 
 ### Writing `content`
 
-`content` is Markdown. A line starting with `- ` is a bullet; any other non-empty
-line is a paragraph. Blank lines only separate. Inline: `**bold**`, `*italic*`,
-`` `code` ``, `<u>underline</u>`, `~~strike~~`, `[text](url)`.
+`content` is Markdown. A line starting with `- ` (or `* `) is a bullet; any other
+non-empty line is a paragraph. Blank lines only separate — they don't create
+spacing. Inline: `**bold**`, `*italic*`, `` `code` ``, `<u>underline</u>`,
+`~~strike~~`, `[text](url)`.
 
 ```yaml
 content: |
