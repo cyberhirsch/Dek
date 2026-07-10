@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Design system
+
+**Themed links and a readable light theme** (#39)
+Links in slide bodies had no CSS anchor rule at all, so they fell back to the browser's bright blue and — once clicked — purple. They now wear the deck's own accent; a visited link keeps that accent, just calmer, so "seen" reads without a jarring colour shift, and the underline (not colour alone) carries the affordance so a link isn't missed on a light background. Canvas box-links use the same tokens.
+
+The light theme was partly unreadable because `slide.css` hardcoded the *dark* theme's off-white (`rgba(230,236,242,α)`) for all secondary text — header, footer, page number, byline, cite, captions, credits, hairlines — which vanished on a near-white ground. Those 17 literals collapse into three theme-derived tokens emitted by `theme.ts` from each theme's own text/accent: `--dek-dim` (prominent secondary), `--dek-faint` (chrome), `--dek-line` (hairlines), plus `--dek-link` / `--dek-link-visited`. On the light theme secondary text now clears WCAG AA (dim 6.2:1, faint 3.7:1, links 4.8:1) instead of the previous ~1:1.
+
 ### Canvas & editor
 
 **Drop a link onto the canvas → QR code + clickable box** (#38)

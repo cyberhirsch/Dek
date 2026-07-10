@@ -134,9 +134,12 @@ watch(
   position: relative;
 }
 .el-text-body :deep(a) {
-  color: var(--dek-accent);
+  color: var(--dek-link, var(--dek-accent));
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.el-text-body :deep(a:visited) {
+  color: var(--dek-link-visited, var(--dek-accent));
 }
 .el-line.bullet {
   padding-left: 1.4em;
