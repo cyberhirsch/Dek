@@ -285,6 +285,14 @@ soft radial `glow` sits behind each slide.
 - **[FEATURES.md](./FEATURES.md)** — prioritized feature list (P0/P1/P2).
 - **[template.md](./template.md)** — the canonical layout library / schema contract.
 
+## The agent skill
+
+**[skills/dek/](./skills/dek/)** packages the deck format, the layout catalog, the canvas
+element model, and the design language as an Agent Skill — one `SKILL.md` that installs
+unchanged in **Claude Code, Antigravity, and Codex**. Drop it
+in your agent's skills folder and it will edit `deck.md` correctly without being told the
+schema each time. Install paths: **[skills/README.md](./skills/README.md)**.
+
 ## Design notes
 
 - **No in-app LLM** by design — hand the `.md` to any external model; its edits coexist with
