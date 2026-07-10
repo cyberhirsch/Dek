@@ -66,6 +66,47 @@ content: |
 The config block is optional — a file whose first block already declares a
 `layout:` is treated as all slides.
 
+## Where a deck lives: the bundle
+
+**A deck is a folder, not a loose file.** It's one object you can move, copy, or
+zip:
+
+```
+My Talk.dek/
+  deck.md          the slides — always named deck.md inside a bundle
+  Assets/          every image, video poster, and file the deck references
+```
+
+The name lives on the *folder*. That's deliberate: asset paths inside `deck.md`
+are therefore just `Assets/photo.jpg`, with no deck name baked in, so renaming
+the deck can't orphan its images.
+
+**Creating a new deck means creating the bundle** — all three parts, even when
+there are no images yet:
+
+```bash
+mkdir -p "Gaussian Splatting.dek/Assets"
+# then write the slides to "Gaussian Splatting.dek/deck.md"
+```
+
+Writing a bare `my-deck.md` and stopping is the most common mistake. The user
+opens a *folder* in Dek ("Open deck…"), and a loose `.md` with images beside it
+can't be opened that way at all.
+
+### Two other layouts you will meet
+
+Recognise them, work with whatever you find, and **never convert one to another**
+— rewriting the image paths breaks every picture in the deck.
+
+| Shape | Looks like | Asset paths |
+|---|---|---|
+| **Bundle** (write new decks this way) | `My Talk.dek/deck.md` + `Assets/` | `Assets/pic.png` |
+| **Legacy workspace** (several decks share a folder) | `My Talk.md` + `My Talk Assets/` | `/My Talk Assets/pic.png` |
+| **Dev server** (inside the Dek repo) | `deck.md` at the root, or `decks/*.md` | `/deck Assets/pic.png` |
+
+If you're editing an existing deck, match the convention already in the file.
+If you're creating one from scratch, make a bundle.
+
 ## How Dek reads your file
 
 You never run Dek. The file *is* the interface, so it helps to know exactly what
@@ -156,6 +197,7 @@ You can't see the rendered slide, so verify what you can:
 - No bare `---` inside any block scalar.
 - No ALL CAPS headings.
 - Image paths are unchanged, or point at files that exist.
+- A new deck is a **bundle**: `<Name>.dek/deck.md` plus an `Assets/` folder.
 - The YAML parses. If you have a shell, this is worth the ten seconds:
 
   ```bash
@@ -208,10 +250,12 @@ time while presenting.
 
 ### Images
 
-Image fields hold a path relative to the deck: `Assets/photo.jpg`. In a deck
-bundle (`My Talk.dek/` containing `deck.md` and `Assets/`) that path is literal.
-**Never invent an image path** — if the picture doesn't exist, leave the field
-empty and say so, rather than writing a reference that will render as a hole.
+In a bundle, image fields hold a path relative to `deck.md`: `Assets/photo.jpg`,
+pointing at a real file in the bundle's `Assets/` folder.
+
+**Never invent an image path.** A reference to a file that doesn't exist renders
+as a hole in a live presentation. If you don't have the picture, leave the field
+empty, choose a layout that doesn't need one, and tell the user what's missing.
 
 ## How to work on a deck
 
