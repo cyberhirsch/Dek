@@ -176,6 +176,49 @@ function cleanupDrag() {
 const total = computed(() => props.deck.slides.length)
 const selSet = computed(() => new Set(props.selected))
 
+// Clicking a slide focuses the navigator itself. This is what makes the arrow
+// keys reliable: the click pulls focus off whatever text field was being edited
+// on the stage, so the very next Arrow press navigates instead of moving a caret
+// (and instead of being swallowed by Deck.vue's "typing → ignore arrows" guard).
+function onRowClick(index: number, e: MouseEvent) {
+  emit('select', { index, shift: e.shiftKey, meta: e.metaKey || e.ctrlKey })
+  nav.value?.focus({ preventScroll: true })
+}
+
+// The navigator is a real list: when it holds focus, arrows move between slides.
+// stopPropagation keeps Deck.vue's window-level handler from also firing and
+// double-stepping. A rename input owns its own keys, so skip while renaming.
+function onNavKey(e: KeyboardEvent) {
+  if (renaming.value != null) return
+  const last = props.deck.slides.length - 1
+  let next = props.current
+  switch (e.key) {
+    case 'ArrowDown':
+    case 'ArrowRight':
+    case 'PageDown':
+      next = Math.min(last, props.current + 1)
+      break
+    case 'ArrowUp':
+    case 'ArrowLeft':
+    case 'PageUp':
+      next = Math.max(0, props.current - 1)
+      break
+    case 'Home':
+      next = 0
+      break
+    case 'End':
+      next = last
+      break
+    default:
+      return
+  }
+  e.preventDefault()
+  e.stopPropagation()
+  // Shift extends the multi-selection (onSelect ranges anchor→index); a plain
+  // arrow moves the single selection.
+  if (next !== props.current || e.shiftKey) emit('select', { index: next, shift: e.shiftKey, meta: false })
+}
+
 // Expand / collapse every group at once (collapse state lives here in the nav).
 const headerRunIds = computed(() =>
   entries.value.flatMap((e) => (e.kind === 'header' ? [e.runId] : [])),
@@ -204,7 +247,16 @@ function toggleCollapseAll() {
       @autogroup="emit('autogroup')"
       @toggle-collapse="toggleCollapseAll"
     />
-    <div ref="nav" class="nav" @scroll="syncViewport" @dragend="cleanupDrag" @drop="onDrop" @dragover.prevent>
+    <div
+      ref="nav"
+      class="nav"
+      tabindex="0"
+      @scroll="syncViewport"
+      @dragend="cleanupDrag"
+      @drop="onDrop"
+      @dragover.prevent
+      @keydown="onNavKey"
+    >
     <div class="virtual" :style="{ height: totalHeight + 'px' }">
     <template v-for="e in visibleEntries" :key="e.key">
       <!-- group header -->
@@ -238,7 +290,7 @@ function toggleCollapseAll() {
         draggable="true"
         @dragstart="onDragStart(e.index)"
         @dragover="onSlideDragOver($event, e.index)"
-        @click="emit('select', { index: e.index, shift: $event.shiftKey, meta: $event.metaKey || $event.ctrlKey })"
+        @click="onRowClick(e.index, $event)"
         @contextmenu.prevent="emit('contextmenu-slide', { x: $event.clientX, y: $event.clientY, index: e.index })"
       >
         <div v-if="dropBefore === e.index" class="drop-line top" />
@@ -275,6 +327,13 @@ function toggleCollapseAll() {
   overflow-y: auto;
   padding: 8px 6px 40px;
   user-select: none;
+}
+/* The pane is focusable so it can own the arrow keys, but the active-slide
+   outline is the real focus indicator — a box around the whole list would just
+   be noise. */
+.nav:focus,
+.nav:focus-visible {
+  outline: none;
 }
 .virtual {
   position: relative;
