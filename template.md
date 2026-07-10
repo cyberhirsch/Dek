@@ -42,7 +42,7 @@ byline: "Seb Hirsch · Lecturer, Visual Effects Artist & Motion Designer"
 # 2. section — section divider. One large centered word/phrase.
 # ============================================================================
 layout: section
-title: "WELCOME!"
+title: "Welcome"
 
 ---
 
@@ -71,13 +71,17 @@ portraits:
 ---
 
 # ============================================================================
-# 5. text — ALL-CAPS heading + a Markdown content block. No image.
+# 5. text — heading + a Markdown content block. No image.
 #    `content` is plain Markdown: a line starting with `- ` is a bullet, any
 #    other non-empty line is a paragraph. Inline: **bold**, *italic*,
 #    <u>underline</u>, `code`.
+#
+#    Headings are Title Case, never ALL CAPS: the heading face is Cormorant
+#    Garamond italic 300, and caps flatten its thick/thin modulation into
+#    uniform rectangles. See skills/dek/references/design.md.
 # ============================================================================
 layout: text
-title: "ABLAUF HEUTE"
+title: "Ablauf heute"
 content: |
   - Questionnaire
   - Anwesenheitsliste
@@ -94,7 +98,7 @@ content: |
 #    `side: left | right` controls which side the image sits on.
 # ============================================================================
 layout: text-image
-title: "BOKEH"
+title: "Bokeh"
 side: left
 image: Assets/M7_p081_img1.jpeg
 content: |
