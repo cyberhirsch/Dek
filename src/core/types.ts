@@ -94,6 +94,13 @@ export interface BoxElement extends ElementBase {
   src?: string
   fit?: 'cover' | 'contain'
   focus?: Focus
+  /** A URL rendered as a QR code filling the box. The *link* is stored, never a
+   *  generated image, so `deck.md` stays readable and editing the URL redraws
+   *  the code (the same contract as `diagram`'s Mermaid `code`). */
+  qr?: string
+  /** Makes the box clickable while presenting. Only `http(s)`/`mailto` are
+   *  followed; clicks never navigate while editing. */
+  link?: string
   // text (optional). Inline Markdown: **bold**, *italic*, <u>underline</u>, `code`.
   content?: string
   /** Font family, or the tokens 'heading' / 'body' (resolve to the theme fonts). */

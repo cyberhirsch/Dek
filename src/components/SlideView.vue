@@ -38,6 +38,7 @@ const emit = defineEmits<{
   'element-image': [index: number, file: File]
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
+  'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
 }>()
 
@@ -308,6 +309,7 @@ watch(
       @element-image="(idx, f) => emit('element-image', idx, f)"
       @split-element="emit('split', { kind: 'element', index: $event })"
       @drop-image="(f, t) => emit('drop-image', f, t)"
+      @drop-link="(u, t) => emit('drop-link', u, t)"
       @ctxmenu="emit('ctxmenu', $event)"
     />
   </div>

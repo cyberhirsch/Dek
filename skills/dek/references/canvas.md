@@ -48,6 +48,8 @@ three at once:
 | `src` | string | Image path; makes the box a picture. |
 | `fit` | `cover` \| `contain` | How the image fills the box. |
 | `focus` | `{x, y, scale}` | Pan/zoom of the image inside the box. |
+| `qr` | string (URL) | Draws the URL as a QR code filling the box. The *link* is stored, never a generated image — editing the URL redraws the code. Ignored if the box also has a `src`. |
+| `link` | string (URL) | Makes the box clickable while presenting (`http(s)`/`mailto` only). Combine with `src` to make a photo clickable, or with `qr` so a code is both scannable and clickable. |
 | `content` | string | Inline Markdown. `- ` lines become bullets. |
 | `font` | `heading` \| `body` \| family | **Use the tokens**, not a literal family. |
 | `size` | number | Font size in stage px. |
@@ -61,6 +63,16 @@ three at once:
 
 Text auto-shrinks to fit its box: the `size` you set is a **maximum**, not a
 guarantee.
+
+A QR box needs no image asset and takes almost no room in the file:
+
+```yaml
+- { type: box, x: 980, y: 460, w: 240, h: 240, qr: "https://example.com/rundgang" }
+```
+
+Dragging a hyperlink onto the canvas does this for you: onto empty canvas it
+creates a QR box; onto a box that already holds a photo it only adds `link`, so
+the photo becomes clickable without being destroyed.
 
 ### arrow
 

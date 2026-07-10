@@ -103,6 +103,38 @@ describe('deckToPptx', () => {
     expect(s3).toMatch(/<a:blip r:embed="rId\d+"\/>/)
   })
 
+  it('embeds a QR box as a rasterised image via the injected resolver', async () => {
+    const qrDeck: Deck = {
+      config: { deck: 'QR' },
+      slides: [
+        {
+          layout: 'freeform',
+          elements: [
+            { type: 'box', x: 900, y: 480, w: 240, h: 240, rotation: 0, qr: 'https://cyberhirsch.github.io/Dek/' },
+          ],
+        },
+      ],
+    }
+    const resolveQr = async (t: string) => (t ? { base64: TINY_PNG, ext: 'png' } : null)
+    const blob = await deckToPptx(qrDeck, resolveImage, resolveQr)
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()))
+    expect(zip.file('ppt/media/image1.png')).not.toBeNull()
+    const s1 = await zip.file('ppt/slides/slide1.xml')!.async('string')
+    expect(s1).toMatch(/<a:blip r:embed="rId\d+"\/>/)
+  })
+
+  it('omits a QR box (no broken package) when no QR resolver is supplied', async () => {
+    const qrDeck: Deck = {
+      config: {},
+      slides: [{ layout: 'freeform', elements: [{ type: 'box', x: 0, y: 0, w: 240, h: 240, rotation: 0, qr: 'https://x.io' }] }],
+    }
+    const blob = await deckToPptx(qrDeck, resolveImage) // no resolveQr
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()))
+    const s1 = await zip.file('ppt/slides/slide1.xml')!.async('string')
+    expect(s1).not.toContain('<a:blip')
+    expect(zip.file('ppt/media/image1.png')).toBeNull()
+  })
+
   it('lists an image Default content-type and the slide overrides', async () => {
     const zip = await build(deck)
     const ct = await zip.file('[Content_Types].xml')!.async('string')

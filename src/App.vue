@@ -620,6 +620,48 @@ async function onDropImage(
   const y = Math.max(0, Math.min(720 - h, target.y - h / 2))
   onCreateElement(newElementRect('image', x, y, w, h, url))
 }
+
+/**
+ * A hyperlink was dropped on the canvas.
+ *
+ * Onto a box that already carries a picture, the link only makes that picture
+ * clickable — a stray drop must never destroy an image. Onto anything else
+ * (an empty box, or bare canvas) the URL becomes a QR code, which is what you
+ * want when the audience is supposed to reach the link from their seats.
+ *
+ * Only the URL is stored, never a generated image: `deck.md` stays readable and
+ * changing the link redraws the code.
+ */
+const QR_SIZE = 240
+function onDropLink(
+  url: string,
+  target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number },
+) {
+  if (!deck.value) return
+  if (target.kind === 'box') {
+    const s = deck.value.slides[current.value]
+    const el = s.elements?.[target.index]
+    if (!el || el.type !== 'box') return
+    const patch: Partial<BoxElement> = el.src ? { link: url } : { qr: url, link: url }
+    const els = s.elements!.map((e, i) => (i === target.index ? ({ ...e, ...patch } as SlideElement) : e))
+    patchSlide({ elements: els })
+    return
+  }
+  const x = Math.max(0, Math.min(1280 - QR_SIZE, target.x - QR_SIZE / 2))
+  const y = Math.max(0, Math.min(720 - QR_SIZE, target.y - QR_SIZE / 2))
+  onCreateElement({
+    type: 'box',
+    x: Math.round(x),
+    y: Math.round(y),
+    w: QR_SIZE,
+    h: QR_SIZE,
+    rotation: 0,
+    qr: url,
+    link: url,
+    fill: 'transparent',
+    stroke: 'transparent',
+  })
+}
 /** Insert an image: upload it, then arm the image tool so the next click-drag on
  *  the canvas places it at the dragged position and size. */
 async function onInsertImage(file: File) {
@@ -1172,6 +1214,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           @element-image="onElementImage"
           @split="splitOverflow"
           @drop-image="onDropImage"
+          @drop-link="onDropLink"
           @ctxmenu="onCanvasContextMenu"
         />
       </div>

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck } from '../core/types'
 import { themeVars } from '../render/theme'
 import { deckToPptx } from '../export/pptx'
+import { qrPngDataUrl } from '../render/qr'
 import SlideView from './SlideView.vue'
 
 const props = defineProps<{ deck: Deck }>()
@@ -322,8 +323,17 @@ async function resolvePptxImage(url: string): Promise<{ base64: string; ext: str
   }
 }
 
+async function resolvePptxQr(text: string): Promise<{ base64: string; ext: string } | null> {
+  try {
+    const dataUrl = await qrPngDataUrl(text)
+    return { base64: dataUrl.slice(dataUrl.indexOf(',') + 1), ext: 'png' }
+  } catch {
+    return null
+  }
+}
+
 async function downloadPptx() {
-  const blob = await deckToPptx(props.deck, resolvePptxImage)
+  const blob = await deckToPptx(props.deck, resolvePptxImage, resolvePptxQr)
   triggerDownload(blob, `${deckSlug()}.pptx`)
 }
 

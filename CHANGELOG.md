@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Canvas & editor
+
+**Drop a link onto the canvas → QR code + clickable box** (#38)
+Dragging a hyperlink onto a freeform slide now does the obvious thing. Onto empty canvas it creates a **QR code** the audience can scan from their seats; onto a box that already holds a photo it only adds a `link`, so the picture becomes clickable while presenting — a stray drop can never destroy an image. Two new `box` fields back this: `qr` renders a URL as a code (the *link* is stored, never a generated image, so `deck.md` stays readable and editing the URL redraws the code — the same contract as a `diagram`'s Mermaid source), and `link` makes any box clickable (`http(s)`/`mailto` only, never navigates while editing). Links are real `<a>` anchors, so they work in the exported standalone HTML with no script; QR codes export as rasterised PNGs into the `.pptx`. The encoder (`qrcode-generator`) is a lazy chunk, so slides without a QR pay nothing. New `src/render/qr.ts` + `QrCode.vue`, 14 tests covering the path builder, link-scheme safety, drag parsing, and PPTX embedding.
+
 ### Opening & saving
 
 **Decks are bundles: `My Talk.dek/` = `deck.md` + `Assets/`** (#37)

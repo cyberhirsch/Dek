@@ -7,6 +7,8 @@ import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import BoxText from './BoxText.vue'
+import QrCode from './QrCode.vue'
+import { safeLink, urlFromDataTransfer } from '../render/qr'
 
 const STAGE_W = 1280
 const STAGE_H = 720
@@ -34,6 +36,8 @@ const emit = defineEmits<{
   /** An image file was dropped on the canvas: either onto a box (set its image)
    *  or onto empty background (create a new image box at the drop point). */
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
+  /** A hyperlink was dropped: link an existing box, or create a QR box. */
+  'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   /** Right-click: client coords for the menu, stage coords for new-element
    *  placement, and the element index under the cursor (−1 = empty background).
    *  `kind` flags a text selection / link hit inside a box being edited; `url`
@@ -86,8 +90,14 @@ const dropActive = ref(false)
 function hasFiles(e: DragEvent): boolean {
   return !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')
 }
+/** A dragged hyperlink. Browsers offer `text/uri-list`; dragging a URL out of the
+ *  address bar or from selected text may only offer `text/plain`. */
+function hasUrl(e: DragEvent): boolean {
+  const t = e.dataTransfer ? Array.from(e.dataTransfer.types) : []
+  return t.includes('text/uri-list') || t.includes('text/plain')
+}
 function onCanvasDragOver(e: DragEvent) {
-  if (!props.editable || !hasFiles(e)) return
+  if (!props.editable || !(hasFiles(e) || hasUrl(e))) return
   e.preventDefault()
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
   dropActive.value = true
@@ -106,16 +116,31 @@ function boxIndexAt(e: DragEvent): number | null {
 }
 function onCanvasDrop(e: DragEvent) {
   dropActive.value = false
-  if (!props.editable || !hasFiles(e)) return
-  e.preventDefault()
+  if (!props.editable) return
+
+  // A dropped image file wins over any URL the drag also carries — dragging an
+  // image out of a browser exposes both, and the file is the richer intent.
   const file = e.dataTransfer?.files?.[0]
-  if (!file || !file.type.startsWith('image/')) return
+  if (file) {
+    if (!file.type.startsWith('image/')) return
+    e.preventDefault()
+    const idx = boxIndexAt(e)
+    if (idx != null) emit('drop-image', file, { kind: 'box', index: idx })
+    else {
+      const p = toStage(e)
+      emit('drop-image', file, { kind: 'new', x: Math.round(p.x), y: Math.round(p.y) })
+    }
+    return
+  }
+
+  const url = urlFromDataTransfer(e.dataTransfer)
+  if (!url) return // plain text, or a scheme we refuse to follow
+  e.preventDefault()
   const idx = boxIndexAt(e)
-  if (idx != null) {
-    emit('drop-image', file, { kind: 'box', index: idx })
-  } else {
+  if (idx != null) emit('drop-link', url, { kind: 'box', index: idx })
+  else {
     const p = toStage(e)
-    emit('drop-image', file, { kind: 'new', x: Math.round(p.x), y: Math.round(p.y) })
+    emit('drop-link', url, { kind: 'new', x: Math.round(p.x), y: Math.round(p.y) })
   }
 }
 
@@ -620,7 +645,7 @@ defineExpose({ commitEdit })
       @pointerdown="onElementDown($event, i)"
       @dblclick="onElementDblClick(i)"
     >
-      <!-- box: shape (bg/border) + optional image + optional text -->
+      <!-- box: shape (bg/border) + optional image or QR + optional text -->
       <template v-if="el.type === 'box'">
         <FramedImage
           v-if="asBox(el).src"
@@ -628,6 +653,18 @@ defineExpose({ commitEdit })
           :src="asBox(el).src"
           :focus="asBox(el).focus"
           :fit="asBox(el).fit ?? 'cover'"
+        />
+        <!-- a box with no picture but a `qr:` URL draws the code instead -->
+        <QrCode v-else-if="asBox(el).qr" :text="asBox(el).qr as string" />
+        <!-- A real anchor, not a click handler: it survives into the exported
+             standalone HTML, and it isn't rendered while editing, so a click
+             there still selects and moves the box (never navigates). -->
+        <a
+          v-if="!editable && safeLink(asBox(el).link)"
+          class="el-link"
+          :href="safeLink(asBox(el).link)"
+          target="_blank"
+          rel="noopener noreferrer"
         />
         <!-- replace / remove controls appear on hover for image-carrying boxes -->
         <div v-if="editable && asBox(el).src" class="img-ctrl" @pointerdown.stop @click.stop>
@@ -863,6 +900,16 @@ defineExpose({ commitEdit })
   outline: none;
   cursor: text;
   background: rgba(127, 199, 255, 0.08);
+}
+/* The canvas layer is pointer-events:none while presenting, so a linked box has
+   to opt back in — the same exception the video play button makes. */
+.el-link {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: inherit;
 }
 .el-arrow {
   display: block;
