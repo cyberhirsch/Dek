@@ -4,7 +4,17 @@ import { onMounted, ref, watch } from 'vue'
 type Mermaid = typeof import('mermaid')['default']
 let mermaidPromise: Promise<Mermaid> | null = null
 function loadMermaid(): Promise<Mermaid> {
-  mermaidPromise ??= import('mermaid').then((m) => m.default)
+  // Never memoize a rejection. A chunk fetch can fail transiently — offline, or a
+  // stale bundle asking for a chunk a new deploy removed — and caching the
+  // rejected promise would leave every diagram broken for the rest of the
+  // session, long after the network recovered.
+  mermaidPromise ??= import('mermaid').then(
+    (m) => m.default,
+    (e) => {
+      mermaidPromise = null
+      throw e
+    },
+  )
   return mermaidPromise
 }
 
