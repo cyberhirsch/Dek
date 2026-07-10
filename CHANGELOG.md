@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Opening & saving
+
+**Reopen the last deck automatically; one prompt to open a folder** (#36)
+Dek used to throw away its file-system grant on every reload, so opening a deck cost a file dialog, a folder dialog, and a permission bubble *every session*. The handle (folder or lone `.md`) now lives in IndexedDB and is re-attached on startup: if the readwrite grant survived, the deck reopens with **zero dialogs**. When the browser has downgraded the grant to `prompt` — Chrome does this across sessions — a "Reopen …" banner re-grants it in one click, showing only a small allow bubble, never a picker.
+
+"Open folder…" became the primary **"Open deck…"**: a single directory prompt covers the `.md`, its `Assets/`, and every subfolder, and the folder's other decks are now listed in the deck menu (`listDecks` reads the active folder backend), so switching decks inside a folder needs no picker and no re-grant. "Open a single .md…" is demoted — a lone file handle can't reach its images folder, which is a browser security boundary, not something the app can work around. Leaving a folder (New / Save As / picking an in-app deck) clears the remembered handle so a reload doesn't drag you back into it.
+
 ### Export
 
 **PowerPoint (.pptx) export** (#35)

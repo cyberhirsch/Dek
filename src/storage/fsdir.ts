@@ -36,16 +36,52 @@ export function supportsDir(): boolean {
   return typeof pickerWindow().showDirectoryPicker === 'function'
 }
 export async function pickDir(startIn?: unknown): Promise<DirHandle> {
-  return pickerWindow().showDirectoryPicker!({ mode: 'readwrite', ...(startIn ? { startIn } : {}) })
+  // A stable `id` makes Chrome reopen the picker where it was last used.
+  return pickerWindow().showDirectoryPicker!({ id: 'dek-decks', mode: 'readwrite', ...(startIn ? { startIn } : {}) })
 }
 
 const isDir = (h: FileHandle | DirHandle): h is DirHandle => 'getFileHandle' in h
 const DIR_CACHE = 'fs:recent-directories'
+const ACTIVE_DIR = 'fs:active-directory'
 
 async function ensureDirectoryPermission(dir: DirHandle): Promise<boolean> {
   if (!dir.queryPermission) return true
   if ((await dir.queryPermission({ mode: 'readwrite' })) === 'granted') return true
   return (await dir.requestPermission?.({ mode: 'readwrite' })) === 'granted'
+}
+
+/** Current readwrite state of a granted handle, without prompting. Chrome keeps
+ *  handles across sessions but usually downgrades the grant to 'prompt', which a
+ *  user gesture can re-grant with one click (no folder picker). */
+export async function directoryPermission(dir: DirHandle): Promise<'granted' | 'prompt' | 'denied'> {
+  if (!dir.queryPermission) return 'granted'
+  try {
+    return (await dir.queryPermission({ mode: 'readwrite' })) as 'granted' | 'prompt' | 'denied'
+  } catch {
+    return 'denied'
+  }
+}
+/** Re-request readwrite on a remembered handle. Must run inside a user gesture. */
+export async function requestDirectoryPermission(dir: DirHandle): Promise<boolean> {
+  return ensureDirectoryPermission(dir)
+}
+
+export interface ActiveFolder {
+  dir: DirHandle
+  /** The `.md` that was open, so a restore reopens the same deck. */
+  md?: string
+}
+/** The folder the user last had open, so the app can re-attach on startup
+ *  instead of making them pick it again every reload. */
+export async function rememberActiveFolder(dir: DirHandle, md?: string): Promise<void> {
+  await idbSet(ACTIVE_DIR, { dir, md })
+}
+export async function loadActiveFolder(): Promise<ActiveFolder | null> {
+  const saved = await idbGet<ActiveFolder>(ACTIVE_DIR)
+  return saved?.dir ? saved : null
+}
+export async function clearActiveFolder(): Promise<void> {
+  await idbSet(ACTIVE_DIR, undefined)
 }
 
 export async function rememberDirectory(dir: DirHandle): Promise<void> {
@@ -209,7 +245,7 @@ function assetFileName(ref: string, blob: Blob, i: number): string {
  * Save As through the native file picker, then write the matching sibling
  * Assets folder and continue editing there.
  */
-export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string }> {
+export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend: StorageBackend; deck: Deck; dirName: string; dir: DirHandle; md: string }> {
   const suggestedName = `${deckBaseName(name) || 'deck'}.md`
   const mdHandle = await pickSave(suggestedName)
   const mdName = mdHandle.name
@@ -249,7 +285,7 @@ export async function saveAsFolder(name: string, deck: Deck): Promise<{ backend:
   await ws.close()
 
   const backend = fsDirBackend(dir, mdName)
-  return { backend, deck: await backend.loadDeck(), dirName: dir.name }
+  return { backend, deck: await backend.loadDeck(), dirName: dir.name, dir, md: mdName }
 }
 
 export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend {

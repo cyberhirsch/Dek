@@ -85,16 +85,19 @@ function setTheme(id: ThemeId) {
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
+          <button
+            v-if="dir"
+            title="One prompt grants the deck, its images and every subfolder — and it reopens automatically next time"
+            @click="openFolder"
+          >
+            📁 Open deck…
+          </button>
           <button @click="newDeck">＋ New deck…</button>
           <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
-          <button v-if="dir" @click="openFolder">📁 Open folder…</button>
-          <button v-if="fs" title="Opens the deck and its matching Assets folder" @click="openFile">
-            📄 Open file…
-          </button>
           <button v-if="dir" title="Saves a Markdown file with a matching Assets folder" @click="saveAs">
             ⤓ Save As…
           </button>
-          <button @click="exportDeck">⇪ Export (PDF / HTML)…</button>
+          <button @click="exportDeck">⇪ Export (PDF / HTML / PPTX)…</button>
         </div>
         <div class="dm-grp">
           <div class="dm-lbl">Theme</div>
@@ -106,6 +109,13 @@ function setTheme(id: ThemeId) {
         <div v-if="decks.length" class="dm-grp">
           <div class="dm-lbl">Decks</div>
           <button v-for="d in decks" :key="d.file" class="dm-deck" @click="pick(d.file)">{{ d.name }}</button>
+        </div>
+        <!-- Secondary: a lone .md can't reach its images folder from a file
+             handle, so it costs a second prompt. "Open deck…" is the good path. -->
+        <div v-if="fs" class="dm-grp">
+          <button class="dm-sub" title="A lone .md — needs a second prompt to reach its images" @click="openFile">
+            📄 Open a single .md…
+          </button>
         </div>
         <div v-if="!fs" class="dm-note">
           Open / Save As need the File System Access API (a Chromium browser with it enabled).
@@ -200,6 +210,10 @@ function setTheme(id: ThemeId) {
 }
 .dm-menu button.active {
   color: #7fc7ff;
+}
+.dm-menu button.dm-sub {
+  color: rgba(230, 236, 242, 0.55);
+  font-size: 11px;
 }
 .dm-note {
   padding: 8px;

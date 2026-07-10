@@ -195,8 +195,16 @@ Persistence is pluggable behind one interface (`src/storage/`):
 |---------|-----------|-----------|
 | `server.ts` | `npm run dev` | real files via the dev API (`deck.md`, `public/Assets/`) |
 | `browser.ts` | hosted static build | IndexedDB (`idb.ts`), seeded from `deck.example.md` |
-| `fs.ts` | "Open file…" | a real local `.md` (File System Access API) |
-| `fsdir.ts` | "Open folder…" / "Save As… (folder + images)" | a folder with the `.md` + an assets subfolder |
+| `fs.ts` | "Open a single .md…" | a real local `.md` (File System Access API) |
+| `fsdir.ts` | "Open deck…" / "Save As… (folder + images)" | a folder with the `.md` + an assets subfolder |
+
+**Opening a deck.** "Open deck…" is one directory prompt: it grants the `.md`, its
+`Assets/`, and every subfolder at once, and the folder's other `.md` files then appear
+in the deck menu — no native file picker. The handle is kept in IndexedDB, so the deck
+**reopens automatically on the next visit** with no dialogs (if the browser downgraded
+the grant, a one-click "Reopen" banner re-grants it without a picker). "Open a single
+.md…" stays available, but a lone file handle can't reach its images folder, so it costs
+a second prompt.
 
 **Dev API** (in `vite.config.ts`): `GET /api/decks`, `GET|PUT /api/deck`,
 `PUT /api/slide`, `POST /api/save-as`, `POST /api/new`, `POST /api/upload`. The dev server

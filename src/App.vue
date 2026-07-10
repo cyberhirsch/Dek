@@ -23,6 +23,9 @@ import {
   externalChangePending,
   adoptDiskBaseline,
   DeckConflictError,
+  restoreLocalDeck,
+  pendingLocalGrant,
+  reconnectLocalDeck,
 } from './api'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
@@ -151,7 +154,11 @@ const { canUndo, canRedo, snap, undo, redo, reset: resetUndo } = useUndo({
 
 onMounted(async () => {
   try {
-    deck.value = await fetchDeck()
+    // Reopen the folder/file the user last had open, so a reload costs no
+    // dialogs. If Chrome downgraded the grant, `onReconnectFolder` offers a
+    // one-click re-grant instead of a picker.
+    deck.value = (await restoreLocalDeck()) ?? (await fetchDeck())
+    reconnectName.value = await pendingLocalGrant()
     void refreshDiskAssets()
   } catch (e) {
     error.value = (e as Error).message
@@ -187,6 +194,7 @@ async function onOpenFile() {
   error.value = ''
   try {
     applyDeck(await openLocalFile())
+    reconnectName.value = null
   } catch (e) {
     if (!isAbort(e)) error.value = `Open file failed: ${(e as Error).message}`
   }
@@ -195,8 +203,21 @@ async function onOpenFolder() {
   error.value = ''
   try {
     applyDeck(await openLocalFolder())
+    reconnectName.value = null
   } catch (e) {
     if (!isAbort(e)) error.value = `Open folder failed: ${(e as Error).message}`
+  }
+}
+// The last-used folder/file, when its readwrite grant needs one click to restore.
+const reconnectName = ref<string | null>(null)
+async function onReconnectFolder() {
+  error.value = ''
+  try {
+    const restored = await reconnectLocalDeck()
+    if (restored) applyDeck(restored)
+    reconnectName.value = await pendingLocalGrant()
+  } catch (e) {
+    if (!isAbort(e)) error.value = `Reconnect failed: ${(e as Error).message}`
   }
 }
 async function onOpenDeck(file: string) {
@@ -1241,6 +1262,15 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button class="toast-x" title="Dismiss">✕</button>
     </div>
 
+    <!-- Chrome downgrades a remembered handle's readwrite grant to "prompt" on a
+         new session. Re-granting needs a user gesture, but only shows a small
+         allow bubble — never a file/folder picker. -->
+    <div v-if="reconnectName" class="toast reconnect">
+      <span>Reopen “{{ reconnectName }}” — your last deck.</span>
+      <button class="toast-btn" @click="onReconnectFolder">Reopen</button>
+      <button class="toast-x" title="Dismiss" @click="reconnectName = null">✕</button>
+    </div>
+
     <!-- import review: correct detected layouts before the deck is saved -->
     <ImportReview
       v-if="pendingImport"
@@ -1315,6 +1345,25 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   background: rgba(60, 18, 18, 0.97);
   border: 1px solid rgba(248, 113, 113, 0.5);
   color: #fecaca;
+}
+.toast.reconnect {
+  background: rgba(16, 24, 34, 0.97);
+  border: 1px solid rgba(127, 199, 255, 0.45);
+  color: #cfe6ff;
+  cursor: default;
+}
+.toast-btn {
+  background: rgba(127, 199, 255, 0.16);
+  border: 1px solid rgba(127, 199, 255, 0.55);
+  color: #cfe6ff;
+  border-radius: 7px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+.toast-btn:hover {
+  background: rgba(127, 199, 255, 0.28);
 }
 .toast-x {
   background: none;

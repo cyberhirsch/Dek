@@ -4,6 +4,7 @@
 // URLs so the deck stays a single portable file.
 import { parseDeck, serializeDeck } from '../core/deck'
 import type { Deck } from '../core/types'
+import { idbGet, idbSet } from './idb'
 import type { StorageBackend } from './types'
 
 // Picker/handle types aren't in every TS lib version — keep them loose.
@@ -47,6 +48,36 @@ export async function ensurePermission(h: FileHandle, mode: 'read' | 'readwrite'
   if (!h.queryPermission) return true
   if ((await h.queryPermission({ mode })) === 'granted') return true
   return (await h.requestPermission?.({ mode })) === 'granted'
+}
+
+// ── remembering the last opened file ──
+// File handles are structured-cloneable, so the handle itself lives in IndexedDB
+// and the app can reopen the same .md on the next visit. Chrome usually
+// downgrades the grant to 'prompt' across sessions; re-granting needs a click but
+// shows only a small allow bubble, never the file picker.
+const ACTIVE_FILE = 'fs:active-file'
+
+export async function rememberActiveFile(h: FileHandle): Promise<void> {
+  await idbSet(ACTIVE_FILE, h)
+}
+export async function loadActiveFile(): Promise<FileHandle | null> {
+  return (await idbGet<FileHandle>(ACTIVE_FILE)) ?? null
+}
+export async function clearActiveFile(): Promise<void> {
+  await idbSet(ACTIVE_FILE, undefined)
+}
+/** Readwrite state of a remembered handle, without prompting. */
+export async function filePermission(h: FileHandle): Promise<'granted' | 'prompt' | 'denied'> {
+  if (!h.queryPermission) return 'granted'
+  try {
+    return (await h.queryPermission({ mode: 'readwrite' })) as 'granted' | 'prompt' | 'denied'
+  } catch {
+    return 'denied'
+  }
+}
+/** Re-request readwrite on a remembered file. Must run inside a user gesture. */
+export async function requestFilePermission(h: FileHandle): Promise<boolean> {
+  return ensurePermission(h, 'readwrite')
 }
 
 /** A StorageBackend bound to a single local file handle. */

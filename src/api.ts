@@ -11,14 +11,29 @@ import {
   fetchServerDeckMtime,
 } from './storage/server'
 import { browserBackend } from './storage/browser'
-import { fsBackend, pickOpen, supportsFS } from './storage/fs'
 import {
+  clearActiveFile,
+  filePermission,
+  fsBackend,
+  loadActiveFile,
+  pickOpen,
+  rememberActiveFile,
+  requestFilePermission,
+  supportsFS,
+  type FileHandle,
+} from './storage/fs'
+import {
+  clearActiveFolder,
   directoryForFile,
+  directoryPermission,
   ensureCanonicalAssets,
   fsDirBackend,
+  loadActiveFolder,
   pickDir,
+  rememberActiveFolder,
   rememberedDirectoryForFile,
   rememberDirectory,
+  requestDirectoryPermission,
   saveAsFolder,
   supportsDir,
 } from './storage/fsdir'
@@ -57,6 +72,13 @@ async function active(): Promise<StorageBackend> {
   return override ?? (await ensureBase())
 }
 
+/** Forget the remembered local folder/file, so the next startup doesn't reopen
+ *  it over whatever deck the user switched to. */
+async function clearLocalHandles(): Promise<void> {
+  await clearActiveFolder()
+  await clearActiveFile()
+}
+
 function setCurrent(file: string | undefined) {
   currentFile = file
   if (file) localStorage.setItem(LS_FILE, file)
@@ -73,6 +95,9 @@ export function getCurrentFile(): string | undefined {
 
 /** Decks available to switch to (always from the base backend, not the FS file). */
 export async function listDecks(): Promise<DeckRef[]> {
+  // With a folder open, the switchable decks are the .md files *in that folder*
+  // — so the deck menu replaces the native file picker.
+  if (override?.id === 'fsdir') return override.listDecks()
   return (await ensureBase()).listDecks()
 }
 
@@ -89,7 +114,17 @@ export async function fetchDeck(): Promise<Deck> {
 }
 
 export async function openDeck(file: string): Promise<Deck> {
+  // Switching to another .md inside the open folder stays in that folder — no
+  // picker, no re-grant — and the restore slot follows the newly opened deck.
+  if (override?.id === 'fsdir') {
+    const deck = await override.loadDeck(file)
+    setCurrent(file)
+    const activeDir = await loadActiveFolder()
+    if (activeDir) await rememberActiveFolder(activeDir.dir, file)
+    return deck
+  }
   override = null // switching to an in-app deck leaves any open local file
+  await clearLocalHandles() // …so a reload doesn't silently reopen it
   const b = await ensureBase()
   const deck = await b.loadDeck(file)
   setCurrent(file)
@@ -140,6 +175,7 @@ export async function deleteDeckAsset(filename: string): Promise<void> {
 
 export async function saveAs(name: string, config: DeckConfig, slides: Slide[]): Promise<string> {
   override = null
+  await clearLocalHandles()
   const file = await (await ensureBase()).saveAs(name, { config, slides })
   setCurrent(file)
   setServerBaseMtime(undefined) // new file — let the next save re-establish the baseline
@@ -148,6 +184,7 @@ export async function saveAs(name: string, config: DeckConfig, slides: Slide[]):
 
 export async function newDeck(name: string): Promise<string> {
   override = null
+  await clearLocalHandles()
   const file = await (await ensureBase()).newDeck(name)
   setCurrent(file)
   setServerBaseMtime(undefined)
@@ -200,18 +237,110 @@ export async function openLocalFile(): Promise<Deck> {
     await folderBackend.saveDeck(handle.name, hydrated)
     override = folderBackend
     setCurrent(handle.name)
+    await clearActiveFile()
+    await rememberActiveFolder(dir, handle.name)
     return hydrated
   }
 
   override = fileBackend
   setCurrent(handle.name)
+  await clearActiveFolder()
+  await rememberActiveFile(handle) // reopen this .md on the next visit
   return deck
+}
+
+// ── reopening the last deck ──
+// The handle the user last opened (a folder, or a lone .md) lives in IndexedDB.
+// Chrome keeps it across sessions but usually downgrades the readwrite grant to
+// 'prompt'. When it's still 'granted' we reopen silently (zero dialogs); when it
+// isn't, the UI offers a one-click reconnect — a small "allow" bubble, never a
+// picker. Only one of the two slots is ever populated.
+
+async function attachFolder(dir: import('./storage/fsdir').DirHandle, md?: string): Promise<Deck> {
+  const backend = fsDirBackend(dir, md ?? 'deck.md')
+  override = backend
+  const deck = await backend.loadDeck(md)
+  setCurrent(md ?? dir.name)
+  await rememberActiveFolder(dir, md)
+  return deck
+}
+async function attachFile(handle: FileHandle): Promise<Deck> {
+  const backend = fsBackend(handle)
+  const deck = await backend.loadDeck()
+  override = backend
+  setCurrent(handle.name)
+  return deck
+}
+
+/** Silently reopen the last folder or file, if its readwrite grant survived. */
+export async function restoreLocalDeck(): Promise<Deck | null> {
+  if (supportsDir()) {
+    const active = await loadActiveFolder()
+    if (active && (await directoryPermission(active.dir)) === 'granted') {
+      try {
+        return await attachFolder(active.dir, active.md)
+      } catch {
+        await clearActiveFolder()
+      }
+    }
+  }
+  if (supportsFS()) {
+    const file = await loadActiveFile()
+    if (file && (await filePermission(file)) === 'granted') {
+      try {
+        return await attachFile(file)
+      } catch {
+        await clearActiveFile()
+      }
+    }
+  }
+  return null
+}
+
+/** Name of the remembered folder/file when it needs a one-click re-grant. */
+export async function pendingLocalGrant(): Promise<string | null> {
+  if (supportsDir()) {
+    const active = await loadActiveFolder()
+    if (active) return (await directoryPermission(active.dir)) === 'prompt' ? active.dir.name : null
+  }
+  if (supportsFS()) {
+    const file = await loadActiveFile()
+    if (file) return (await filePermission(file)) === 'prompt' ? file.name : null
+  }
+  return null
+}
+
+/** Re-grant the remembered folder/file (call from a click) and reopen it. */
+export async function reconnectLocalDeck(): Promise<Deck | null> {
+  const active = await loadActiveFolder()
+  if (active) {
+    if (!(await requestDirectoryPermission(active.dir))) return null
+    try {
+      return await attachFolder(active.dir, active.md)
+    } catch {
+      await clearActiveFolder()
+      return null
+    }
+  }
+  const file = await loadActiveFile()
+  if (file) {
+    if (!(await requestFilePermission(file))) return null
+    try {
+      return await attachFile(file)
+    } catch {
+      await clearActiveFile()
+      return null
+    }
+  }
+  return null
 }
 
 /** Open a local folder (deck.md + Assets) so images resolve and display. */
 export async function openLocalFolder(): Promise<Deck> {
   const dir = await pickDir()
   await rememberDirectory(dir)
+  await clearActiveFile()
+  await rememberActiveFolder(dir)
   override = fsDirBackend(dir)
   const deck = await override.loadDeck()
   setCurrent(dir.name)
@@ -223,8 +352,10 @@ export async function openLocalFolder(): Promise<Deck> {
  * image beside it, then keeps editing there. Returns the reloaded deck.
  */
 export async function saveLocalFolderAs(name: string, config: DeckConfig, slides: Slide[]): Promise<Deck> {
-  const { backend, deck, dirName } = await saveAsFolder(name, { config, slides })
+  const { backend, deck, dirName, dir, md } = await saveAsFolder(name, { config, slides })
   override = backend
   setCurrent(dirName)
+  await clearActiveFile()
+  await rememberActiveFolder(dir, md) // reload straight back into this folder
   return deck
 }
