@@ -15,6 +15,7 @@ import {
   attr,
   num,
   paragraphs,
+  type Crop,
   type Shape,
 } from './ooxml'
 
@@ -102,6 +103,74 @@ function placeholderType(sp: Element): string | undefined {
   return ph ? attr(ph, 'type') ?? 'body' : undefined
 }
 
+/**
+ * Read a picture's `<a:blipFill>/<a:srcRect>` crop. Its `l/t/r/b` are ST_Percentage
+ * (1000 = 1%), each the fraction trimmed off that edge. Returns undefined for no
+ * crop, and for negative ("outset"/zoom-out) or degenerate crops — those can't be
+ * reproduced by trimming pixels, so the full image is kept rather than guessed at.
+ */
+export function readCrop(pic: Element): Crop | undefined {
+  const rect = firstTag(pic, 'a:srcRect')
+  if (!rect) return undefined
+  const f = (n: string) => num(rect, n, 0) / 100000
+  const c = { l: f('l'), t: f('t'), r: f('r'), b: f('b') }
+  if (c.l <= 0 && c.t <= 0 && c.r <= 0 && c.b <= 0) return undefined
+  if (c.l < 0 || c.t < 0 || c.r < 0 || c.b < 0) return undefined
+  if (1 - c.l - c.r <= 0 || 1 - c.t - c.b <= 0) return undefined
+  return c
+}
+
+/** The source-pixel rectangle a crop selects from a `w×h` image. */
+export function cropPixels(w: number, h: number, c: Crop) {
+  return {
+    sx: c.l * w,
+    sy: c.t * h,
+    sw: (1 - c.l - c.r) * w,
+    sh: (1 - c.t - c.b) * h,
+  }
+}
+
+/** Bake a crop into the pixels: draw the selected sub-region to a canvas and
+ *  return it as a data URL, so the stored image *is* the cropped region and no
+ *  focus math is needed. Browser-only (canvas); returns the source unchanged when
+ *  there's no DOM (e.g. Node import tests) or on any failure. */
+async function bakeCrop(dataUrl: string, crop: Crop): Promise<string> {
+  if (typeof document === 'undefined') return dataUrl
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = reject
+      el.src = dataUrl
+    })
+    const { sx, sy, sw, sh } = cropPixels(img.naturalWidth, img.naturalHeight, crop)
+    if (sw <= 0 || sh <= 0) return dataUrl
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(sw))
+    canvas.height = Math.max(1, Math.round(sh))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return dataUrl
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+    // Keep PNG for PNG sources (crisp graphics/transparency); photos → JPEG.
+    const isPng = /^data:image\/png/i.test(dataUrl)
+    return canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.92)
+  } catch {
+    return dataUrl
+  }
+}
+
+/** Replace each cropped picture's `src` with its baked (cropped) image, in place. */
+async function bakeCrops(shapes: Shape[]): Promise<void> {
+  await Promise.all(
+    shapes.map(async (s) => {
+      if (s.kind === 'pic' && s.crop) {
+        s.src = await bakeCrop(s.src, s.crop)
+        delete s.crop
+      }
+    }),
+  )
+}
+
 /** Walk a spTree / group, collecting text + picture shapes (EMU → stage px). */
 function collectShapes(container: Element, tx: TX, sx: number, sy: number, media: Map<string, string>, rels: Map<string, Rel>): Shape[] {
   const out: Shape[] = []
@@ -131,7 +200,8 @@ function collectShapes(container: Element, tx: TX, sx: number, sy: number, media
       const src = rel ? media.get(rel.target) : undefined
       if (!src) continue // unrenderable (emf/wmf) or missing — skip
       const r = scale(worldRect(firstTag(node, 'p:spPr'), tx))
-      out.push({ kind: 'pic', src, ...r })
+      const crop = readCrop(node)
+      out.push({ kind: 'pic', src, ...(crop ? { crop } : {}), ...r })
     } else if (tag === 'p:grpSp') {
       out.push(...collectShapes(node, childTx(tx, firstTag(node, 'p:grpSpPr')), sx, sy, media, rels))
     }
@@ -212,6 +282,7 @@ export async function importPptx(data: ArrayBuffer | Uint8Array, fileName = 'dec
     const notes = notesRel ? notesText(await readText(zip, notesRel.target), P) : ''
     const spTree = firstTag(doc, 'p:spTree')
     const shapes = spTree ? collectShapes(spTree, IDENTITY, sx, sy, media, rels) : []
+    await bakeCrops(shapes) // reproduce PowerPoint picture crops before classifying
     slides.push(classifySlide(shapes, { index: i, ptToPx, notes }))
   }
 

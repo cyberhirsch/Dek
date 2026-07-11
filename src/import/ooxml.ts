@@ -33,10 +33,21 @@ export interface TextShape extends Rect {
   plain: string
 }
 
+/** A PowerPoint picture crop (`<a:srcRect>`): the fraction (0–1) trimmed off each
+ *  edge of the source image. */
+export interface Crop {
+  l: number
+  t: number
+  r: number
+  b: number
+}
+
 export interface PicShape extends Rect {
   kind: 'pic'
   /** Data-URL of the embedded image. */
   src: string
+  /** Set when PowerPoint cropped the picture; baked into `src` before render. */
+  crop?: Crop
 }
 
 export type Shape = TextShape | PicShape

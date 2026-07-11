@@ -103,6 +103,9 @@ The native OS-chrome number spinners (corner radius, stroke width) were replaced
 
 ### Import
 
+**PowerPoint picture crops are preserved** (#40)
+A picture cropped in PowerPoint (via `<a:srcRect>`) used to import as the whole, uncropped image, so a different part of it showed. The crop is now read and **baked into the pixels** — the importer draws the selected sub-region to a canvas and stores that as the image. Baking (rather than mapping to Dek's `focus`) is what makes it faithful: `focus` is pan/zoom over an `object-fit: cover` base and can't un-crop a region the cover already discarded, whereas a baked image carries its crop into any layout the classifier picks. Only cropped pictures are re-encoded (PNG sources stay PNG, photos become JPEG q0.92); uncropped images pass through untouched. Negative "outset"/zoom-out crops, which can't be reproduced by trimming, keep the full image rather than guess.
+
 **Import review step** (#3)
 After parsing a PPTX or PDF, a full-screen review grid (`ImportReview.vue`) now appears before anything is saved. Each slide shows its thumbnail alongside a layout selector. Freeform slides are flagged in amber. Clicking Commit saves the deck; Cancel discards the parse result with no side effects.
 
