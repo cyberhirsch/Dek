@@ -39,7 +39,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -69,6 +69,15 @@ const listBaseSize = computed(() =>
 
 function patch(p: Partial<Slide>) {
   emit('patch', p)
+}
+// Right-clicking a layout image opens Dek's own image menu (Copy/Paste/Fit/…)
+// instead of the browser's native one — the same actions the freeform canvas
+// offers, wired to this slide's `image` field. Only in edit mode, and only when
+// an image is present.
+function onImageCtx(e: MouseEvent) {
+  if (!props.editable || !props.slide.image) return
+  e.preventDefault()
+  emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image' })
 }
 function patchConfig(p: Partial<DeckConfig>) {
   emit('config-patch', p)
@@ -191,7 +200,7 @@ watch(
           />
         </div>
         <div class="img-col">
-          <div class="frame-img">
+          <div class="frame-img" @contextmenu="onImageCtx">
             <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
           </div>
         </div>
@@ -200,7 +209,7 @@ watch(
 
     <!-- image-full -->
     <div v-else-if="slide.layout === 'image-full'" class="dek-pad l-image-full">
-      <div class="bg">
+      <div class="bg" @contextmenu="onImageCtx">
         <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
       <div v-if="slide.title || slide.caption || editable" class="overlay">
@@ -211,7 +220,7 @@ watch(
 
     <!-- image-caption -->
     <div v-else-if="slide.layout === 'image-caption'" class="dek-pad l-image-caption">
-      <div class="frame">
+      <div class="frame" @contextmenu="onImageCtx">
         <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'contain'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
       <FittedText v-if="editable || slide.caption" class="fit-photo-caption cap" :class="slide.captionPos ?? 'bottom-right'" content-class="photo-caption" :model-value="slide.caption" :editable="editable" placeholder="Caption / credit" :base-size="18" :min-size="10" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />

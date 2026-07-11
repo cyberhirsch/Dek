@@ -640,56 +640,20 @@ async function onElementImage(index: number, file: File) {
   )
   patchSlide({ elements: els })
 }
-/** Copy a box's image to the system clipboard, so it can be pasted elsewhere
- *  (another app, another box, another slide). */
-async function copyImageAt(index: number) {
-  const el = deck.value?.slides[current.value]?.elements?.[index]
-  if (!el || el.type !== 'box' || !el.src) return
+// ── image clipboard / download (shared by freeform boxes and layout images) ──
+/** Copy a resolved image URL to the system clipboard as real image bytes. */
+async function copyImageSrc(src: string) {
   try {
-    const blob = await (await fetch(el.src)).blob()
+    const blob = await (await fetch(src)).blob()
     await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
   } catch {
     window.alert('Could not copy the image — your browser may not support copying images.')
   }
 }
-/** Paste an image from the system clipboard onto a box, replacing its picture
- *  (same upload path as "Replace Image…"). */
-async function pasteImageAt(index: number) {
+/** Save a resolved image URL to disk via the browser's normal download flow. */
+async function downloadImageSrc(src: string) {
   try {
-    const items = await navigator.clipboard.read()
-    for (const item of items) {
-      const type = item.types.find((t) => t.startsWith('image/'))
-      if (!type) continue
-      const blob = await item.getType(type)
-      const ext = (type.split('/')[1] || 'png').replace('+xml', '')
-      await onElementImage(index, new File([blob], `pasted.${ext}`, { type }))
-      return
-    }
-    window.alert('No image found on the clipboard.')
-  } catch {
-    window.alert('Could not read the clipboard — allow clipboard access and try again.')
-  }
-}
-/** Make the box clickable using a URL copied from the system clipboard —
- *  the paste-driven counterpart to dragging a link onto an image (onDropLink). */
-async function addLinkFromClipboardAt(index: number) {
-  try {
-    const text = (await navigator.clipboard.readText()).trim()
-    if (!/^(https?:|mailto:)/i.test(text)) {
-      window.alert("The clipboard doesn't contain a link.")
-      return
-    }
-    patchElementAt(index, { link: text })
-  } catch {
-    window.alert('Could not read the clipboard — allow clipboard access and try again.')
-  }
-}
-/** Save a box's image to disk via the browser's normal download flow. */
-async function downloadImageAt(index: number) {
-  const el = deck.value?.slides[current.value]?.elements?.[index]
-  if (!el || el.type !== 'box' || !el.src) return
-  try {
-    const blob = await (await fetch(el.src)).blob()
+    const blob = await (await fetch(src)).blob()
     const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '')
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -700,6 +664,52 @@ async function downloadImageAt(index: number) {
   } catch {
     window.alert('Could not download the image.')
   }
+}
+/** Read one image off the system clipboard as a File, or null with an alert. */
+async function readClipboardImage(): Promise<File | null> {
+  try {
+    const items = await navigator.clipboard.read()
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'))
+      if (!type) continue
+      const blob = await item.getType(type)
+      const ext = (type.split('/')[1] || 'png').replace('+xml', '')
+      return new File([blob], `pasted.${ext}`, { type })
+    }
+    window.alert('No image found on the clipboard.')
+  } catch {
+    window.alert('Could not read the clipboard — allow clipboard access and try again.')
+  }
+  return null
+}
+/** Read an http(s)/mailto URL off the clipboard, or null with an alert. */
+async function readClipboardLink(): Promise<string | null> {
+  try {
+    const text = (await navigator.clipboard.readText()).trim()
+    if (/^(https?:|mailto:)/i.test(text)) return text
+    window.alert("The clipboard doesn't contain a link.")
+  } catch {
+    window.alert('Could not read the clipboard — allow clipboard access and try again.')
+  }
+  return null
+}
+
+// ── freeform box image actions ──
+function copyImageAt(index: number) {
+  const el = deck.value?.slides[current.value]?.elements?.[index]
+  if (el?.type === 'box' && el.src) void copyImageSrc(el.src)
+}
+async function pasteImageAt(index: number) {
+  const file = await readClipboardImage()
+  if (file) await onElementImage(index, file)
+}
+async function addLinkFromClipboardAt(index: number) {
+  const link = await readClipboardLink()
+  if (link) patchElementAt(index, { link })
+}
+function downloadImageAt(index: number) {
+  const el = deck.value?.slides[current.value]?.elements?.[index]
+  if (el?.type === 'box' && el.src) void downloadImageSrc(el.src)
 }
 /** A file was dropped on the canvas (from Explorer / desktop / another window):
  *  onto a box → set that box's image; onto empty canvas → new image box, sized
@@ -840,19 +850,27 @@ function closeCtx() {
   ctxMenu.value = null
 }
 // A hidden input drives "Replace Image…" from the menu (the in-frame button has
-// its own input down in CanvasElements; the menu can't reach that one).
+// its own input down in CanvasElements; the menu can't reach that one). The
+// target is either a freeform box element or the current slide's image field.
 const ctxImgInput = ref<HTMLInputElement | null>(null)
-const ctxImgIdx = ref<number | null>(null)
+const ctxImgTarget = ref<{ kind: 'element'; index: number } | { kind: 'field' } | null>(null)
 function replaceImageAt(index: number) {
-  ctxImgIdx.value = index
+  ctxImgTarget.value = { kind: 'element', index }
+  ctxImgInput.value?.click()
+}
+function replaceFieldImage() {
+  ctxImgTarget.value = { kind: 'field' }
   ctxImgInput.value?.click()
 }
 function onCtxImgPick(e: Event) {
   const input = e.target as HTMLInputElement
   const f = input.files?.[0]
   input.value = ''
-  if (f && f.type.startsWith('image/') && ctxImgIdx.value != null) onElementImage(ctxImgIdx.value, f)
-  ctxImgIdx.value = null
+  const target = ctxImgTarget.value
+  ctxImgTarget.value = null
+  if (!f || !f.type.startsWith('image/') || !target) return
+  if (target.kind === 'element') onElementImage(target.index, f)
+  else void onUpload({ field: 'image', file: f })
 }
 
 function canvasItems(sx: number, sy: number): CtxEntry[] {
@@ -905,6 +923,30 @@ function multiItems(): CtxEntry[] {
     { label: 'Send Backward', hint: 'Ctrl+[', action: () => reorderSelectedElements(-1) },
   ]
 }
+/** Right-click menu for a layout image (the `image` field of a semantic layout
+ *  like Text + Image), mirroring the freeform-box image menu but operating on the
+ *  slide's own image/focus/imageFit fields. `link` doesn't apply — semantic images
+ *  have no per-image link — so it's omitted. */
+function layoutImageItems(): CtxEntry[] {
+  const s = deck.value?.slides[current.value]
+  const src = s?.image
+  if (!src) return []
+  const fit = s.imageFit ?? (s.layout === 'image-caption' ? 'contain' : 'cover')
+  return [
+    { label: 'Copy Image', action: () => void copyImageSrc(src) },
+    { label: 'Paste Image', action: () => pasteFieldImage() },
+    { label: 'Download Image', action: () => void downloadImageSrc(src) },
+    { divider: true },
+    { label: 'Fit: Cover', check: fit === 'cover', action: () => patchSlide({ imageFit: 'cover' }) },
+    { label: 'Fit: Contain', check: fit === 'contain', action: () => patchSlide({ imageFit: 'contain' }) },
+    { label: 'Replace Image…', action: () => replaceFieldImage() },
+    { label: 'Remove Image', action: () => patchSlide({ image: undefined, focus: undefined, imageFit: undefined }) },
+  ]
+}
+async function pasteFieldImage() {
+  const file = await readClipboardImage()
+  if (file) await onUpload({ field: 'image', file })
+}
 function thumbItems(index: number): CtxEntry[] {
   const last = (deck.value?.slides.length ?? 1) - 1
   const multi = selected.value.length > 1
@@ -934,8 +976,13 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string }) {
   if (!editMode.value) return
+  if (p.kind === 'image') {
+    const items = layoutImageItems()
+    if (items.length) ctxMenu.value = { x: p.x, y: p.y, items }
+    return
+  }
   if (p.kind === 'link') {
     ctxMenu.value = { x: p.x, y: p.y, items: linkItems(p.url ?? '') }
     return

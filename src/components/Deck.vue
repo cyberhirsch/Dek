@@ -30,7 +30,7 @@ const emit = defineEmits<{
   split: [e: { index: number; target: SlideSplitTarget }]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)
