@@ -640,6 +640,67 @@ async function onElementImage(index: number, file: File) {
   )
   patchSlide({ elements: els })
 }
+/** Copy a box's image to the system clipboard, so it can be pasted elsewhere
+ *  (another app, another box, another slide). */
+async function copyImageAt(index: number) {
+  const el = deck.value?.slides[current.value]?.elements?.[index]
+  if (!el || el.type !== 'box' || !el.src) return
+  try {
+    const blob = await (await fetch(el.src)).blob()
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+  } catch {
+    window.alert('Could not copy the image — your browser may not support copying images.')
+  }
+}
+/** Paste an image from the system clipboard onto a box, replacing its picture
+ *  (same upload path as "Replace Image…"). */
+async function pasteImageAt(index: number) {
+  try {
+    const items = await navigator.clipboard.read()
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'))
+      if (!type) continue
+      const blob = await item.getType(type)
+      const ext = (type.split('/')[1] || 'png').replace('+xml', '')
+      await onElementImage(index, new File([blob], `pasted.${ext}`, { type }))
+      return
+    }
+    window.alert('No image found on the clipboard.')
+  } catch {
+    window.alert('Could not read the clipboard — allow clipboard access and try again.')
+  }
+}
+/** Make the box clickable using a URL copied from the system clipboard —
+ *  the paste-driven counterpart to dragging a link onto an image (onDropLink). */
+async function addLinkFromClipboardAt(index: number) {
+  try {
+    const text = (await navigator.clipboard.readText()).trim()
+    if (!/^(https?:|mailto:)/i.test(text)) {
+      window.alert("The clipboard doesn't contain a link.")
+      return
+    }
+    patchElementAt(index, { link: text })
+  } catch {
+    window.alert('Could not read the clipboard — allow clipboard access and try again.')
+  }
+}
+/** Save a box's image to disk via the browser's normal download flow. */
+async function downloadImageAt(index: number) {
+  const el = deck.value?.slides[current.value]?.elements?.[index]
+  if (!el || el.type !== 'box' || !el.src) return
+  try {
+    const blob = await (await fetch(el.src)).blob()
+    const ext = (blob.type.split('/')[1] || 'png').replace('+xml', '')
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `image.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    window.alert('Could not download the image.')
+  }
+}
 /** A file was dropped on the canvas (from Explorer / desktop / another window):
  *  onto a box → set that box's image; onto empty canvas → new image box, sized
  *  proportionally to the image and centred on the drop point. */
@@ -819,6 +880,11 @@ function elementItems(index: number): CtxEntry[] {
   if (el?.type === 'box' && (el as BoxElement).src) {
     const b = el as BoxElement
     items.push(
+      { divider: true },
+      { label: 'Copy Image', action: () => copyImageAt(index) },
+      { label: 'Paste Image', action: () => pasteImageAt(index) },
+      { label: 'Add Link (from Clipboard)', action: () => addLinkFromClipboardAt(index) },
+      { label: 'Download Image', action: () => downloadImageAt(index) },
       { divider: true },
       { label: 'Fit: Cover', check: (b.fit ?? 'cover') === 'cover', action: () => patchElementAt(index, { fit: 'cover' }) },
       { label: 'Fit: Contain', check: b.fit === 'contain', action: () => patchElementAt(index, { fit: 'contain' }) },
