@@ -103,8 +103,12 @@ function onCanvasDragOver(e: DragEvent) {
   dropActive.value = true
 }
 function onCanvasDragLeave(e: DragEvent) {
-  // Only clear when the pointer actually leaves the layer, not on child crossings.
-  if (e.target === root.value) dropActive.value = false
+  // `dragleave` also fires on the layer each time the pointer crosses onto a
+  // child box — testing `e.target` there wrongly cleared the state, so the
+  // highlight flickered off/on as you moved over an element. Use `relatedTarget`
+  // (where the pointer is *going*): only clear when it leaves the layer entirely.
+  const to = e.relatedTarget as Node | null
+  if (!to || !root.value?.contains(to)) dropActive.value = false
 }
 /** The topmost box element under the drop point (DOM-based, so it respects
  *  z-order and rotation), or null when the drop lands on empty canvas. */

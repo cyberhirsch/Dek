@@ -21,6 +21,23 @@ window.addEventListener('vite:preloadError', (event) => {
   location.reload()
 })
 
+// A file (or link) dropped just outside an in-app dropzone would otherwise make
+// the browser navigate to it — opening the image in a new view and throwing away
+// the deck. Swallow file/URL drops everywhere except real text fields, so a
+// near-miss on the canvas is a harmless no-op instead of a navigation. The app's
+// own drop handlers still fire (they run on bubbling, before this); preventDefault
+// only cancels the *browser's* default, never the app's emit.
+function isTextField(t: EventTarget | null): boolean {
+  return t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName))
+}
+function guardStrayDrop(e: DragEvent) {
+  if (isTextField(e.target)) return
+  const types = e.dataTransfer ? Array.from(e.dataTransfer.types) : []
+  if (types.includes('Files') || types.includes('text/uri-list')) e.preventDefault()
+}
+window.addEventListener('dragover', guardStrayDrop)
+window.addEventListener('drop', guardStrayDrop)
+
 // `?view=presenter` loads the standalone presenter popup (a second-monitor view
 // synced to the main window) instead of the full editor app.
 const isPresenter = new URLSearchParams(location.search).get('view') === 'presenter'

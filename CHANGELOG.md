@@ -18,6 +18,15 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Right-click an image on the canvas for Copy / Paste / Add Link / Download** (#42)
+Right-clicking a freeform box that carries a picture now offers **Copy Image** (to the system clipboard), **Paste Image** (a clipboard image replaces the box's picture, through the same compress-and-store upload path as Replace), **Add Link (from Clipboard)** (an `http(s)`/`mailto` URL on the clipboard makes the box clickable — the paste-driven twin of dragging a link onto an image), and **Download Image**, alongside the existing Fit/Replace/Remove entries.
+
+**Drag-and-drop image fixes: no more flicker, no more "opens in a new tab"** (#42)
+Dropping an image onto a canvas box was unreliable in two ways. The drop-highlight *flickered* because `dragleave` fires on the canvas layer every time the pointer crosses onto a child box; it now tests `relatedTarget` (where the pointer is going) and only clears when the pointer truly leaves the layer. And a drop that landed a hair outside a box — or on a slide whose canvas layer is `pointer-events: none` because it has no elements yet — hit the browser's default and **opened the image in a new tab, losing the deck**. A window-level guard now swallows stray file/URL drops everywhere except real text fields, so a near-miss is a harmless no-op; the app's own drop handlers still fire, since `preventDefault` only cancels the browser's default, not the emit.
+
+**Zoom-out on a framed image stops at the natural fit** (#42)
+Scroll-to-zoom on single-image layouts let you shrink an image below its fit baseline (down to 0.3×), which left the picture floating in a small box with gaps around it — reading as if it had been cropped. Scale 1 (the image exactly covering/containing the frame) is now the floor: you zoom *in* to crop and frame, and can't zoom out past the natural fit. Imported PowerPoint crops are unaffected — those are baked into the pixels, not stored as a sub-1 zoom.
+
 **Cut/Copy/Paste and cross-deck import in the slide context menu** (#42)
 Right-clicking a slide thumbnail now offers **Cut/Copy/Paste Slide(s)**, mirroring the element-level clipboard (`Ctrl+C/X/V` work too, when the navigator has focus and no element is selected) — multi-selected thumbnails cut/copy as a set, and Paste always lands right after the slide you right-clicked. Also new: **Import Slides…**, which opens Dek's own deck browser in a picker mode over the granted workspace folder — pick another `.dek` bundle and its slides splice in at that point, with every referenced image copied into the current deck's own asset store (`api.ts`'s `importSlidesFromWorkspaceDeck`; works no matter which backend the *current* deck lives in, since only the source needs to be a listable workspace bundle). The source deck is never modified.
 
