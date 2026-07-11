@@ -6,8 +6,7 @@ import type { ThemeId } from '../tokens'
 
 defineProps<{ currentName: string; themeId?: ThemeId }>()
 const emit = defineEmits<{
-  'open-file': []
-  'open-folder': []
+  browse: [] //   open Dek's in-app deck browser
   'save-as': []
   new: []
   open: [file: string]
@@ -42,13 +41,9 @@ async function toggle() {
     }
   }
 }
-function openFile() {
+function openDeck() {
   open.value = false
-  emit('open-file')
-}
-function openFolder() {
-  open.value = false
-  emit('open-folder')
+  emit('browse')
 }
 function saveAs() {
   open.value = false
@@ -85,21 +80,13 @@ function setTheme(id: ThemeId) {
       <div class="dm-backdrop" @click="open = false" />
       <div class="dm-menu">
         <div class="dm-grp">
-          <button
-            v-if="dir"
-            title="One prompt grants the deck, its images and every subfolder — and it reopens automatically next time"
-            @click="openFolder"
-          >
-            📁 Open deck…
+          <button v-if="dir" title="Open a deck from your decks folder — no file dialog" @click="openDeck">
+            📂 Open deck…
           </button>
           <button @click="newDeck">＋ New deck…</button>
           <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
-          <button
-            v-if="dir"
-            title="Pick or create the deck's own folder — it gets deck.md and an Assets folder inside"
-            @click="saveAs"
-          >
-            ⤓ Save As bundle…
+          <button v-if="dir" title="Save this deck under a new name in your decks folder" @click="saveAs">
+            ⤓ Save As…
           </button>
           <button @click="exportDeck">⇪ Export (PDF / HTML / PPTX)…</button>
         </div>
@@ -113,13 +100,6 @@ function setTheme(id: ThemeId) {
         <div v-if="decks.length" class="dm-grp">
           <div class="dm-lbl">Decks</div>
           <button v-for="d in decks" :key="d.file" class="dm-deck" @click="pick(d.file)">{{ d.name }}</button>
-        </div>
-        <!-- Secondary: a lone .md can't reach its images folder from a file
-             handle, so it costs a second prompt. "Open deck…" is the good path. -->
-        <div v-if="fs" class="dm-grp">
-          <button class="dm-sub" title="A lone .md — needs a second prompt to reach its images" @click="openFile">
-            📄 Open a single .md…
-          </button>
         </div>
         <div v-if="!fs" class="dm-note">
           Open / Save As need the File System Access API (a Chromium browser with it enabled).
@@ -214,10 +194,6 @@ function setTheme(id: ThemeId) {
 }
 .dm-menu button.active {
   color: #7fc7ff;
-}
-.dm-menu button.dm-sub {
-  color: rgba(230, 236, 242, 0.55);
-  font-size: 11px;
 }
 .dm-note {
   padding: 8px;

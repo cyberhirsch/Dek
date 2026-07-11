@@ -30,8 +30,7 @@ const emit = defineEmits<{
   close: []
   export: []
   review: []
-  'open-file': []
-  'open-folder': []
+  browse: []
   'save-as': []
   'new-deck': []
   'open-deck': [file: string]
@@ -138,8 +137,7 @@ const themeSwatches = computed(() => {
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         :theme-id="(deck.config.theme?.preset as ThemeId | undefined) ?? 'default'"
-        @open-file="emit('open-file')"
-        @open-folder="emit('open-folder')"
+        @browse="emit('browse')"
         @save-as="emit('save-as')"
         @new="emit('new-deck')"
         @open="emit('open-deck', $event)"

@@ -24,22 +24,31 @@ import {
 } from './storage/fs'
 import {
   clearActiveFolder,
+  clearWorkspace,
+  createWorkspaceDeck,
+  type DeckEntry,
+  type DirHandle,
   directoryForFile,
   directoryPermission,
   ensureCanonicalAssets,
   fsDirBackend,
+  listWorkspaceDecks,
   loadActiveFolder,
+  loadWorkspace,
+  openWorkspaceDeck,
   pickDir,
   rememberActiveFolder,
   rememberedDirectoryForFile,
   rememberDirectory,
+  rememberWorkspace,
   requestDirectoryPermission,
   saveAsFolder,
   supportsDir,
 } from './storage/fsdir'
-import { localAssetRefs } from './storage/assets'
+import { BUNDLE_MD, localAssetRefs } from './storage/assets'
 
 export { supportsFS, supportsDir, DeckConflictError }
+export type { DeckEntry }
 
 const LS_FILE = 'dek:file'
 
@@ -333,6 +342,84 @@ export async function reconnectLocalDeck(): Promise<Deck | null> {
     }
   }
   return null
+}
+
+// ── workspace: Dek's own Open/Save over one granted decks folder ──
+// After a one-time folder grant there are no native file dialogs: the deck list
+// and the save-name field are Dek's own in-app UI, operating on the workspace
+// handle. Images stay in each bundle's Assets/, so deck.md stays small.
+
+let workspace: DirHandle | null = null
+async function getWorkspace(): Promise<DirHandle | null> {
+  if (!workspace) workspace = await loadWorkspace()
+  return workspace
+}
+
+export type WorkspaceState =
+  | { status: 'unsupported' }
+  | { status: 'none' } //     no folder chosen yet
+  | { status: 'prompt'; name: string } // remembered, needs a one-click re-grant
+  | { status: 'ready'; name: string }
+
+export async function workspaceState(): Promise<WorkspaceState> {
+  if (!supportsDir()) return { status: 'unsupported' }
+  const ws = await getWorkspace()
+  if (!ws) return { status: 'none' }
+  const perm = await directoryPermission(ws)
+  if (perm === 'granted') return { status: 'ready', name: ws.name }
+  if (perm === 'prompt') return { status: 'prompt', name: ws.name }
+  return { status: 'none' } // denied/stale → treat as unchosen
+}
+
+/** Pick the decks folder (one native dialog, ever). Must run in a user gesture. */
+export async function chooseWorkspace(): Promise<void> {
+  const dir = await pickDir()
+  await rememberWorkspace(dir)
+  workspace = dir
+}
+
+/** Re-grant a remembered workspace (one allow-bubble, no picker). */
+export async function reconnectWorkspace(): Promise<boolean> {
+  const ws = await getWorkspace()
+  if (!ws) return false
+  return requestDirectoryPermission(ws)
+}
+
+/** The decks in the workspace, for the in-app Open panel. */
+export async function listWorkspace(): Promise<DeckEntry[]> {
+  const ws = await getWorkspace()
+  return ws ? listWorkspaceDecks(ws) : []
+}
+
+/** Open a deck from the workspace by its bundle folder name. No dialog. */
+export async function openWorkspaceFile(file: string): Promise<Deck> {
+  const ws = await getWorkspace()
+  if (!ws) throw new Error('No decks folder chosen yet.')
+  const { backend, deck, bundle } = await openWorkspaceDeck(ws, file)
+  override = backend
+  setCurrent(BUNDLE_MD)
+  await clearActiveFile()
+  await rememberActiveFolder(bundle, BUNDLE_MD)
+  return deck
+}
+
+/** Save the deck as a new `<name>.dek` bundle in the workspace. No dialog. */
+export async function saveWorkspaceFile(name: string, config: DeckConfig, slides: Slide[]): Promise<Deck> {
+  const ws = await getWorkspace()
+  if (!ws) throw new Error('No decks folder chosen yet.')
+  const { backend, deck, bundle } = await createWorkspaceDeck(ws, name, { config, slides })
+  override = backend
+  setCurrent(BUNDLE_MD)
+  await clearActiveFile()
+  await rememberActiveFolder(bundle, BUNDLE_MD)
+  setServerBaseMtime(undefined)
+  return deck
+}
+
+/** Forget the workspace so the user can pick a different decks folder. */
+export async function forgetWorkspace(): Promise<void> {
+  workspace = null
+  await clearWorkspace()
 }
 
 /** Open a local folder (deck.md + Assets) so images resolve and display. */

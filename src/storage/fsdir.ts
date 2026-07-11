@@ -13,6 +13,7 @@ import {
   bundleDeckName,
   canonicalAssetRef,
   collectAssetRefs,
+  deckBaseName,
   mapSlideAssetRefs,
 } from './assets'
 import { type FileHandle } from './fs'
@@ -46,6 +47,105 @@ export async function pickDir(startIn?: unknown): Promise<DirHandle> {
 const isDir = (h: FileHandle | DirHandle): h is DirHandle => 'getFileHandle' in h
 const DIR_CACHE = 'fs:recent-directories'
 const ACTIVE_DIR = 'fs:active-directory'
+const WORKSPACE = 'fs:workspace'
+
+// ── workspace ──
+// The one folder the user grants (once). Every deck lives inside it as a `.dek`
+// bundle, and Dek's own in-app Open/Save panels operate over it — so after the
+// single grant there are no native file dialogs at all. The handle is persisted
+// and re-permissioned exactly like the active-folder slot.
+
+export interface DeckEntry {
+  /** Folder name including the `.dek` suffix — the on-disk id. */
+  file: string
+  /** Display name (suffix stripped). */
+  name: string
+}
+
+export async function rememberWorkspace(dir: DirHandle): Promise<void> {
+  await idbSet(WORKSPACE, dir)
+}
+export async function loadWorkspace(): Promise<DirHandle | null> {
+  return (await idbGet<DirHandle>(WORKSPACE)) ?? null
+}
+export async function clearWorkspace(): Promise<void> {
+  await idbSet(WORKSPACE, undefined)
+}
+
+/** The `.dek` bundles in the workspace, newest-name-sorted for the picker. */
+export async function listWorkspaceDecks(dir: DirHandle): Promise<DeckEntry[]> {
+  const out: DeckEntry[] = []
+  for await (const h of dir.values()) {
+    if (isDir(h) && /\.dek$/i.test(h.name)) out.push({ file: h.name, name: bundleDeckName(h.name) })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Open a bundle in the workspace by its folder name. */
+export async function openWorkspaceDeck(dir: DirHandle, file: string): Promise<{ backend: StorageBackend; deck: Deck; bundle: DirHandle }> {
+  const bundle = await dir.getDirectoryHandle(file)
+  const backend = fsDirBackend(bundle, BUNDLE_MD)
+  return { backend, deck: await backend.loadDeck(BUNDLE_MD), bundle }
+}
+
+/** Write a deck into a bundle folder: `deck.md` plus an `Assets/` folder holding
+ *  every referenced image, with refs rewritten to `Assets/<file>`. Shared by the
+ *  workspace create path and the folder Save-As. */
+async function writeDeckToBundle(bundle: DirHandle, deck: Deck, deckName: string): Promise<void> {
+  const assets = await bundle.getDirectoryHandle(BUNDLE_ASSETS, { create: true })
+  const map = new Map<string, string>()
+  let i = 0
+  for (const ref of collectAssetRefs(deck.slides)) {
+    try {
+      const blob = await (await fetch(ref)).blob()
+      const fn = assetFileName(ref, blob, i++)
+      const h = await assets.getFileHandle(fn, { create: true })
+      const ws = await h.createWritable()
+      await ws.write(blob)
+      await ws.close()
+      map.set(ref, bundleAssetRef(fn))
+    } catch {
+      /* unreachable image — leave its ref as-is */
+    }
+  }
+  const saved: Deck = {
+    config: { ...deck.config, deck: deckName || deck.config.deck },
+    slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref)),
+  }
+  const h = await bundle.getFileHandle(BUNDLE_MD, { create: true })
+  const ws = await h.createWritable()
+  await ws.write(serializeDeck(saved))
+  await ws.close()
+}
+
+/** Create a new `<name>.dek` bundle in the workspace (uniquified so it never
+ *  clobbers a sibling) and write the deck into it. Returns a backend bound to it. */
+export async function createWorkspaceDeck(
+  dir: DirHandle,
+  name: string,
+  deck: Deck,
+): Promise<{ backend: StorageBackend; deck: Deck; bundle: DirHandle; file: string }> {
+  const base = deckBaseName(name) || 'Untitled'
+  const file = await uniqueBundleName(dir, base)
+  const bundle = await dir.getDirectoryHandle(file, { create: true })
+  await writeDeckToBundle(bundle, deck, bundleDeckName(file))
+  const backend = fsDirBackend(bundle, BUNDLE_MD)
+  return { backend, deck: await backend.loadDeck(BUNDLE_MD), bundle, file }
+}
+
+/** `<base>.dek`, or `<base>-2.dek` … if that folder already exists. */
+async function uniqueBundleName(dir: DirHandle, base: string): Promise<string> {
+  for (let i = 1; i < 1000; i++) {
+    const file = i === 1 ? `${base}.dek` : `${base}-${i}.dek`
+    try {
+      await dir.getDirectoryHandle(file)
+      // exists → try the next suffix
+    } catch {
+      return file // NotFound → available
+    }
+  }
+  return `${base}-${Date.now()}.dek`
+}
 
 async function ensureDirectoryPermission(dir: DirHandle): Promise<boolean> {
   if (!dir.queryPermission) return true

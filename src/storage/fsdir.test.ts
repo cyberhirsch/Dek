@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { FileHandle } from './fs'
-import { directoryForFile, ensureCanonicalAssets, type DirHandle } from './fsdir'
+import {
+  createWorkspaceDeck,
+  directoryForFile,
+  ensureCanonicalAssets,
+  listWorkspaceDecks,
+  openWorkspaceDeck,
+  type DirHandle,
+} from './fsdir'
+import type { Deck } from '../core/types'
 
 class MockFileHandle implements FileHandle {
   private data = new Blob()
@@ -99,5 +107,48 @@ describe('canonical Assets folders', () => {
     const target = await parent.getDirectoryHandle('Open Source & AI dek - SIM Edition Assets')
     const copied = await target.getFileHandle('hero.webp')
     expect(await (await copied.getFile()).text()).toBe('image bytes')
+  })
+})
+
+describe('workspace', () => {
+  const deck: Deck = { config: { deck: 'x' }, slides: [{ layout: 'cover', title: 'Hi' }] }
+
+  it('lists only the .dek bundles, by display name', async () => {
+    const ws = new MockDirHandle('decks')
+    await ws.getDirectoryHandle('VoluLab Chiemgau.dek', { create: true })
+    await ws.getDirectoryHandle('Lukas.dek', { create: true })
+    await ws.getDirectoryHandle('not-a-deck', { create: true }) // ignored
+    await ws.getFileHandle('stray.md', { create: true }) // ignored
+
+    const list = await listWorkspaceDecks(ws)
+    expect(list.map((d) => d.name)).toEqual(['Lukas', 'VoluLab Chiemgau'])
+    expect(list.map((d) => d.file)).toEqual(['Lukas.dek', 'VoluLab Chiemgau.dek'])
+  })
+
+  it('creates a named bundle with deck.md + Assets and titles it from the folder', async () => {
+    const ws = new MockDirHandle('decks')
+    const { file, bundle, deck: saved } = await createWorkspaceDeck(ws, 'My Talk', deck)
+
+    expect(file).toBe('My Talk.dek')
+    expect(saved.config.deck).toBe('My Talk')
+    const md = await (bundle as MockDirHandle).getFileHandle('deck.md')
+    expect(await (await md.getFile()).text()).toContain('layout: cover')
+    await (bundle as MockDirHandle).getDirectoryHandle('Assets') // exists, no throw
+  })
+
+  it('uniquifies the folder name instead of clobbering a sibling', async () => {
+    const ws = new MockDirHandle('decks')
+    const first = await createWorkspaceDeck(ws, 'My Talk', deck)
+    const second = await createWorkspaceDeck(ws, 'My Talk', deck)
+    expect(first.file).toBe('My Talk.dek')
+    expect(second.file).toBe('My Talk-2.dek')
+  })
+
+  it('round-trips: a created bundle reopens with the same content', async () => {
+    const ws = new MockDirHandle('decks')
+    const { file } = await createWorkspaceDeck(ws, 'Round Trip', deck)
+    const { deck: reopened } = await openWorkspaceDeck(ws, file)
+    expect(reopened.slides[0].title).toBe('Hi')
+    expect(reopened.config.deck).toBe('Round Trip')
   })
 })

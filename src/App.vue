@@ -15,9 +15,6 @@ import {
   uploadImage,
   openDeck,
   newDeck,
-  openLocalFile,
-  openLocalFolder,
-  saveLocalFolderAs,
   listDeckAssets,
   deleteDeckAsset,
   externalChangePending,
@@ -26,6 +23,8 @@ import {
   restoreLocalDeck,
   pendingLocalGrant,
   reconnectLocalDeck,
+  openWorkspaceFile,
+  saveWorkspaceFile,
 } from './api'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
@@ -40,6 +39,7 @@ import ExportView from './components/ExportView.vue'
 import ImportReview from './components/ImportReview.vue'
 import EditableText from './components/EditableText.vue'
 import DeckMenu from './components/DeckMenu.vue'
+import DeckBrowser from './components/DeckBrowser.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import SourcePane from './components/SourcePane.vue'
 import ContextMenu, { type CtxEntry } from './components/ContextMenu.vue'
@@ -190,22 +190,28 @@ function applyDeck(d: Deck) {
 function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
 }
-async function onOpenFile() {
+// ── Dek's own Open / Save panel (over the granted workspace folder) ──
+const deckBrowser = ref<'open' | 'save' | null>(null)
+async function onBrowserOpen(file: string) {
   error.value = ''
   try {
-    applyDeck(await openLocalFile())
+    applyDeck(await openWorkspaceFile(file))
     reconnectName.value = null
+    deckBrowser.value = null
   } catch (e) {
-    if (!isAbort(e)) error.value = `Open file failed: ${(e as Error).message}`
+    if (!isAbort(e)) error.value = `Open failed: ${(e as Error).message}`
   }
 }
-async function onOpenFolder() {
+async function onBrowserSave(name: string) {
+  if (!deck.value) return
   error.value = ''
   try {
-    applyDeck(await openLocalFolder())
+    applyDeck(await saveWorkspaceFile(name, deck.value.config, deck.value.slides))
+    saveStatus.value = 'saved'
     reconnectName.value = null
+    deckBrowser.value = null
   } catch (e) {
-    if (!isAbort(e)) error.value = `Open folder failed: ${(e as Error).message}`
+    if (!isAbort(e)) error.value = (e as Error).message
   }
 }
 // The last-used folder/file, when its readwrite grant needs one click to restore.
@@ -227,14 +233,8 @@ async function onOpenDeck(file: string) {
     error.value = (e as Error).message
   }
 }
-async function onSaveAs() {
-  if (!deck.value) return
-  try {
-    applyDeck(await saveLocalFolderAs(deck.value.config.deck ?? 'deck', deck.value.config, deck.value.slides))
-    saveStatus.value = 'saved'
-  } catch (e) {
-    if (!isAbort(e)) error.value = (e as Error).message
-  }
+function onSaveAs() {
+  deckBrowser.value = 'save'
 }
 async function onNewDeck() {
   const n = window.prompt('New deck name:', 'Untitled')
@@ -271,6 +271,12 @@ function isTyping(el: HTMLElement | null): boolean {
   return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
 }
 function onKey(e: KeyboardEvent) {
+  // The deck browser is a modal: Escape closes it, everything else is ignored so
+  // shortcuts don't act on the deck behind it.
+  if (deckBrowser.value) {
+    if (e.key === 'Escape') deckBrowser.value = null
+    return
+  }
   const ae = document.activeElement as HTMLElement | null
   const typing = isTyping(ae)
   const mod = e.ctrlKey || e.metaKey
@@ -1164,8 +1170,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @close="editMode = false"
       @export="exportOpen = true"
       @review="toggleReview"
-      @open-file="onOpenFile"
-      @open-folder="onOpenFolder"
+      @browse="deckBrowser = 'open'"
       @save-as="onSaveAs"
       @new-deck="onNewDeck"
       @open-deck="onOpenDeck"
@@ -1200,7 +1205,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :deck="deck"
           :editable="editMode"
           :bullet-format-command="bulletFormatCommand"
-          :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen"
+          :nav-enabled="!overviewOpen && !presenterOpen && !exportOpen && !deckBrowser"
           :tool="activeTool"
           :selected-el="selectedEls"
           :pending-image="pendingImage"
@@ -1256,8 +1261,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         :theme-id="(deck.config.theme?.preset as ThemeId | undefined) ?? 'default'"
-        @open-file="onOpenFile"
-        @open-folder="onOpenFolder"
+        @browse="deckBrowser = 'open'"
         @save-as="onSaveAs"
         @new="onNewDeck"
         @open="onOpenDeck"
@@ -1278,6 +1282,14 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     </div>
 
     <!-- overlays -->
+    <DeckBrowser
+      v-if="deckBrowser"
+      :mode="deckBrowser"
+      :current-name="deck?.config.deck ?? ''"
+      @open-deck="onBrowserOpen"
+      @save-deck="onBrowserSave"
+      @close="deckBrowser = null"
+    />
     <Overview
       v-if="deck && overviewOpen"
       :deck="deck"

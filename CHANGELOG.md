@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Opening & saving
+
+**Dek's own Open/Save panels — one folder grant, no more file dialogs** (#41)
+Native file dialogs are gone from the everyday flow. You grant a **decks folder once** (the single unavoidable OS prompt, persisted and auto-reconnected), and after that Open and Save are Dek's own in-app panels over that folder: **Open** lists the `.dek` decks in it, click to open; **Save As** is a text field — type a name, and Dek creates `<name>.dek/` for you (uniquified, never clobbering a sibling). No folder to create by hand, no picker. This works because a *directory* grant gives full programmatic access — list, create, read, write — whereas the per-file pickers were the only thing forcing native dialogs. Images stay in each bundle's `Assets/`, so `deck.md` stays small and readable (a self-contained single file was the alternative, but inlining images as data URLs bloats it past what an LLM can hold). New `DeckBrowser.vue` + a workspace layer in `storage/fsdir.ts`; 4 tests cover listing, named creation, uniquification, and round-trip.
+
 ### Design system
 
 **Themed links and a readable light theme** (#39)
