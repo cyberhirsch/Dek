@@ -15,10 +15,11 @@ import {
   type WorkspaceState,
 } from '../api'
 
-const props = defineProps<{ mode: 'open' | 'save'; currentName?: string }>()
+const props = defineProps<{ mode: 'open' | 'save' | 'import'; currentName?: string }>()
 const emit = defineEmits<{
   'open-deck': [file: string]
   'save-deck': [name: string]
+  'import-deck': [file: string]
   close: []
 }>()
 
@@ -65,7 +66,8 @@ const onReconnect = () => guard(async () => { await reconnectWorkspace(); await 
 const onForget = () => guard(async () => { await forgetWorkspace(); await refresh() })
 
 function onOpen(file: string) {
-  emit('open-deck', file)
+  if (props.mode === 'import') emit('import-deck', file)
+  else emit('open-deck', file)
 }
 function onSave() {
   const name = saveName.value.trim()
@@ -81,7 +83,7 @@ function onSave() {
   <div class="db-backdrop" @click.self="emit('close')">
     <div class="db">
       <header class="db-head">
-        <span class="db-title">{{ mode === 'save' ? 'Save deck' : 'Open deck' }}</span>
+        <span class="db-title">{{ mode === 'save' ? 'Save deck' : mode === 'import' ? 'Import slides…' : 'Open deck' }}</span>
         <span v-if="ready" class="db-folder" :title="folderName">📁 {{ folderName }}</span>
         <button class="db-x" title="Close (Esc)" @click="emit('close')">✕</button>
       </header>
@@ -112,10 +114,12 @@ function onSave() {
             <span class="db-item-icon">◈</span>
             <span class="db-item-name">{{ d.name }}</span>
           </button>
-          <div v-if="!decks.length" class="db-list-empty">No decks here yet — save one below.</div>
+          <div v-if="!decks.length" class="db-list-empty">
+            {{ mode === 'import' ? 'No other decks here to import from.' : 'No decks here yet — save one below.' }}
+          </div>
         </div>
 
-        <div class="db-save">
+        <div v-if="mode !== 'import'" class="db-save">
           <input
             ref="nameInput"
             v-model="saveName"

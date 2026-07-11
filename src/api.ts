@@ -45,7 +45,8 @@ import {
   saveAsFolder,
   supportsDir,
 } from './storage/fsdir'
-import { BUNDLE_MD, localAssetRefs } from './storage/assets'
+import { BUNDLE_MD, collectAssetRefs, localAssetRefs, mapSlideAssetRefs } from './storage/assets'
+import { fileToOptimizedDataUrl } from './core/image'
 
 export { supportsFS, supportsDir, DeckConflictError }
 export type { DeckEntry }
@@ -414,6 +415,31 @@ export async function saveWorkspaceFile(name: string, config: DeckConfig, slides
   await rememberActiveFolder(bundle, BUNDLE_MD)
   setServerBaseMtime(undefined)
   return deck
+}
+
+/** Copy every slide from another workspace deck into the *active* deck's asset
+ *  store, rewriting image refs to point at the copies, and hand back the slides
+ *  ready to splice in. The source bundle itself is left untouched. Works no
+ *  matter which backend the active deck lives in (workspace, server, browser) —
+ *  only the source has to be a workspace bundle, since that's what's listable
+ *  without a file dialog. */
+export async function importSlidesFromWorkspaceDeck(file: string): Promise<Slide[]> {
+  const ws = await getWorkspace()
+  if (!ws) throw new Error('No decks folder chosen yet.')
+  const { deck } = await openWorkspaceDeck(ws, file)
+  const backend = await active()
+  const map = new Map<string, string>()
+  for (const ref of collectAssetRefs(deck.slides)) {
+    try {
+      const blob = await (await fetch(ref)).blob()
+      const name = ref.split('/').pop() || 'image'
+      const dataUrl = await fileToOptimizedDataUrl(new File([blob], name, { type: blob.type }))
+      map.set(ref, await backend.uploadAsset(currentFile, name, dataUrl))
+    } catch {
+      /* unreachable image — leave its ref as-is */
+    }
+  }
+  return deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => map.get(ref) ?? ref))
 }
 
 /** Forget the workspace so the user can pick a different decks folder. */

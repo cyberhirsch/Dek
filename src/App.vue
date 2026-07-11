@@ -25,6 +25,8 @@ import {
   reconnectLocalDeck,
   openWorkspaceFile,
   saveWorkspaceFile,
+  importSlidesFromWorkspaceDeck,
+  supportsDir,
 } from './api'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
@@ -190,8 +192,10 @@ function applyDeck(d: Deck) {
 function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
 }
-// ── Dek's own Open / Save panel (over the granted workspace folder) ──
-const deckBrowser = ref<'open' | 'save' | null>(null)
+// ── Dek's own Open / Save / Import panel (over the granted workspace folder) ──
+const deckBrowser = ref<'open' | 'save' | 'import' | null>(null)
+// Set by openSlideImport(): which slide to insert the imported ones after.
+const importAt = ref<number | null>(null)
 async function onBrowserOpen(file: string) {
   error.value = ''
   try {
@@ -212,6 +216,25 @@ async function onBrowserSave(name: string) {
     deckBrowser.value = null
   } catch (e) {
     if (!isAbort(e)) error.value = (e as Error).message
+  }
+}
+async function onBrowserImport(file: string) {
+  if (!deck.value) return
+  error.value = ''
+  try {
+    const slides = await importSlidesFromWorkspaceDeck(file)
+    if (slides.length) {
+      snap('add')
+      const at = (importAt.value ?? current.value) + 1
+      deck.value.slides.splice(at, 0, ...slides)
+      focusSlide(at)
+      selected.value = slides.map((_, i) => at + i)
+      void saveWholeDeck()
+    }
+    deckBrowser.value = null
+    importAt.value = null
+  } catch (e) {
+    if (!isAbort(e)) error.value = `Import failed: ${(e as Error).message}`
   }
 }
 // The last-used folder/file, when its readwrite grant needs one click to restore.
@@ -274,7 +297,10 @@ function onKey(e: KeyboardEvent) {
   // The deck browser is a modal: Escape closes it, everything else is ignored so
   // shortcuts don't act on the deck behind it.
   if (deckBrowser.value) {
-    if (e.key === 'Escape') deckBrowser.value = null
+    if (e.key === 'Escape') {
+      deckBrowser.value = null
+      importAt.value = null
+    }
     return
   }
   const ae = document.activeElement as HTMLElement | null
@@ -306,6 +332,27 @@ function onKey(e: KeyboardEvent) {
   } else if (editMode.value && mod && !typing && (e.key === ']' || e.key === '[') && selectedEls.value.length) {
     e.preventDefault()
     reorderSelectedElements(e.key === ']' ? 1 : -1)
+  } else if (
+    editMode.value && mod && !typing && navFocused.value && selectedEls.value.length === 0 && e.key.toLowerCase() === 'c'
+  ) {
+    e.preventDefault()
+    copySlides()
+  } else if (
+    editMode.value && mod && !typing && navFocused.value && selectedEls.value.length === 0 && e.key.toLowerCase() === 'x'
+  ) {
+    e.preventDefault()
+    cutSlides()
+  } else if (
+    editMode.value &&
+    mod &&
+    !typing &&
+    navFocused.value &&
+    selectedEls.value.length === 0 &&
+    e.key.toLowerCase() === 'v' &&
+    slideClipboard.slides.length
+  ) {
+    e.preventDefault()
+    pasteSlides(current.value)
   } else if (e.key === 'Escape' && editMode.value) {
     if (typing) ae!.blur()
     else if (selectedEls.value.length) {
@@ -794,16 +841,32 @@ function multiItems(): CtxEntry[] {
 }
 function thumbItems(index: number): CtxEntry[] {
   const last = (deck.value?.slides.length ?? 1) - 1
-  return [
+  const multi = selected.value.length > 1
+  const items: CtxEntry[] = [
     { label: 'Duplicate Slide', action: () => { focusSlide(index); duplicateSlide() } },
     { label: 'Insert Slide Before', action: () => insertSlideAt(index) },
     { label: 'Insert Slide After', action: () => insertSlideAt(index + 1) },
+    { divider: true },
+    { label: multi ? 'Cut Slides' : 'Cut Slide', hint: 'Ctrl+X', action: cutSlides },
+    { label: multi ? 'Copy Slides' : 'Copy Slide', hint: 'Ctrl+C', action: copySlides },
+    {
+      label: 'Paste Slides',
+      hint: 'Ctrl+V',
+      disabled: !slideClipboard.slides.length,
+      action: () => pasteSlides(index),
+    },
+  ]
+  if (supportsDir()) {
+    items.push({ divider: true }, { label: 'Import Slides…', action: () => openSlideImport(index) })
+  }
+  items.push(
     { divider: true },
     { label: 'Delete Slide', disabled: last < 1, action: () => { focusSlide(index); removeSlide() } },
     { divider: true },
     { label: 'Move to Top', disabled: index === 0, action: () => moveSlideTo(index, 0) },
     { label: 'Move to Bottom', disabled: index === last, action: () => moveSlideTo(index, last) },
-  ]
+  )
+  return items
 }
 function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link'; url?: string }) {
   if (!editMode.value) return
@@ -880,7 +943,16 @@ function linkItems(url: string): CtxEntry[] {
 }
 function onSlideContextMenu(p: { x: number; y: number; index: number }) {
   if (!editMode.value) return
+  // Right-clicking outside the current multi-selection selects just that slide
+  // (matches the element context menu's behavior).
+  if (!selected.value.includes(p.index)) focusSlide(p.index)
   ctxMenu.value = { x: p.x, y: p.y, items: thumbItems(p.index) }
+}
+/** Open the deck browser in "import" mode to merge another workspace deck's
+ *  slides in right after `index`. */
+function openSlideImport(index: number) {
+  importAt.value = index
+  deckBrowser.value = 'import'
 }
 
 // ── text formatting (works on whatever text is being edited) ──
@@ -1019,6 +1091,38 @@ function moveSlideTo(from: number, to: number) {
   const [s] = deck.value.slides.splice(from, 1)
   deck.value.slides.splice(to, 0, s)
   focusSlide(to)
+  void saveWholeDeck()
+}
+
+// ── slide clipboard (Cut/Copy/Paste in the navigator's context menu) ──
+// Module-level, like the element clipboard, so it survives navigation and
+// works across decks in the same session.
+const slideClipboard: { slides: Slide[] } = { slides: [] }
+function cloneSlides(indices: number[]): Slide[] {
+  if (!deck.value) return []
+  return [...new Set(indices)].sort((a, b) => a - b).map((i) => JSON.parse(JSON.stringify(deck.value!.slides[i])) as Slide)
+}
+function copySlides() {
+  const idx = selected.value.length ? selected.value : [current.value]
+  const clones = cloneSlides(idx)
+  if (clones.length) slideClipboard.slides = clones
+}
+function cutSlides() {
+  const idx = selected.value.length ? selected.value : [current.value]
+  const clones = cloneSlides(idx)
+  if (!clones.length) return
+  slideClipboard.slides = clones
+  selected.value = idx
+  removeSlide()
+}
+/** Paste the clipboard's slides right after `after`, and select the pasted run. */
+function pasteSlides(after: number) {
+  if (!deck.value || !slideClipboard.slides.length) return
+  snap('add')
+  const copies = slideClipboard.slides.map((s) => JSON.parse(JSON.stringify(s)) as Slide)
+  deck.value.slides.splice(after + 1, 0, ...copies)
+  focusSlide(after + 1)
+  selected.value = copies.map((_, i) => after + 1 + i)
   void saveWholeDeck()
 }
 
@@ -1288,7 +1392,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       :current-name="deck?.config.deck ?? ''"
       @open-deck="onBrowserOpen"
       @save-deck="onBrowserSave"
-      @close="deckBrowser = null"
+      @import-deck="onBrowserImport"
+      @close="((deckBrowser = null), (importAt = null))"
     />
     <Overview
       v-if="deck && overviewOpen"
