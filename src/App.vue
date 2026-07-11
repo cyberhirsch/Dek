@@ -948,6 +948,15 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
     { label: 'Paste Image', action: () => pasteFieldImage(t) },
     { label: 'Download Image', action: () => void downloadImageSrc(src) },
   ]
+  // Links apply to the single image and gallery cells (both have a link field);
+  // portraits are a plain string array with nowhere to store one.
+  if (t.field === 'image' || t.field === 'gallery') {
+    items.push(
+      { divider: true },
+      { label: 'Add Link (from Clipboard)', action: () => addFieldLink(t) },
+    )
+    if (fieldImageLink(s, t)) items.push({ label: 'Remove Link', action: () => setFieldLink(t, undefined) })
+  }
   // Fit only makes sense for the single framed image; portraits/gallery are grids.
   if (t.field === 'image') {
     const fit = s.imageFit ?? (s.layout === 'image-caption' ? 'contain' : 'cover')
@@ -963,6 +972,39 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
     { label: 'Remove Image', action: () => removeFieldImage(t) },
   )
   return items
+}
+/** The link currently on an image field / gallery slot, if any. */
+function fieldImageLink(s: Slide, t: ImageField): string | undefined {
+  if (t.field === 'image') return s.imageLink
+  if (t.field === 'gallery') {
+    const it = s.items?.[t.index ?? -1]
+    return it && typeof it === 'object' && 'link' in it ? (it as { link?: string }).link : undefined
+  }
+  return undefined
+}
+async function addFieldLink(t: ImageField) {
+  const link = await readClipboardLink()
+  if (link) setFieldLink(t, link)
+}
+/** Set (or clear, when `link` is undefined) the link on the single image or a
+ *  gallery cell. Gallery normalises the slot to an object so it can hold a link. */
+function setFieldLink(t: ImageField, link: string | undefined) {
+  const s = deck.value?.slides[current.value]
+  if (!s) return
+  if (t.field === 'image') {
+    patchSlide({ imageLink: link })
+  } else if (t.field === 'gallery') {
+    const items = (s.items ?? []).map((it, i) => {
+      if (i !== t.index) return it
+      const image = typeof it === 'string' ? it : (it as { image: string }).image
+      const label = typeof it === 'object' && it && 'label' in it ? (it as { label?: string }).label : undefined
+      const next: { image: string; label?: string; link?: string } = { image }
+      if (label != null) next.label = label
+      if (link) next.link = link
+      return next
+    })
+    patchSlide({ items })
+  }
 }
 async function pasteFieldImage(t: ImageField) {
   const file = await readClipboardImage()

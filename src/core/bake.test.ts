@@ -89,6 +89,21 @@ describe('bakeToElements geometry contract', () => {
     expect(out).not.toBe(slide.elements) // a copy, not the same array
   })
 
+  it('carries a layout image link onto the baked box (so export links work)', () => {
+    const els = bakeToElements({ layout: 'image-full', image: 'a.png', imageLink: 'https://x.io' })
+    const img = boxes(els).find((b) => b.src === 'a.png')!
+    expect(img.link).toBe('https://x.io')
+  })
+
+  it('carries a gallery cell link onto its baked box', () => {
+    const els = bakeToElements({
+      layout: 'gallery',
+      items: [{ image: 'g.png', link: 'https://y.io' }],
+    })
+    const img = boxes(els).find((b) => b.src === 'g.png')!
+    expect(img.link).toBe('https://y.io')
+  })
+
   it('produces finite geometry for every layout, even with empty fields', () => {
     const layouts: Slide['layout'][] = [
       'cover', 'section', 'statement', 'speaker', 'text', 'text-image',

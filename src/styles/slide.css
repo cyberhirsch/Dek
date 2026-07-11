@@ -365,6 +365,7 @@
 .frame-img {
   /* Sized by aspect ratio (set per variant below), centred in its column and
      capped so a portrait frame never overflows the stage. */
+  position: relative;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;
@@ -375,6 +376,15 @@
   border: 1px solid var(--dek-line);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
   background: rgba(255, 255, 255, 0.03);
+}
+/* A transparent anchor laid over a layout image, so the picture is clickable in
+   present/export (never while editing — the anchor isn't rendered then, so a
+   click still selects/pans). Sits below any overlaid caption/label, which live
+   outside the image frame, so those stay clickable too. */
+.img-link {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
 }
 /* For the narrower ratios the frame doesn't fill its column, so pin it to the
    column's left edge (margin-right auto) — that keeps the image's top-left corner

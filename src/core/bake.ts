@@ -207,13 +207,13 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       const colH = STAGE_H - PAD_Y - y
       const textX = left ? PAD_X + colW + GAP : PAD_X
       const imgX = left ? PAD_X : PAD_X + textW + GAP // image pinned to its column's left
-      if (slide.image) els.push(image(slide.image, imgX, y, imgW, Math.min(imgH, colH), { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1 }))
+      if (slide.image) els.push(image(slide.image, imgX, y, imgW, Math.min(imgH, colH), { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: slide.imageLink }))
       els.push(text(content, textX, y, textW, colH, listStyle(bodySize)))
       break
     }
     case 'image-full': {
       // full-bleed image; overlay text bottom-anchored inside the pad
-      if (slide.image) els.push(image(slide.image, 0, 0, STAGE_W, STAGE_H, { focus: slide.focus }))
+      if (slide.image) els.push(image(slide.image, 0, 0, STAGE_W, STAGE_H, { focus: slide.focus, link: slide.imageLink }))
       const capH = slide.caption ? 22 * BODY_LH : 0
       let bottom = STAGE_H - PAD_Y
       if (slide.caption) {
@@ -225,7 +225,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
     }
     case 'image-caption': {
       // .l-image-caption: frame inset 60px, caption chip 80px into a corner
-      if (slide.image) els.push(image(slide.image, 60, 60, STAGE_W - 120, STAGE_H - 120, { fit: 'contain', focus: slide.focus, radius: 12 }))
+      if (slide.image) els.push(image(slide.image, 60, 60, STAGE_W - 120, STAGE_H - 120, { fit: 'contain', focus: slide.focus, radius: 12, link: slide.imageLink }))
       if (slide.caption) {
         const pos = slide.captionPos ?? 'bottom-right'
         const capH = 18 * BODY_LH
@@ -238,7 +238,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
     case 'gallery': {
       // .l-gallery: h1 +28, grid gap 24, cover-fit frames, 28px serif labels
       const items = (slide.items ?? []).filter(
-        (it): it is { image: string; label?: string } => !!it && typeof it === 'object' && 'image' in it,
+        (it): it is { image: string; label?: string; link?: string } => !!it && typeof it === 'object' && 'image' in it,
       )
       let y = PAD_Y
       if (title) {
@@ -256,7 +256,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       items.forEach((it, i) => {
         const cx = PAD_X + (i % cols) * (cellW + GAP)
         const cy = y + Math.floor(i / cols) * (cellH + GAP)
-        if (it.image) els.push(image(it.image, cx, cy, cellW, cellH - labelH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1 }))
+        if (it.image) els.push(image(it.image, cx, cy, cellW, cellH - labelH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link }))
         if (it.label) els.push(text(it.label, cx, cy + cellH - labelH + 10, cellW, 28 * 1.2, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
       })
       break

@@ -21,6 +21,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Layout images are linkable, not just freeform boxes** (#42)
+Making a picture clickable used to be a freeform-only trick (a box's `link` field). Now the **single image** in Text + Image / Image – Full / Image + Caption carries an `imageLink`, and **gallery cells** carry a per-cell `link` — set either from the right-click menu's **Add Link (from Clipboard)** (with **Remove Link** when one's present). In present and exported modes the picture becomes a real `<a>` overlay (an anchor laid over the frame, below any caption/label so those stay clickable, and absent while editing so clicks still select/pan). `imageLink` travels across layout switches like `focus`/`imageFit`, and because bake maps it onto the image's box element, the link survives into both the standalone-HTML and `.pptx` exports. Only `http(s)`/`mailto` are followed. (Speaker portraits stay unlinkable — they're a plain string array with nowhere to store a link.)
+
 **Right-click an image on the canvas for Copy / Paste / Add Link / Download** (#42)
 Right-clicking a freeform box that carries a picture now offers **Copy Image** (to the system clipboard), **Paste Image** (a clipboard image replaces the box's picture, through the same compress-and-store upload path as Replace), **Add Link (from Clipboard)** (an `http(s)`/`mailto` URL on the clipboard makes the box clickable — the paste-driven twin of dragging a link onto an image), and **Download Image**, alongside the existing Fit/Replace/Remove entries.
 

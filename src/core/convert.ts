@@ -54,6 +54,7 @@ const SLOT_CANDIDATES: Record<Slot, string[]> = {
 const MOD_SUPPORT: Record<string, LayoutId[]> = {
   focus: ['text-image', 'image-full', 'image-caption'],
   imageFit: ['text-image', 'image-full', 'image-caption'],
+  imageLink: ['text-image', 'image-full', 'image-caption'],
   side: ['text-image'],
   captionPos: ['image-caption'],
   columns: ['gallery'],

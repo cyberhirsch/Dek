@@ -4,6 +4,7 @@ import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../cor
 import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
+import { safeLink } from '../render/qr'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
 import FittedText from './FittedText.vue'
@@ -212,6 +213,7 @@ watch(
         <div class="img-col">
           <div class="frame-img" @contextmenu="onImageCtx">
             <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+            <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
           </div>
         </div>
       </div>
@@ -221,6 +223,7 @@ watch(
     <div v-else-if="slide.layout === 'image-full'" class="dek-pad l-image-full">
       <div class="bg" @contextmenu="onImageCtx">
         <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
       </div>
       <div v-if="slide.title || slide.caption || editable" class="overlay">
         <FittedText v-if="editable || slide.title" class="fit-image-title" content-class="image-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Overlay title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
@@ -232,6 +235,7 @@ watch(
     <div v-else-if="slide.layout === 'image-caption'" class="dek-pad l-image-caption">
       <div class="frame" @contextmenu="onImageCtx">
         <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'contain'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
       </div>
       <FittedText v-if="editable || slide.caption" class="fit-photo-caption cap" :class="slide.captionPos ?? 'bottom-right'" content-class="photo-caption" :model-value="slide.caption" :editable="editable" placeholder="Caption / credit" :base-size="18" :min-size="10" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
     </div>
@@ -279,6 +283,7 @@ watch(
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
             <div class="frame" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
               <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
+              <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
             </div>
             <FittedText v-if="editable || it.label" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />

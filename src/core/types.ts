@@ -45,6 +45,8 @@ export interface Focus {
 export interface GalleryItem {
   image: string
   label?: string
+  /** Makes the cell clickable in present/export (http(s)/mailto only). */
+  link?: string
 }
 
 export interface TextItem {
@@ -201,6 +203,9 @@ export interface Slide {
    *  default for text-image / image-full), `contain` shows the whole image
    *  letterboxed (the default for image-caption). */
   imageFit?: 'cover' | 'contain'
+  /** Makes the layout image (`image` field) clickable in present/export — the
+   *  layout counterpart of a freeform box's `link`. `http(s)`/`mailto` only. */
+  imageLink?: string
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus
