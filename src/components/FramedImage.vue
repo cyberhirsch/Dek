@@ -72,6 +72,13 @@ function onDrop(e: DragEvent) {
   const file = e.dataTransfer?.files?.[0]
   if (file && file.type.startsWith('image/')) emit('file', file)
 }
+// `dragleave` also fires when the pointer crosses onto a child (the drop overlay,
+// the replace button) — clearing `over` there made the "drop to replace" hint
+// flicker. Only clear when the pointer actually leaves the frame.
+function onDragLeave(e: DragEvent) {
+  const to = e.relatedTarget as Node | null
+  if (!to || !(e.currentTarget as HTMLElement).contains(to)) over.value = false
+}
 
 // ── click to browse ──
 const fileEl = ref<HTMLInputElement | null>(null)
@@ -92,7 +99,7 @@ function onPick(e: Event) {
     @mousedown="onMouseDown"
     @wheel="onWheel"
     @dragover.prevent="editable && (over = true)"
-    @dragleave.prevent="over = false"
+    @dragleave.prevent="onDragLeave($event)"
     @drop.prevent="editable && onDrop($event)"
   >
     <img v-if="src" :src="src" :style="style" alt="" draggable="false" />

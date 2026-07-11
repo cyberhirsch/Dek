@@ -39,7 +39,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery'; imageIndex?: number }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -72,12 +72,22 @@ function patch(p: Partial<Slide>) {
 }
 // Right-clicking a layout image opens Dek's own image menu (Copy/Paste/Fit/…)
 // instead of the browser's native one — the same actions the freeform canvas
-// offers, wired to this slide's `image` field. Only in edit mode, and only when
-// an image is present.
-function onImageCtx(e: MouseEvent) {
-  if (!props.editable || !props.slide.image) return
+// offers, wired to the slide's image field. Only in edit mode, and only when an
+// image is present. `target` names the multi-image slots (portraits / gallery);
+// omit it for the single `image` field.
+function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; index: number }) {
+  if (!props.editable) return
+  const src = !target
+    ? props.slide.image
+    : target.field === 'portraits'
+      ? props.slide.portraits?.[target.index]
+      : galleryItems.value[target.index]?.image
+  if (!src) return
   e.preventDefault()
-  emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image' })
+  emit('ctxmenu', {
+    x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1,
+    kind: 'image', imageField: target?.field ?? 'image', imageIndex: target?.index,
+  })
 }
 function patchConfig(p: Partial<DeckConfig>) {
   emit('config-patch', p)
@@ -161,7 +171,7 @@ watch(
     <!-- speaker -->
     <div v-else-if="slide.layout === 'speaker'" class="dek-pad l-speaker">
       <div class="portraits">
-        <div v-for="(p, i) in slide.portraits ?? []" :key="i" class="frame">
+        <div v-for="(p, i) in slide.portraits ?? []" :key="i" class="frame" @contextmenu="onImageCtx($event, { field: 'portraits', index: i })">
           <FramedImage :src="p" :editable="editable" @file="emit('upload', { field: 'portraits', file: $event, index: i })" />
         </div>
         <div v-if="editable && (slide.portraits ?? []).length < 3" class="frame add-frame" @click="patch({ portraits: [...(slide.portraits ?? []), ''] })">+</div>
@@ -267,7 +277,7 @@ watch(
       <div class="gallery-wrap">
         <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
-            <div class="frame">
+            <div class="frame" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
               <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
             </div>

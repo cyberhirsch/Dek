@@ -851,15 +851,17 @@ function closeCtx() {
 }
 // A hidden input drives "Replace Image…" from the menu (the in-frame button has
 // its own input down in CanvasElements; the menu can't reach that one). The
-// target is either a freeform box element or the current slide's image field.
+// target is either a freeform box element or one of the slide's image fields
+// (the single `image`, or a `portraits` / `gallery` slot by index).
+type ImageField = { field: 'image' | 'portraits' | 'gallery'; index?: number }
 const ctxImgInput = ref<HTMLInputElement | null>(null)
-const ctxImgTarget = ref<{ kind: 'element'; index: number } | { kind: 'field' } | null>(null)
+const ctxImgTarget = ref<{ kind: 'element'; index: number } | ({ kind: 'field' } & ImageField) | null>(null)
 function replaceImageAt(index: number) {
   ctxImgTarget.value = { kind: 'element', index }
   ctxImgInput.value?.click()
 }
-function replaceFieldImage() {
-  ctxImgTarget.value = { kind: 'field' }
+function replaceFieldImage(t: ImageField) {
+  ctxImgTarget.value = { kind: 'field', ...t }
   ctxImgInput.value?.click()
 }
 function onCtxImgPick(e: Event) {
@@ -870,7 +872,7 @@ function onCtxImgPick(e: Event) {
   ctxImgTarget.value = null
   if (!f || !f.type.startsWith('image/') || !target) return
   if (target.kind === 'element') onElementImage(target.index, f)
-  else void onUpload({ field: 'image', file: f })
+  else void onUpload({ field: target.field, file: f, index: target.index })
 }
 
 function canvasItems(sx: number, sy: number): CtxEntry[] {
@@ -923,29 +925,65 @@ function multiItems(): CtxEntry[] {
     { label: 'Send Backward', hint: 'Ctrl+[', action: () => reorderSelectedElements(-1) },
   ]
 }
-/** Right-click menu for a layout image (the `image` field of a semantic layout
- *  like Text + Image), mirroring the freeform-box image menu but operating on the
- *  slide's own image/focus/imageFit fields. `link` doesn't apply — semantic images
- *  have no per-image link — so it's omitted. */
-function layoutImageItems(): CtxEntry[] {
-  const s = deck.value?.slides[current.value]
-  const src = s?.image
-  if (!src) return []
-  const fit = s.imageFit ?? (s.layout === 'image-caption' ? 'contain' : 'cover')
-  return [
-    { label: 'Copy Image', action: () => void copyImageSrc(src) },
-    { label: 'Paste Image', action: () => pasteFieldImage() },
-    { label: 'Download Image', action: () => void downloadImageSrc(src) },
-    { divider: true },
-    { label: 'Fit: Cover', check: fit === 'cover', action: () => patchSlide({ imageFit: 'cover' }) },
-    { label: 'Fit: Contain', check: fit === 'contain', action: () => patchSlide({ imageFit: 'contain' }) },
-    { label: 'Replace Image…', action: () => replaceFieldImage() },
-    { label: 'Remove Image', action: () => patchSlide({ image: undefined, focus: undefined, imageFit: undefined }) },
-  ]
+/** The resolved (hydrated) src for an image field / slot on the current slide. */
+function fieldImageSrc(s: Slide, t: ImageField): string | undefined {
+  if (t.field === 'image') return s.image
+  if (t.field === 'portraits') return s.portraits?.[t.index ?? -1]
+  const it = s.items?.[t.index ?? -1]
+  if (typeof it === 'string') return it
+  if (it && typeof it === 'object' && 'image' in it) return (it as { image?: string }).image
+  return undefined
 }
-async function pasteFieldImage() {
+/** Right-click menu for a layout image, mirroring the freeform-box image menu but
+ *  operating on the slide's own image fields — the single `image` (with a Fit
+ *  toggle) or a `portraits` / `gallery` slot. `link` doesn't apply — layout images
+ *  have no per-image link — so it's omitted. */
+function layoutImageItems(t: ImageField): CtxEntry[] {
+  const s = deck.value?.slides[current.value]
+  if (!s) return []
+  const src = fieldImageSrc(s, t)
+  if (!src) return []
+  const items: CtxEntry[] = [
+    { label: 'Copy Image', action: () => void copyImageSrc(src) },
+    { label: 'Paste Image', action: () => pasteFieldImage(t) },
+    { label: 'Download Image', action: () => void downloadImageSrc(src) },
+  ]
+  // Fit only makes sense for the single framed image; portraits/gallery are grids.
+  if (t.field === 'image') {
+    const fit = s.imageFit ?? (s.layout === 'image-caption' ? 'contain' : 'cover')
+    items.push(
+      { divider: true },
+      { label: 'Fit: Cover', check: fit === 'cover', action: () => patchSlide({ imageFit: 'cover' }) },
+      { label: 'Fit: Contain', check: fit === 'contain', action: () => patchSlide({ imageFit: 'contain' }) },
+    )
+  }
+  items.push(
+    { divider: true },
+    { label: 'Replace Image…', action: () => replaceFieldImage(t) },
+    { label: 'Remove Image', action: () => removeFieldImage(t) },
+  )
+  return items
+}
+async function pasteFieldImage(t: ImageField) {
   const file = await readClipboardImage()
-  if (file) await onUpload({ field: 'image', file })
+  if (file) await onUpload({ field: t.field, file, index: t.index })
+}
+/** Clear an image field / slot. The single image resets its focus/fit too; a
+ *  portrait or gallery slot is removed from its array (matching the in-frame ✕). */
+function removeFieldImage(t: ImageField) {
+  const s = deck.value?.slides[current.value]
+  if (!s) return
+  if (t.field === 'image') {
+    patchSlide({ image: undefined, focus: undefined, imageFit: undefined })
+  } else if (t.field === 'portraits') {
+    const portraits = [...(s.portraits ?? [])]
+    portraits.splice(t.index ?? -1, 1)
+    patchSlide({ portraits })
+  } else {
+    const items = [...(s.items ?? [])]
+    items.splice(t.index ?? -1, 1)
+    patchSlide({ items })
+  }
 }
 function thumbItems(index: number): CtxEntry[] {
   const last = (deck.value?.slides.length ?? 1) - 1
@@ -976,10 +1014,10 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery'; imageIndex?: number }) {
   if (!editMode.value) return
   if (p.kind === 'image') {
-    const items = layoutImageItems()
+    const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex })
     if (items.length) ctxMenu.value = { x: p.x, y: p.y, items }
     return
   }
