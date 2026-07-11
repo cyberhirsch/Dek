@@ -197,6 +197,10 @@ export interface Slide {
   side?: 'left' | 'right'
   /** text-image: aspect ratio of the image frame. */
   imageRatio?: '16:9' | '1:1' | '9:16'
+  /** How the image sits in its frame: `cover` fills and crops overflow (the
+   *  default for text-image / image-full), `contain` shows the whole image
+   *  letterboxed (the default for image-caption). */
+  imageFit?: 'cover' | 'contain'
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus

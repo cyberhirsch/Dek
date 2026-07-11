@@ -59,6 +59,13 @@ function onImgPick(e: Event) {
 
 const slide = computed(() => props.deck.slides[props.index])
 
+// The image layouts that carry a single framed image and support a fill/fit
+// toggle. image-caption defaults to `contain` (show the whole photo); the others
+// default to `cover` (fill the frame), matching SlideView's per-layout defaults.
+const IMAGE_FIT_LAYOUTS: LayoutId[] = ['text-image', 'image-full', 'image-caption']
+const showImageFit = computed(() => !!slide.value && IMAGE_FIT_LAYOUTS.includes(slide.value.layout))
+const imageFit = computed(() => slide.value?.imageFit ?? (slide.value?.layout === 'image-caption' ? 'contain' : 'cover'))
+
 const LAYOUT_LABELS: Record<LayoutId, string> = {
   cover: 'Cover',
   section: 'Section',
@@ -323,6 +330,15 @@ const themeSwatches = computed(() => {
           <button v-for="r in (['16:9', '1:1', '9:16'] as const)" :key="r"
             :class="{ on: (slide.imageRatio ?? '16:9') === r }"
             @click="emit('patch', { imageRatio: r })">{{ r }}</button>
+        </div>
+      </template>
+
+      <!-- fill vs fit: shared by every single-image layout -->
+      <template v-if="showImageFit">
+        <span v-if="slide?.layout !== 'text-image'" class="div" />
+        <div class="seg">
+          <button title="Fill the frame, cropping overflow" :class="{ on: imageFit === 'cover' }" @click="emit('patch', { imageFit: 'cover' })">fill</button>
+          <button title="Show the whole image inside the frame" :class="{ on: imageFit === 'contain' }" @click="emit('patch', { imageFit: 'contain' })">fit</button>
         </div>
       </template>
 

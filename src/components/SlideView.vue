@@ -192,7 +192,7 @@ watch(
         </div>
         <div class="img-col">
           <div class="frame-img">
-            <FramedImage :src="slide.image" :focus="slide.focus" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+            <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
           </div>
         </div>
       </div>
@@ -201,7 +201,7 @@ watch(
     <!-- image-full -->
     <div v-else-if="slide.layout === 'image-full'" class="dek-pad l-image-full">
       <div class="bg">
-        <FramedImage :src="slide.image" :focus="slide.focus" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
       <div v-if="slide.title || slide.caption || editable" class="overlay">
         <FittedText v-if="editable || slide.title" class="fit-image-title" content-class="image-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Overlay title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
@@ -212,7 +212,7 @@ watch(
     <!-- image-caption -->
     <div v-else-if="slide.layout === 'image-caption'" class="dek-pad l-image-caption">
       <div class="frame">
-        <FramedImage :src="slide.image" :focus="slide.focus" fit="contain" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'contain'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
       </div>
       <FittedText v-if="editable || slide.caption" class="fit-photo-caption cap" :class="slide.captionPos ?? 'bottom-right'" content-class="photo-caption" :model-value="slide.caption" :editable="editable" placeholder="Caption / credit" :base-size="18" :min-size="10" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
     </div>

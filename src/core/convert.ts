@@ -53,6 +53,7 @@ const SLOT_CANDIDATES: Record<Slot, string[]> = {
 // Modifier fields travel with their parent media slot; parked if the target can't use them.
 const MOD_SUPPORT: Record<string, LayoutId[]> = {
   focus: ['text-image', 'image-full', 'image-caption'],
+  imageFit: ['text-image', 'image-full', 'image-caption'],
   side: ['text-image'],
   captionPos: ['image-caption'],
   columns: ['gallery'],
