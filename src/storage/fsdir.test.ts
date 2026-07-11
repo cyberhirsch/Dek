@@ -151,4 +151,13 @@ describe('workspace', () => {
     expect(reopened.slides[0].title).toBe('Hi')
     expect(reopened.config.deck).toBe('Round Trip')
   })
+
+  it("names an opened bundle from its folder, not the inner deck.md's deck: field", async () => {
+    const ws = new MockDirHandle('decks')
+    const { backend, file } = await createWorkspaceDeck(ws, 'My Talk', deck)
+    // Simulate a deck.md whose stored name drifted from the folder name.
+    await backend.saveAs('Stale Inner Name', deck)
+    const { deck: reopened } = await openWorkspaceDeck(ws, file)
+    expect(reopened.config.deck).toBe('My Talk')
+  })
 })

@@ -84,11 +84,11 @@ function setTheme(id: ThemeId) {
             📂 Open deck…
           </button>
           <button @click="newDeck">＋ New deck…</button>
-          <button @click="pickImport">⬇ Import (PowerPoint / PDF)…</button>
+          <button @click="pickImport">↓ Import (PowerPoint / PDF)…</button>
           <button v-if="dir" title="Save this deck under a new name in your decks folder" @click="saveAs">
-            ⤓ Save As…
+            💾 Save As…
           </button>
-          <button @click="exportDeck">⇪ Export (PDF / HTML / PPTX)…</button>
+          <button @click="exportDeck">↑ Export (PDF / HTML / PPTX)…</button>
         </div>
         <div class="dm-grp">
           <div class="dm-lbl">Theme</div>

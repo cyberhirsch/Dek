@@ -81,11 +81,15 @@ export async function listWorkspaceDecks(dir: DirHandle): Promise<DeckEntry[]> {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** Open a bundle in the workspace by its folder name. */
+/** Open a bundle in the workspace by its folder name. The deck's display name is
+ *  taken from the `.dek` folder, not from whatever `deck:` the inner `deck.md`
+ *  happens to carry — the folder is the source of truth for a bundle's name. */
 export async function openWorkspaceDeck(dir: DirHandle, file: string): Promise<{ backend: StorageBackend; deck: Deck; bundle: DirHandle }> {
   const bundle = await dir.getDirectoryHandle(file)
   const backend = fsDirBackend(bundle, BUNDLE_MD)
-  return { backend, deck: await backend.loadDeck(BUNDLE_MD), bundle }
+  const loaded = await backend.loadDeck(BUNDLE_MD)
+  const deck: Deck = { ...loaded, config: { ...loaded.config, deck: bundleDeckName(file) } }
+  return { backend, deck, bundle }
 }
 
 /** Write a deck into a bundle folder: `deck.md` plus an `Assets/` folder holding
@@ -513,6 +517,9 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     id: 'fsdir',
     label: `folder · ${dir.name}`,
     async listDecks() {
+      // A bundle (`My Talk.dek/`) is one deck; its name is the folder, not the
+      // inner `deck.md`. Listing the `.md` here would show "deck".
+      if (/\.dek$/i.test(dir.name)) return [{ file: BUNDLE_MD, name: bundleDeckName(dir.name) }]
       const out: { file: string; name: string }[] = []
       for await (const h of dir.values()) {
         if (!isDir(h) && h.name.endsWith('.md')) out.push({ file: h.name, name: h.name.replace(/\.md$/, '') })

@@ -45,7 +45,7 @@ import {
   saveAsFolder,
   supportsDir,
 } from './storage/fsdir'
-import { BUNDLE_MD, collectAssetRefs, localAssetRefs, mapSlideAssetRefs } from './storage/assets'
+import { BUNDLE_MD, bundleDeckName, collectAssetRefs, localAssetRefs, mapSlideAssetRefs } from './storage/assets'
 import { fileToOptimizedDataUrl } from './core/image'
 
 export { supportsFS, supportsDir, DeckConflictError }
@@ -269,7 +269,11 @@ export async function openLocalFile(): Promise<Deck> {
 async function attachFolder(dir: import('./storage/fsdir').DirHandle, md?: string): Promise<Deck> {
   const backend = fsDirBackend(dir, md ?? 'deck.md')
   override = backend
-  const deck = await backend.loadDeck(md)
+  const loaded = await backend.loadDeck(md)
+  // A bundle's name is its `.dek` folder, not the inner deck.md's `deck:` field.
+  const deck: Deck = /\.dek$/i.test(dir.name)
+    ? { ...loaded, config: { ...loaded.config, deck: bundleDeckName(dir.name) } }
+    : loaded
   setCurrent(md ?? dir.name)
   await rememberActiveFolder(dir, md)
   return deck
