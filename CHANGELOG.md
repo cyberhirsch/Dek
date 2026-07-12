@@ -21,6 +21,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Validator no longer false-flags `imageFit` / `imageLink`** (#42)
+Adding `imageFit` (Fill/Fit) or `imageLink` to a Text + Image / Image – Full / Image + Caption slide raised a spurious yellow warning badge — *Field "imageFit" isn't rendered by the … layout* — because the deck analyzer's per-layout allow-list hadn't been updated alongside the renderer, bake, and convert. Both fields are now recognised on the three single-image layouts, so setting Fit or a link on a layout image leaves the slide clean.
+
 **Layout images are linkable, not just freeform boxes** (#42)
 Making a picture clickable used to be a freeform-only trick (a box's `link` field). Now the **single image** in Text + Image / Image – Full / Image + Caption carries an `imageLink`, and **gallery cells** carry a per-cell `link` — set either from the right-click menu's **Add Link (from Clipboard)** (with **Remove Link** when one's present). In present and exported modes the picture becomes a real `<a>` overlay (an anchor laid over the frame, below any caption/label so those stay clickable, and absent while editing so clicks still select/pan). `imageLink` travels across layout switches like `focus`/`imageFit`, and because bake maps it onto the image's box element, the link survives into both the standalone-HTML and `.pptx` exports. Only `http(s)`/`mailto` are followed. (Speaker portraits stay unlinkable — they're a plain string array with nowhere to store a link.)
 

@@ -128,6 +128,21 @@ describe('analyzeDeck', () => {
     )
   })
 
+  it('does not flag imageFit/imageLink on single-image layouts', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        { layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', imageFit: 'contain', imageLink: 'https://x.io' },
+        { layout: 'image-full', image: '/i.jpg', imageFit: 'cover', imageLink: 'https://x.io' },
+        { layout: 'image-caption', image: '/i.jpg', caption: 'c', imageFit: 'contain', imageLink: 'https://x.io' },
+      ],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues.some((i) => i.field === 'imageFit' || i.field === 'imageLink')).toBe(false)
+  })
+
   it('does not flag universal fields (notes, group, stash, elements)', () => {
     const deck: Deck = {
       config: {},
