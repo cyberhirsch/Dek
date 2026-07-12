@@ -110,7 +110,11 @@
 }
 
 /* ── Layout: cover ─────────────────────────────────────────────── */
-.l-cover {
+/* Layout-container rules are scoped to `.dek-pad` (not a bare `.l-x`): the slide
+   root `.dek-slide` carries the same `l-x` class, so a bare selector would also
+   pad/align the stage itself — shifting the absolutely-positioned running
+   header/footer/page-number from layout to layout. */
+.dek-pad.l-cover {
   justify-content: center;
 }
 .l-cover .fit-cover-title {
@@ -157,7 +161,7 @@
 }
 
 /* ── Layout: section ───────────────────────────────────────────── */
-.l-section {
+.dek-pad.l-section {
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -176,7 +180,7 @@
 }
 
 /* ── Layout: statement ─────────────────────────────────────────── */
-.l-statement {
+.dek-pad.l-statement {
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -212,7 +216,7 @@
 }
 
 /* ── Layout: speaker ───────────────────────────────────────────── */
-.l-speaker {
+.dek-pad.l-speaker {
   flex-direction: column;
   justify-content: center;
 }
@@ -455,7 +459,7 @@
 }
 
 /* ── Layout: image-full ────────────────────────────────────────── */
-.l-image-full {
+.dek-pad.l-image-full {
   padding: 0;
 }
 .l-image-full .bg {
@@ -498,7 +502,7 @@
 }
 
 /* ── Layout: image-caption ─────────────────────────────────────── */
-.l-image-caption {
+.dek-pad.l-image-caption {
   padding: 60px;
 }
 .l-image-caption .frame {
@@ -528,7 +532,7 @@
 .cap.top-left { top: 80px; left: 80px; }
 
 /* ── Layout: video-embed ───────────────────────────────────────── */
-.l-video-embed {
+.dek-pad.l-video-embed {
   padding: 60px;
   justify-content: center;
 }
@@ -748,7 +752,7 @@
 }
 
 /* ── Layout: diagram (Mermaid) ─────────────────────────────────── */
-.l-diagram {
+.dek-pad.l-diagram {
   padding: 50px 70px;
 }
 .l-diagram .fit-diagram-title {
