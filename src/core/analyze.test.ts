@@ -98,6 +98,39 @@ describe('analyzeDeck', () => {
     expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
   })
 
+  it('does not orphan freeform canvas images (box/image element src)', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'freeform',
+          elements: [
+            { type: 'box', x: 0, y: 0, w: 10, h: 10, rotation: 0, src: 'Assets/canvas.png' },
+            { type: 'image', x: 0, y: 0, w: 10, h: 10, rotation: 0, src: '/Deck Assets/photo.jpg' },
+          ],
+        },
+      ],
+    } as never
+
+    const a = analyzeDeck(deck, ['canvas.png', 'photo.jpg'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+  })
+
+  it('does NOT mass-flag a full folder when the deck references no local files', () => {
+    // A deck with no local file refs + a full folder is the signature of an
+    // unloaded/wrong deck. Flagging everything orphan is how a whole folder gets
+    // one-click deleted — so we report nothing rather than risk it.
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'cover', title: 'Just text, no images' }],
+    }
+
+    const a = analyzeDeck(deck, ['a.jpg', 'b.png', 'c.webp'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+  })
+
   it('reports no orphans when the disk listing is omitted', () => {
     const deck: Deck = {
       config: {},

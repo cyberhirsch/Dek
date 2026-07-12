@@ -32,14 +32,19 @@ function jump(slide: number) {
 }
 function deleteOne(a: AssetRef) {
   if (!a.filename) return
-  if (window.confirm(`Delete "${a.filename}" from the assets folder? This cannot be undone.`)) {
+  if (window.confirm(`Move "${a.filename}" to the assets "_trash" folder? You can restore it from there if it's still needed.`)) {
     emit('delete-asset', a.filename)
   }
 }
 function deleteAllOrphans() {
   const list = orphans.value
   if (!list.length) return
-  if (window.confirm(`Delete all ${list.length} unused asset(s) from the folder? This cannot be undone.`)) {
+  if (
+    window.confirm(
+      `Move ${list.length} unused asset(s) to the assets "_trash" folder?\n\n` +
+        `Only files no slide references are listed. They stay recoverable in "_trash".`,
+    )
+  ) {
     for (const a of list) if (a.filename) emit('delete-asset', a.filename)
   }
 }

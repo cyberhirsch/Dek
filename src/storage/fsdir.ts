@@ -575,6 +575,29 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async deleteAsset(filename) {
       const ad = await assetsHandle()
+      // Soft delete. The File System Access API's removeEntry is permanent — it
+      // bypasses the OS Recycle Bin — so a wrongly-flagged "orphan" would be gone
+      // for good. Instead move the file into a `_trash` subfolder of the assets
+      // dir: it's a directory, so listAssets (which skips dirs) won't surface it
+      // as an orphan again, and the user can recover it straight from the bundle.
+      let src: FileHandle
+      try {
+        src = await ad.getFileHandle(filename)
+      } catch {
+        return // already gone — nothing to do
+      }
+      const trash = await ad.getDirectoryHandle('_trash', { create: true })
+      let name = filename
+      try {
+        await trash.getFileHandle(name) // collision with an earlier trashed copy?
+        name = `${Date.now()}_${filename}`
+      } catch {
+        /* no existing copy — keep the original name for easy restore */
+      }
+      const dest = await trash.getFileHandle(name, { create: true })
+      const ws = await dest.createWritable()
+      await ws.write(await src.getFile())
+      await ws.close()
       await ad.removeEntry(filename)
     },
   }

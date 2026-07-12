@@ -6,6 +6,12 @@
 
 ### Opening & saving
 
+**Deleting an "unused" asset is now recoverable (no more permanent loss)** (#42)
+The Review panel's asset cleanup used the File System Access API's `removeEntry`, which deletes **permanently** — it bypasses the OS Recycle Bin — so a wrongly-flagged image was gone for good. Deleting now **moves the file into an `Assets/_trash/` subfolder** instead of unlinking it: it disappears from the deck and from the orphan list (a directory, so it isn't re-scanned), but stays intact and recoverable straight from the bundle. Collisions keep the original name for the first copy and timestamp-prefix any later one. The confirmation dialogs were reworded to match (files are moved to `_trash`, not irreversibly destroyed).
+
+**Orphan detection no longer false-flags real images** (#42)
+Two ways the "unused asset" scan wrongly condemned images that were actually in use: (1) it never looked at **freeform-canvas element images** (`elements[].src` on box/image elements, and video `poster`/`video`), so every canvas or baked image looked unreferenced; (2) when a deck referenced **no local files at all** yet the folder was full — the signature of a deck that isn't loaded, failed to parse, or is the wrong one — it flagged the *entire* folder as orphaned, which is exactly how a whole set of images could be one-click deleted. The scan now collects canvas element refs, and refuses to mass-flag when there are zero local references to match against (under-reporting orphans beats nuking a folder). Three new tests cover canvas refs, the empty-reference guard, and the trash-move.
+
 **A bundle is named by its folder, and clearer menu icons** (#42)
 A `.dek` bundle's name now always comes from the **folder** (`My Talk.dek` → "My Talk"), not from whatever `deck:` the inner `deck.md` happens to hold — so an opened deck no longer shows up as "deck" in the title and the Decks list when the inner file's name had drifted. Applied on every open path (the Open panel, startup restore, and reconnect). Also swapped the deck-menu icons: Import/Export are now a plain **↓ / ↑** download-up pair and Save As is a **💾**, instead of two arrows (Save As and Export) that pointed in confusingly opposite directions.
 

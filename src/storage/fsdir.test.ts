@@ -160,4 +160,23 @@ describe('workspace', () => {
     const { deck: reopened } = await openWorkspaceDeck(ws, file)
     expect(reopened.config.deck).toBe('My Talk')
   })
+
+  it('deleteAsset moves the file to Assets/_trash instead of permanently unlinking it', async () => {
+    const ws = new MockDirHandle('decks')
+    const { backend, bundle } = await createWorkspaceDeck(ws, 'My Talk', deck)
+    const assets = (await (bundle as MockDirHandle).getDirectoryHandle('Assets')) as MockDirHandle
+    const f = await assets.getFileHandle('photo.png', { create: true })
+    const w = await f.createWritable()
+    await w.write('the only copy')
+    await w.close()
+
+    await backend.deleteAsset!('photo.png')
+
+    // Gone from the live listing, so it won't be re-flagged as an orphan…
+    expect(await backend.listAssets!()).not.toContain('photo.png')
+    // …but preserved intact in _trash, recoverable.
+    const trash = (await assets.getDirectoryHandle('_trash')) as MockDirHandle
+    const recovered = await trash.getFileHandle('photo.png')
+    expect(await (await recovered.getFile()).text()).toBe('the only copy')
+  })
 })

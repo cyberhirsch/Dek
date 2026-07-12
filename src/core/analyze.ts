@@ -240,6 +240,17 @@ function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef
       addAsset(assets, item.image, n, `items[${i}].image`)
     }
   }
+  // Freeform canvas images live on `elements[]`, not the semantic image fields.
+  // Missing them here made every canvas/baked image look unreferenced — i.e. an
+  // "orphan" the Review panel would offer to delete. They ARE references.
+  for (const [i, el] of (slide.elements ?? []).entries()) {
+    const e = el as { type: string; src?: string; video?: string; poster?: string }
+    if (e.type === 'box' || e.type === 'image') addAsset(assets, e.src, n, `elements[${i}].src`)
+    else if (e.type === 'video') {
+      addAsset(assets, e.video, n, `elements[${i}].video`)
+      addAsset(assets, e.poster, n, `elements[${i}].poster`)
+    }
+  }
 }
 
 function assetIssues(assets: AssetRef[], issues: DeckIssue[]) {
@@ -285,7 +296,13 @@ export function analyzeDeck(deck: Deck, diskFiles?: string[]): DeckAnalysis {
   })
 
   const referenced = [...assetMap.values()]
-  const orphans = diskFiles ? orphanAssets(referenced, diskFiles) : []
+  // Safety guard against mass false-orphaning: if the deck references NO local
+  // files at all yet the folder is full, the deck almost certainly isn't the one
+  // that owns these files (not yet loaded, failed to parse, or a wrong/blank
+  // deck). Flagging every file as orphan there is how a whole folder of images
+  // gets one-click deleted. Under-report orphans rather than risk that.
+  const hasLocalRefs = referenced.some((a) => a.kind === 'local')
+  const orphans = diskFiles && hasLocalRefs ? orphanAssets(referenced, diskFiles) : []
   for (const o of orphans) {
     issue(issues, 0, 'info', 'asset', `Unused asset "${o.filename}" in the folder.`, o.filename)
   }
