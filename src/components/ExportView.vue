@@ -52,24 +52,43 @@ const EXPORT_PRES_JS = `
   var show=document.querySelector('.dek-show'); if(!show) return;
   var pages=[].slice.call(show.children).filter(function(n){return n.classList.contains('print-page');});
   var notes=window.__DEK_NOTES||[];
-  var cur=0, ovEl=null, ovOpen=false, presEl=null, presOpen=false, t0=null, tick=null;
+  var themeStyle=show.getAttribute('style')||'';
+  var cur=0, ovEl=null, ovOpen=false, presWin=null, presOverlay=null, presOpen=false, t0=null, tick=null;
   function clampi(i){ return Math.max(0,Math.min(pages.length-1,i)); }
   function fit(){ var s=Math.min(window.innerWidth/1280, window.innerHeight/720); pages.forEach(function(p){ p.style.transform='translate(-50%,-50%) scale('+s+')'; }); }
   function render(){ pages.forEach(function(p,i){ p.classList.toggle('active', i===cur); }); if(ovOpen) markOv(); if(presOpen) fillPres(); }
   function go(d){ cur=clampi(cur+d); render(); }
   function jump(i){ cur=clampi(i); render(); }
   function fs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} }
-  function scaledClone(i,w){ var wrap=document.createElement('div'); wrap.className='dek-clone'; wrap.style.width=w+'px'; wrap.style.height=(w*720/1280)+'px'; var c=pages[i].cloneNode(true); c.classList.add('active'); c.style.position='absolute'; c.style.top='0'; c.style.left='0'; c.style.margin='0'; c.style.boxShadow='none'; c.style.transform='scale('+(w/1280)+')'; c.style.transformOrigin='top left'; wrap.appendChild(c); return wrap; }
+  function scaledClone(i,w,doc){ doc=doc||document; var wrap=doc.createElement('div'); wrap.className='dek-clone'; wrap.style.width=w+'px'; wrap.style.height=(w*720/1280)+'px'; var c=doc.importNode(pages[i],true); c.classList.add('active'); c.style.position='absolute'; c.style.top='0'; c.style.left='0'; c.style.margin='0'; c.style.boxShadow='none'; c.style.transform='scale('+(w/1280)+')'; c.style.transformOrigin='top left'; wrap.appendChild(c); return wrap; }
   function buildOv(){ ovEl=document.createElement('div'); ovEl.className='dek-ov'; pages.forEach(function(p,i){ var cell=document.createElement('div'); cell.className='dek-ov-cell'; cell.appendChild(scaledClone(i,248)); var n=document.createElement('span'); n.className='dek-ov-num'; n.textContent=String(i+1); cell.appendChild(n); cell.addEventListener('click',function(){ jump(i); toggleOv(false); }); ovEl.appendChild(cell); }); document.body.appendChild(ovEl); }
   function markOv(){ if(!ovEl)return; [].forEach.call(ovEl.children,function(c,i){ c.classList.toggle('cur',i===cur); }); }
   function toggleOv(v){ ovOpen=(v==null?!ovOpen:v); if(ovOpen&&!ovEl)buildOv(); if(ovEl)ovEl.style.display=ovOpen?'grid':'none'; if(ovOpen)markOv(); }
-  function buildPres(){ presEl=document.createElement('div'); presEl.className='dek-pres'; presEl.innerHTML='<div class="dek-pres-head"><span>Presenter</span><span class="dek-pres-clock">00:00</span><span><button class="dek-pres-btn" data-act="reset">reset</button> <button class="dek-pres-btn" data-act="exit">exit (P)</button></span></div><div class="dek-pres-body"><div class="dek-pres-main"><div class="dek-lbl dek-cur-lbl"></div><div class="dek-pres-stage dek-cur"></div></div><div class="dek-pres-side"><div><div class="dek-lbl">Next</div><div class="dek-pres-stage dek-next"></div></div><div class="dek-pres-notes-wrap"><div class="dek-lbl">Speaker notes</div><div class="dek-pres-notes"></div></div></div></div>'; document.body.appendChild(presEl); presEl.addEventListener('click',function(e){ var a=e.target&&e.target.getAttribute&&e.target.getAttribute('data-act'); if(a==='exit')togglePres(false); if(a==='reset')t0=Date.now(); }); }
-  function fillPres(){ if(!presEl)return; var main=presEl.querySelector('.dek-cur'); main.innerHTML=''; main.appendChild(scaledClone(cur, main.clientWidth||640)); var nx=presEl.querySelector('.dek-next'); nx.innerHTML=''; if(cur+1<pages.length) nx.appendChild(scaledClone(cur+1, nx.clientWidth||300)); else nx.innerHTML='<div class="dek-end">- end -</div>'; presEl.querySelector('.dek-cur-lbl').textContent='Current  '+(cur+1)+' / '+pages.length; presEl.querySelector('.dek-pres-notes').textContent=notes[cur]||'No notes for this slide.'; }
-  function togglePres(v){ presOpen=(v==null?!presOpen:v); if(presOpen&&!presEl)buildPres(); if(presEl)presEl.style.display=presOpen?'flex':'none'; if(presOpen){ if(t0===null)t0=Date.now(); if(!tick)tick=setInterval(updClock,1000); fillPres(); updClock(); } else if(tick){ clearInterval(tick); tick=null; } }
-  function updClock(){ if(!presEl||t0===null)return; var s=Math.floor((Date.now()-t0)/1000), m=Math.floor(s/60); s=s%60; presEl.querySelector('.dek-pres-clock').textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
-  window.addEventListener('keydown',function(e){ var k=(e.key||'').toLowerCase(); if(e.key==='Escape'){ if(ovOpen){toggleOv(false);return;} if(presOpen){togglePres(false);return;} return; } if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'||e.key==='ArrowDown'){e.preventDefault();go(1);} else if(e.key==='ArrowLeft'||e.key==='PageUp'||e.key==='ArrowUp'){e.preventDefault();go(-1);} else if(e.key==='Home'){e.preventDefault();jump(0);} else if(e.key==='End'){e.preventDefault();jump(pages.length-1);} else if(k==='f'){e.preventDefault();fs();} else if(k==='o'){e.preventDefault();toggleOv();} else if(k==='p'||k==='s'){e.preventDefault();togglePres();} });
+  // Presenter view — pops out into a separate window (dual-screen), falling back
+  // to an in-page overlay only if the popup is blocked.
+  function presMarkup(){ return '<div class="dek-pres" style="display:flex">'
+    +'<div class="dek-pres-head"><span>Presenter</span><span class="dek-pres-clock">00:00</span>'
+    +'<span><button class="dek-pres-btn" data-act="prev">&lsaquo; prev</button> <button class="dek-pres-btn" data-act="next">next &rsaquo;</button> <button class="dek-pres-btn" data-act="reset">reset</button> <button class="dek-pres-btn" data-act="exit">exit (P)</button></span></div>'
+    +'<div class="dek-pres-body"><div class="dek-pres-main"><div class="dek-lbl dek-cur-lbl"></div><div class="dek-pres-stage dek-cur"></div></div>'
+    +'<div class="dek-pres-side"><div><div class="dek-lbl">Next</div><div class="dek-pres-stage dek-next"></div></div>'
+    +'<div class="dek-pres-notes-wrap"><div class="dek-lbl">Speaker notes</div><div class="dek-pres-notes"></div></div></div></div></div>'; }
+  function wireActs(rootEl){ rootEl.addEventListener('click',function(e){ var a=e.target&&e.target.getAttribute&&e.target.getAttribute('data-act'); if(a==='exit')togglePres(false); else if(a==='reset')t0=Date.now(); else if(a==='next')go(1); else if(a==='prev')go(-1); }); }
+  function copyStyles(d){ [].forEach.call(document.querySelectorAll('link[rel="stylesheet"],style'), function(n){ d.head.appendChild(n.cloneNode(true)); }); }
+  function openPresWin(){ presWin=window.open('','dek-presenter','width=1100,height=760'); if(!presWin) return false; var d=presWin.document; d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"><title>Presenter</title></head><body style="margin:0"></body></html>'); d.close(); copyStyles(d); d.body.setAttribute('style','margin:0;'+themeStyle); d.body.innerHTML=presMarkup(); d.addEventListener('keydown',onKey); wireActs(d); presWin.addEventListener('resize',function(){ if(presOpen)fillPres(); }); presWin.addEventListener('pagehide',function(){ if(presOpen)togglePres(false); }); return true; }
+  function buildOverlay(){ var tmp=document.createElement('div'); tmp.innerHTML=presMarkup(); presOverlay=tmp.firstChild; document.body.appendChild(presOverlay); wireActs(presOverlay); }
+  function presScope(){ if(presWin&&!presWin.closed) return presWin.document; return presOverlay; }
+  function fillPres(){ var scope=presScope(); if(!scope)return; var doc=(scope.nodeType===9)?scope:document; var main=scope.querySelector('.dek-cur'); if(!main)return; main.innerHTML=''; main.appendChild(scaledClone(cur, main.clientWidth||640, doc)); var nx=scope.querySelector('.dek-next'); nx.innerHTML=''; if(cur+1<pages.length) nx.appendChild(scaledClone(cur+1, nx.clientWidth||300, doc)); else nx.innerHTML='<div class="dek-end">- end -</div>'; scope.querySelector('.dek-cur-lbl').textContent='Current  '+(cur+1)+' / '+pages.length; scope.querySelector('.dek-pres-notes').textContent=notes[cur]||'No notes for this slide.'; }
+  function togglePres(v){ presOpen=(v==null?!presOpen:v);
+    if(presOpen){ var have=presWin&&!presWin.closed; if(!have&&!presOverlay){ if(openPresWin()){ presWin.focus(); } else { buildOverlay(); } } else if(have){ presWin.focus(); }
+      if(t0===null)t0=Date.now(); if(!tick)tick=setInterval(updClock,1000); fillPres(); updClock();
+    } else { if(presWin&&!presWin.closed)presWin.close(); presWin=null; if(presOverlay){ if(presOverlay.parentNode)presOverlay.parentNode.removeChild(presOverlay); presOverlay=null; } if(tick){ clearInterval(tick); tick=null; } }
+  }
+  function updClock(){ var scope=presScope(); if(!scope||t0===null)return; var el=scope.querySelector('.dek-pres-clock'); if(!el)return; var s=Math.floor((Date.now()-t0)/1000), m=Math.floor(s/60); s=s%60; el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
+  function onKey(e){ var k=(e.key||'').toLowerCase(); if(e.key==='Escape'){ if(ovOpen){toggleOv(false);return;} if(presOpen){togglePres(false);return;} return; } if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'||e.key==='ArrowDown'){e.preventDefault();go(1);} else if(e.key==='ArrowLeft'||e.key==='PageUp'||e.key==='ArrowUp'){e.preventDefault();go(-1);} else if(e.key==='Home'){e.preventDefault();jump(0);} else if(e.key==='End'){e.preventDefault();jump(pages.length-1);} else if(k==='f'){e.preventDefault();fs();} else if(k==='o'){e.preventDefault();toggleOv();} else if(k==='p'||k==='s'){e.preventDefault();togglePres();} }
+  window.addEventListener('keydown',onKey);
   window.addEventListener('resize',function(){ fit(); if(presOpen)fillPres(); });
   window.addEventListener('wheel',function(e){ if(ovOpen||presOpen)return; go(e.deltaY>0?1:-1); },{passive:true});
+  window.addEventListener('beforeunload',function(){ if(presWin&&!presWin.closed)presWin.close(); });
   show.addEventListener('click',function(){ if(!ovOpen&&!presOpen)go(1); });
   fit(); render();
 })();
@@ -186,14 +205,18 @@ async function inlineMedia(root: HTMLElement): Promise<string> {
 
 /** Assemble the standalone presentation HTML document around already-prepared
  *  slide markup (media either inlined as data URLs or rewritten to asset paths). */
-function buildHtmlDoc(slidesHtml: string): string {
+function buildHtmlDoc(slidesHtml: string, withNotes = true): string {
   const css = collectCss()
   const fontLink =
     '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">'
   const styleVars = Object.entries(vars.value)
     .map(([k, v]) => `${k}:${v}`)
     .join(';')
-  const notesJson = JSON.stringify(props.deck.slides.map((s) => s.notes ?? '')).replace(/</g, '\\u003c')
+  // Speaker notes are only embedded for the "presentation" export; the
+  // without-notes variant ships an empty array so private notes never leave.
+  const notesJson = withNotes
+    ? JSON.stringify(props.deck.slides.map((s) => s.notes ?? '')).replace(/</g, '\\u003c')
+    : '[]'
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -224,12 +247,13 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(a.href)
 }
 
-async function downloadHtml() {
+async function downloadHtml(withNotes = true) {
   await renderAll()
   await nextTick()
   const slidesHtml = stack.value ? await inlineMedia(stack.value) : ''
-  const html = buildHtmlDoc(slidesHtml)
-  triggerDownload(new Blob([html], { type: 'text/html' }), `${deckSlug()}.html`)
+  const html = buildHtmlDoc(slidesHtml, withNotes)
+  const suffix = withNotes ? '' : '_no-notes'
+  triggerDownload(new Blob([html], { type: 'text/html' }), `${deckSlug()}${suffix}.html`)
 }
 
 /** Pick a file extension for a fetched asset from its MIME type, falling back to
@@ -355,7 +379,8 @@ onUnmounted(() => {
       <div class="actions">
         <button @click="printPdf">⎙ Print / Save as PDF</button>
         <button @click="printHandout">⎙ Print Handout (notes)</button>
-        <button @click="downloadHtml">⤓ Download HTML</button>
+        <button @click="downloadHtml(true)">⤓ Download HTML Presentation</button>
+        <button @click="downloadHtml(false)">⤓ Download HTML (without Speaker Notes)</button>
         <button @click="downloadZip">⤓ Download ZIP (HTML + assets)</button>
         <button @click="downloadPptx">⤓ Download PPTX</button>
         <button class="close" @click="emit('close')">Close</button>

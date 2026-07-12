@@ -6,6 +6,9 @@
 
 ### Opening & saving
 
+**Two HTML export options, and the exported presenter view pops out** (#42)
+The single "Download HTML" export is now two: **Download HTML Presentation** (the full standalone file, speaker notes embedded) and **Download HTML (without Speaker Notes)** (identical, but ships an empty notes array so private notes never leave your machine — saved as `<deck>_no-notes.html`). In both exports, pressing **P** in present mode now **pops the presenter view out into a separate window** — current slide, next slide, speaker notes, and a running timer — so you can drive it across two screens just like the live editor's presenter, instead of the old in-page overlay. Nav stays in sync between the two windows (arrows/space/click from either), and if the browser blocks the popup it falls back to the in-page overlay. Also swapped the deck-menu arrows so **Export is ↓** (a download) and **Import is ↑**.
+
 **Deleting an "unused" asset is now recoverable (no more permanent loss)** (#42)
 The Review panel's asset cleanup used the File System Access API's `removeEntry`, which deletes **permanently** — it bypasses the OS Recycle Bin — so a wrongly-flagged image was gone for good. Deleting now **moves the file into an `Assets/_trash/` subfolder** instead of unlinking it: it disappears from the deck and from the orphan list (a directory, so it isn't re-scanned), but stays intact and recoverable straight from the bundle. Collisions keep the original name for the first copy and timestamp-prefix any later one. The confirmation dialogs were reworded to match (files are moved to `_trash`, not irreversibly destroyed).
 
