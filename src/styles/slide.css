@@ -344,7 +344,10 @@
   gap: 32px;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* Not clipped: the text column clips itself (.text-col), and leaving the grid
+     visible lets an optional image caption spill into the bottom margin instead
+     of being cut off at the column's edge. The slide still clips at its border. */
+  overflow: visible;
   /* Top-align every ratio so the image's top edge sits just under the heading
      and lines up regardless of aspect ratio. */
   align-items: start;

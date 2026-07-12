@@ -33,6 +33,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Text + Image caption no longer clipped on tall/square images** (#42)
+On a 1:1 or 9:16 image the caption was cut off at the column's edge — the `.cols` grid clipped it (`overflow: hidden`) even though there was open space above the footer. The text column already clips itself, so that grid-level clip was redundant; it's now `overflow: visible`, letting the caption spill into the bottom margin. The image keeps its full height and the caption shows in full.
+
 **Running header/footer/page-number no longer drift between layouts** (#42)
 The running header, footer, and page number are pinned to fixed offsets on the slide stage, but they jumped 50–60px on some layouts. Cause: the layout-container rules (`.l-image-caption`, `.l-video-embed`, `.l-diagram`, `.l-section`, …) were written as bare `.l-x` selectors, and the slide root carries that same `l-x` class — so their `padding`/`text-align` leaked onto the stage itself, and the absolutely-positioned chrome resolved against a padded box. Those rules are now scoped to `.dek-pad`, so the stage is never padded and the chrome sits in exactly the same place on every layout.
 
