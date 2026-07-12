@@ -153,7 +153,7 @@ const themeSwatches = computed(() => {
         @theme="emit('theme', $event)"
       />
       <span class="div" />
-      <label class="chk-auto">
+      <label class="chk-auto" title="Autosave. Save now with Ctrl+S (⌘S)">
         <input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />
         autosave
         <span class="save-led" :class="saveStatus" />

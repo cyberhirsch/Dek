@@ -27,6 +27,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**More keyboard shortcuts: Esc to edit, Ctrl+D duplicate slide, Ctrl+S, Ctrl+A** (#42)
+Filled in the gaps in the shortcut set. **Esc in present mode** now returns to the editor (a second press if you were fullscreen — the browser eats the first Esc to leave fullscreen, which no page can override). **Ctrl/Cmd+D** duplicates the current slide when nothing is selected on the canvas (it still duplicates selected *elements* when some are). **Ctrl/Cmd+S** saves the deck immediately instead of triggering the browser's "save page" dialog (works with autosave on or off). **Ctrl/Cmd+A** in the editor selects every element on the current slide. Typing in a text field is respected throughout — none of these fire while editing text, so native save/select-all/undo still work there. Tooltips updated (Edit button notes Esc; the autosave label notes Ctrl+S). Slide navigation (arrows, Space, Page Up/Down, Home/End) already worked and is unchanged.
+
 **Validator no longer false-flags `imageFit` / `imageLink`** (#42)
 Adding `imageFit` (Fill/Fit) or `imageLink` to a Text + Image / Image – Full / Image + Caption slide raised a spurious yellow warning badge — *Field "imageFit" isn't rendered by the … layout* — because the deck analyzer's per-layout allow-list hadn't been updated alongside the renderer, bake, and convert. Both fields are now recognised on the three single-image layouts, so setting Fit or a link on a layout image leaves the slide clean.
 

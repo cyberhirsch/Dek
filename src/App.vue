@@ -309,6 +309,9 @@ function onKey(e: KeyboardEvent) {
   if (mod && e.key.toLowerCase() === 'e') {
     e.preventDefault()
     editMode.value ? (editMode.value = false) : enterEdit()
+  } else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault() // Ctrl/Cmd+S saves the deck, not the browser's "save page"
+    void saveWholeDeck()
   } else if (mod && e.shiftKey && e.code === 'Digit8') {
     e.preventDefault()
     onFormat('bullet')
@@ -329,6 +332,20 @@ function onKey(e: KeyboardEvent) {
   } else if (editMode.value && mod && !typing && e.key.toLowerCase() === 'd' && selectedEls.value.length) {
     e.preventDefault()
     duplicateSelectedElements()
+  } else if (editMode.value && mod && !typing && e.key.toLowerCase() === 'd' && selectedEls.value.length === 0) {
+    e.preventDefault() // no element selected → Ctrl/Cmd+D duplicates the current slide
+    duplicateSlide()
+  } else if (
+    editMode.value &&
+    mod &&
+    !typing &&
+    e.key.toLowerCase() === 'a' &&
+    (deck.value?.slides[current.value]?.elements?.length ?? 0) > 0
+  ) {
+    e.preventDefault() // Ctrl/Cmd+A selects every element on the current slide
+    const els = deck.value!.slides[current.value].elements!
+    selectedEls.value = els.map((_, i) => i)
+    activeTool.value = 'select'
   } else if (editMode.value && mod && !typing && (e.key === ']' || e.key === '[') && selectedEls.value.length) {
     e.preventDefault()
     reorderSelectedElements(e.key === ']' ? 1 : -1)
@@ -359,6 +376,13 @@ function onKey(e: KeyboardEvent) {
       selectedEls.value = []
       activeTool.value = 'select'
     } else editMode.value = false
+  } else if (
+    e.key === 'Escape' && !editMode.value && !overviewOpen.value && !presenterOpen.value && !exportOpen.value
+  ) {
+    // Present mode: Esc returns to editing. But the browser's first Esc exits
+    // fullscreen (unpreventable), so only switch to edit once we're not
+    // fullscreen — a second Esc then drops back to the editor.
+    if (!document.fullscreenElement) enterEdit()
   } else if (
     editMode.value &&
     selectedEls.value.length > 0 &&
@@ -1575,7 +1599,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Overview (O)" @click="overviewOpen = true">▦</button>
       <button title="Presenter view (P) — opens a separate window" @click="openPresenter">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
-      <button title="Edit (Ctrl+E)" @click="enterEdit">✎</button>
+      <button title="Edit (Ctrl+E or Esc)" @click="enterEdit">✎</button>
     </div>
 
     <!-- overlays -->
