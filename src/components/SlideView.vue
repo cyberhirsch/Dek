@@ -196,7 +196,7 @@ watch(
     </div>
 
     <!-- text-image -->
-    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x'), { 'has-caption': editable || !!slide.caption }]">
+    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x')]">
       <FittedText class="fit-layout-title" content-class="layout-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Heading" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="cols">
         <div class="text-col">

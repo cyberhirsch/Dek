@@ -423,12 +423,6 @@
   line-height: 1.35;
   color: var(--dek-dim);
 }
-/* When a caption is present, give back its ~46px so a near-full-height portrait
-   or square frame doesn't get clipped by the column. 16:9 already has the room. */
-.l-text-image.has-caption.ratio-1x1 .frame-img,
-.l-text-image.has-caption.ratio-9x16 .frame-img {
-  max-height: 410px;
-}
 /* The text column grows/shrinks inversely to the image's width: a wide 16:9
    image takes more room (less text), a tall 9:16 image takes little (much more
    text). The image is whichever track `side` ordered second/first, so each

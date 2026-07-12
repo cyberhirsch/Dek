@@ -73,11 +73,11 @@ describe('bakeToElements geometry contract', () => {
     // no caption field → no caption box at all
     const noCap = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg' })
     expect(withContent(noCap, 'Fig 1. A credit')).toBeUndefined()
-    // a caption never enlarges the image; when the column is short it reserves
-    // room by shrinking the frame (title + tall image + caption forces this)
+    // the caption doesn't shrink the image — the frame keeps its full height
+    // whether or not a caption is present (the caption sits in the bottom margin)
     const tallCap = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', imageRatio: '9:16', caption: 'c' })
     const tallNo = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', imageRatio: '9:16' })
-    expect(boxes(tallCap).find((b) => b.src)!.h).toBeLessThanOrEqual(boxes(tallNo).find((b) => b.src)!.h)
+    expect(boxes(tallCap).find((b) => b.src)!.h).toBe(boxes(tallNo).find((b) => b.src)!.h)
   })
 
   it('respects the image side: text and image swap columns', () => {
