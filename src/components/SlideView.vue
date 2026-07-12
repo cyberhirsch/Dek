@@ -196,7 +196,7 @@ watch(
     </div>
 
     <!-- text-image -->
-    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x')]">
+    <div v-else-if="slide.layout === 'text-image'" class="dek-pad l-text-image" :class="['side-' + (slide.side ?? 'right'), 'ratio-' + (slide.imageRatio ?? '16:9').replace(':', 'x'), { 'has-caption': editable || !!slide.caption }]">
       <FittedText class="fit-layout-title" content-class="layout-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Heading" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="cols">
         <div class="text-col">
@@ -215,6 +215,19 @@ watch(
             <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
             <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
           </div>
+          <FittedText
+            v-if="editable || slide.caption"
+            class="fit-ti-caption"
+            content-class="ti-cap"
+            :model-value="slide.caption"
+            :editable="editable"
+            placeholder="Caption (optional)"
+            :base-size="18"
+            :min-size="10"
+            splittable
+            @update:model-value="patch({ caption: $event })"
+            @split="emit('split', { kind: 'field', field: 'caption' })"
+          />
         </div>
       </div>
     </div>

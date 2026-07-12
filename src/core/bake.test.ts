@@ -61,6 +61,25 @@ describe('bakeToElements geometry contract', () => {
     expect(withContent(square, '- x')!.size).toBe(26)
   })
 
+  it('bakes an optional text-image caption as a box under the image', () => {
+    const withCap = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', caption: 'Fig 1. A credit' })
+    const cap = withContent(withCap, 'Fig 1. A credit')
+    expect(cap).toBeDefined()
+    expect(cap!.size).toBe(18)
+    const img = boxes(withCap).find((b) => b.src)!
+    // caption sits below the image's bottom edge and clears the stage floor
+    expect(cap!.y).toBeGreaterThanOrEqual(img.y + img.h)
+    expect(cap!.y + cap!.h).toBeLessThanOrEqual(720)
+    // no caption field → no caption box at all
+    const noCap = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg' })
+    expect(withContent(noCap, 'Fig 1. A credit')).toBeUndefined()
+    // a caption never enlarges the image; when the column is short it reserves
+    // room by shrinking the frame (title + tall image + caption forces this)
+    const tallCap = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', imageRatio: '9:16', caption: 'c' })
+    const tallNo = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', imageRatio: '9:16' })
+    expect(boxes(tallCap).find((b) => b.src)!.h).toBeLessThanOrEqual(boxes(tallNo).find((b) => b.src)!.h)
+  })
+
   it('respects the image side: text and image swap columns', () => {
     const right = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', side: 'right' })
     const left = bakeToElements({ layout: 'text-image', title: 'T', content: '- x', image: '/i.jpg', side: 'left' })

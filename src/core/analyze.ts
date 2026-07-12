@@ -90,7 +90,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   statement: ['text', 'cite'],
   speaker: ['name', 'role', 'portraits'],
   text: ['title', 'content', 'steps'],
-  'text-image': ['title', 'content', 'steps', 'image', 'side', 'imageRatio', 'focus', 'imageFit', 'imageLink'],
+  'text-image': ['title', 'content', 'steps', 'image', 'side', 'imageRatio', 'focus', 'imageFit', 'imageLink', 'caption'],
   'image-full': ['image', 'title', 'caption', 'focus', 'imageFit', 'imageLink'],
   'image-caption': ['image', 'caption', 'captionPos', 'focus', 'imageFit', 'imageLink'],
   'video-embed': ['video', 'poster', 'image', 'caption'],

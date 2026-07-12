@@ -207,7 +207,11 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       const colH = STAGE_H - PAD_Y - y
       const textX = left ? PAD_X + colW + GAP : PAD_X
       const imgX = left ? PAD_X : PAD_X + textW + GAP // image pinned to its column's left
-      if (slide.image) els.push(image(slide.image, imgX, y, imgW, Math.min(imgH, colH), { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: slide.imageLink }))
+      // Reserve room under the image for an optional caption (mirrors slide.css).
+      const capH = slide.caption ? Math.round(18 * BODY_LH) + 12 : 0
+      const drawnImgH = Math.min(imgH, colH - capH)
+      if (slide.image) els.push(image(slide.image, imgX, y, imgW, drawnImgH, { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: slide.imageLink }))
+      if (slide.caption) els.push(text(slide.caption, imgX, y + drawnImgH + 12, imgW, capH - 12, { size: 18, color: 'rgba(230,236,242,0.85)' }))
       els.push(text(content, textX, y, textW, colH, listStyle(bodySize)))
       break
     }

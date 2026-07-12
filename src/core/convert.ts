@@ -26,7 +26,7 @@ const LAYOUT_FIELDS: Record<LayoutId, Partial<Record<Slot, string>>> = {
   statement: { lede: 'text', caption: 'cite' },
   speaker: { heading: 'name', caption: 'role', portraits: 'portraits' },
   text: { heading: 'title', prose: 'content' },
-  'text-image': { heading: 'title', prose: 'content', image: 'image' },
+  'text-image': { heading: 'title', prose: 'content', image: 'image', caption: 'caption' },
   'image-full': { heading: 'title', caption: 'caption', image: 'image' },
   'image-caption': { caption: 'caption', image: 'image' },
   'video-embed': { caption: 'caption', video: 'video' },
