@@ -49,6 +49,38 @@ function onSideUp() {
   window.removeEventListener('pointerup', onSideUp)
 }
 
+// Everything below tracks window size so the current-slide preview, the next-
+// slide preview, and the notes text all grow/shrink to fill whatever room the
+// divider drag leaves them, instead of sitting at a fixed size inside newly
+// freed (or newly cramped) space.
+const winW = ref(window.innerWidth)
+const winH = ref(window.innerHeight)
+function onWinResize() {
+  winW.value = window.innerWidth
+  winH.value = window.innerHeight
+}
+
+// Layout constants mirrored from the CSS below — the chrome around the two
+// preview stages that a computed max-width has to subtract.
+const HEADER_H = 45 // .pres-head
+const BODY_PAD = 24 // .pres-body padding, each side
+const BODY_GAP = 24 // gap between .main / .side-resizer / .side
+const RESIZER_W = 8
+const MAIN_CHROME_H = 27 + 14 + 36 // .main's label + gap + nav row
+
+// The current-slide stage: as wide as the space left of the divider allows,
+// but capped so its 16:9 height still fits the available vertical room.
+const mainThumbWidth = computed(() => {
+  const availW = winW.value - BODY_PAD * 2 - BODY_GAP * 2 - RESIZER_W - sideW.value
+  const availH = winH.value - HEADER_H - BODY_PAD * 2 - MAIN_CHROME_H
+  const byHeight = availH * (1280 / 720)
+  return Math.max(240, Math.min(availW, byHeight))
+})
+// The "Next" preview simply tracks the side pane's own width.
+const nextThumbWidth = computed(() => Math.max(160, Math.min(sideW.value - 4, 640)))
+// Notes text scales with how much room dragging the divider gives it.
+const notesFontSize = computed(() => Math.round(Math.max(15, Math.min(26, sideW.value / 22))))
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 's') {
     e.preventDefault()
@@ -64,10 +96,12 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => {
   iv = setInterval(() => elapsed.value++, 1000)
   window.addEventListener('keydown', onKey)
+  window.addEventListener('resize', onWinResize)
 })
 onUnmounted(() => {
   clearInterval(iv)
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('resize', onWinResize)
 })
 </script>
 
@@ -88,7 +122,7 @@ onUnmounted(() => {
           Current · {{ current + 1 }} / {{ deck.slides.length }}
           <span v-if="stepCount" class="builds">· {{ stepCount }} build{{ stepCount === 1 ? '' : 's' }}</span>
         </div>
-        <SlideThumb :slide="slide" :config="deck.config" :index="current" :total="deck.slides.length" :width="640" />
+        <SlideThumb :slide="slide" :config="deck.config" :index="current" :total="deck.slides.length" :width="mainThumbWidth" />
         <div class="nav">
           <button :disabled="current === 0" @click="go(-1)">← Prev</button>
           <button :disabled="current >= deck.slides.length - 1" @click="go(1)">Next →</button>
@@ -100,12 +134,12 @@ onUnmounted(() => {
       <div class="side" :style="{ flex: 'none', width: sideW + 'px' }">
         <div class="next">
           <div class="label">Next</div>
-          <SlideThumb v-if="next" :slide="next" :config="deck.config" :index="current + 1" :total="deck.slides.length" :width="300" />
+          <SlideThumb v-if="next" :slide="next" :config="deck.config" :index="current + 1" :total="deck.slides.length" :width="nextThumbWidth" />
           <div v-else class="end">— end —</div>
         </div>
         <div class="notes">
           <div class="label">Speaker notes</div>
-          <div class="notes-body">{{ slide?.notes || 'No notes for this slide.' }}</div>
+          <div class="notes-body" :style="{ fontSize: notesFontSize + 'px' }">{{ slide?.notes || 'No notes for this slide.' }}</div>
         </div>
       </div>
     </div>
@@ -220,7 +254,6 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 14px;
-  font-size: 16px;
   line-height: 1.5;
   white-space: pre-wrap;
   color: #e6ecf2;

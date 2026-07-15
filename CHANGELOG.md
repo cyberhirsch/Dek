@@ -36,6 +36,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Presenter view's slide preview and notes text now fill the space the divider gives them** (#42)
+Dragging the divider between the current-slide preview and the notes/next-slide pane used to just add or remove empty margin — the current-slide preview was pinned at a fixed 640px and the notes text at a fixed 16px regardless of how much room the drag left them. Both now track the divider: the current-slide preview fills whatever space remains (capped so its 16:9 shape still fits the available height), the "Next" preview tracks the side pane's width, and the notes text scales between 15–26px with the side pane's width. Recomputed on window resize too.
+
 **Right-click selected text or a link in any slide layout for Dek's own menu** (#42)
 Selecting text (or right-clicking a link) inside a semantic layout's title, bullets, caption, subtitle, or byline used to fall through to the browser's native context menu — Cut/Copy/Paste/Select All, plus whatever the OS bolts on (emoji picker, "Go to …", spell check). It's the same menu the freeform canvas's text boxes already had (Bold/Italic/Underline/Strikethrough, **Add Link… (from selection)**; or Open/Edit/Remove Link when the selection is a link), just never wired to the semantic layouts' text fields. Now it opens there too. Scoped to actual contenteditable text with either a link or a non-empty selection under the cursor — a bare caret still gets the native menu (Cut/Copy/Paste etc. still work normally), and it can't collide with the freeform canvas's own text-box menu when canvas elements are overlaid on a layout.
 
