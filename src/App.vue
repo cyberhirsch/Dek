@@ -52,6 +52,22 @@ const deck = ref<Deck | null>(null)
 const current = ref(0)
 const error = ref<string | null>(null)
 
+// Without the File System Access API, decks can only live in this browser's
+// local storage — no real files on disk, no folder of decks, no Open/Save As.
+// Safari and Firefox never support it; a Chromium browser (Chrome/Edge/Brave/
+// Opera) usually does out of the box, so if it's missing there it's most often
+// a disabled flag or an old version rather than a permanent limitation — hence
+// the two different fixes below. Dismissal is remembered so this doesn't nag
+// on every load once the user has seen and understood it.
+const FS_WARNING_DISMISSED = 'dek:fs-warning-dismissed'
+const isChromiumBased = /Chrome|Chromium|Edg\/|OPR\//.test(navigator.userAgent)
+const fsWarningDismissed = ref(localStorage.getItem(FS_WARNING_DISMISSED) === '1')
+const showFsWarning = computed(() => !supportsDir() && !fsWarningDismissed.value)
+function dismissFsWarning() {
+  fsWarningDismissed.value = true
+  localStorage.setItem(FS_WARNING_DISMISSED, '1')
+}
+
 const editMode = ref(true) // start in the editor; "Present" switches to present mode
 const showSource = ref(false) // raw Markdown source pane (right dock)
 const autosave = ref(true)
@@ -1648,6 +1664,24 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button class="toast-x" title="Dismiss" @click="reconnectName = null">✕</button>
     </div>
 
+    <!-- No File System Access API: decks aren't saved as real files, only to
+         this browser's local storage. Explains why, and how to fix it. -->
+    <div v-if="showFsWarning" class="toast warn">
+      <span v-if="isChromiumBased">
+        Decks aren't saving to real files — the File System Access API looks disabled in this browser.
+        Check <code>chrome://flags</code> (or your browser's equivalent flags page) for
+        <strong>"File System Access API"</strong> or <strong>"Experimental Web Platform features"</strong>,
+        enable it, and relaunch. Until then, decks only persist in this browser's local storage.
+      </span>
+      <span v-else>
+        Decks aren't saving to real files — Safari and Firefox don't support the File System Access API.
+        Use a Chromium-based browser (Chrome, Edge, Brave, Opera) to open/save decks as files on disk.
+        Until then, decks only persist in this browser's local storage.
+      </span>
+      <button class="toast-btn" @click="dismissFsWarning">Got it</button>
+      <button class="toast-x" title="Dismiss" @click="dismissFsWarning">✕</button>
+    </div>
+
     <!-- import review: correct detected layouts before the deck is saved -->
     <ImportReview
       v-if="pendingImport"
@@ -1728,6 +1762,19 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   border: 1px solid rgba(127, 199, 255, 0.45);
   color: #cfe6ff;
   cursor: default;
+}
+.toast.warn {
+  background: rgba(46, 38, 14, 0.97);
+  border: 1px solid rgba(255, 180, 116, 0.5);
+  color: #ffe6c2;
+  cursor: default;
+  max-width: 640px;
+  line-height: 1.5;
+}
+.toast.warn code {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0 5px;
+  border-radius: 4px;
 }
 .toast-btn {
   background: rgba(127, 199, 255, 0.16);

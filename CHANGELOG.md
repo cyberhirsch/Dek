@@ -6,6 +6,9 @@
 
 ### Opening & saving
 
+**A warning banner explains when Open/Save As can't save real files** (#42)
+Without the File System Access API, Dek silently falls back to browser local storage — decks aren't real files on disk, and the whole Open/Save As workspace flow disappears from the deck menu with nothing but a small note if you happen to open it. There's now a dismissible banner at startup that explains this plainly and gives an actual fix: on a Chromium-based browser (Chrome, Edge, Brave, Opera) it points at the "File System Access API" / "Experimental Web Platform features" flag, since the API is usually on by default there and its absence means it's off or the browser is outdated; on Safari or Firefox it says plainly that the feature isn't supported and suggests switching browsers, since no flag will fix that. Dismissal is remembered (`localStorage`) so it won't nag on every load.
+
 **Fixed: exported presenter opened as a new tab instead of a real window** (#42)
 The exported presenter's `window.open()` call was missing the `popup` window feature that the live editor's presenter popup already used (`popup,width=1100,height=700`) — without it, Chrome doesn't reliably create a standalone popup and can open the presenter as just another tab in the same browser window instead of a separate window you can drag to a second monitor. Added `popup` (and an explicit `about:blank` URL) to match.
 
