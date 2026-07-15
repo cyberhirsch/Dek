@@ -36,6 +36,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Right-click selected text or a link in any slide layout for Dek's own menu** (#42)
+Selecting text (or right-clicking a link) inside a semantic layout's title, bullets, caption, subtitle, or byline used to fall through to the browser's native context menu — Cut/Copy/Paste/Select All, plus whatever the OS bolts on (emoji picker, "Go to …", spell check). It's the same menu the freeform canvas's text boxes already had (Bold/Italic/Underline/Strikethrough, **Add Link… (from selection)**; or Open/Edit/Remove Link when the selection is a link), just never wired to the semantic layouts' text fields. Now it opens there too. Scoped to actual contenteditable text with either a link or a non-empty selection under the cursor — a bare caret still gets the native menu (Cut/Copy/Paste etc. still work normally), and it can't collide with the freeform canvas's own text-box menu when canvas elements are overlaid on a layout.
+
 **Text + Image caption no longer clipped on tall/square images** (#42)
 On a 1:1 or 9:16 image the caption was cut off at the column's edge — the `.cols` grid clipped it (`overflow: hidden`) even though there was open space above the footer. The text column already clips itself, so that grid-level clip was redundant; it's now `overflow: visible`, letting the caption spill into the bottom margin. The image keeps its full height and the caption shows in full.
 

@@ -93,6 +93,38 @@ function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; in
 function patchConfig(p: Partial<DeckConfig>) {
   emit('config-patch', p)
 }
+// Right-clicking selected text (or a link) in any semantic-layout text field —
+// title, bullets, caption, subtitle, byline, … — opens Dek's own text/link menu
+// (Bold/Italic/Add Link…, or Open/Edit/Remove Link) instead of the browser's
+// native one. Matches any contenteditable surface (EditableText's `.dek-editable`
+// title/caption/etc. AND EditableTextList's `.dek-list.editable-list` bullets),
+// so it can't fire for image frames or the freeform canvas, which have no
+// contenteditable ancestor and handle their own menus.
+function onTextCtx(e: MouseEvent) {
+  if (!props.editable) return
+  const target = e.target as HTMLElement | null
+  // The canvas-elements overlay (freeform boxes, or freeform elements layered
+  // on any layout) wires its own contenteditable text boxes and context menu
+  // with real element indices — skip those so the bubbled event isn't handled
+  // twice, once by it and once (with the wrong index) by this generic handler.
+  if (target?.closest('.canvas-layer')) return
+  const host = target?.closest('[contenteditable="true"]') as HTMLElement | null
+  if (!host) return
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount || !sel.anchorNode || !host.contains(sel.anchorNode)) return
+  const anchor = sel.anchorNode
+  const anchorEl = (anchor.nodeType === 1 ? (anchor as HTMLElement) : anchor.parentElement) ?? null
+  const link = anchorEl?.closest('a')
+  if (link) {
+    e.preventDefault()
+    emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'link', url: link.getAttribute('href') ?? '' })
+  } else if (!sel.isCollapsed) {
+    e.preventDefault()
+    emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'text' })
+  }
+  // else: a bare caret with no link — nothing Dek-specific to offer, so leave
+  // the native menu (Cut/Copy/Paste/Select all) alone.
+}
 
 // text content ops — the editable list round-trips through the Markdown `content` field
 function setRows(rows: TextRow[]) {
@@ -132,7 +164,7 @@ watch(
 </script>
 
 <template>
-  <div class="dek-slide" :class="['l-' + slide.layout, { glow }]">
+  <div class="dek-slide" :class="['l-' + slide.layout, { glow }]" @contextmenu="onTextCtx">
     <EditableText
       v-if="editable && slide.layout !== 'cover'"
       class="dek-header"
