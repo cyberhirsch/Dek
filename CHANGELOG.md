@@ -6,6 +6,9 @@
 
 ### Opening & saving
 
+**Fixed: exported presenter opened as a new tab instead of a real window** (#42)
+The exported presenter's `window.open()` call was missing the `popup` window feature that the live editor's presenter popup already used (`popup,width=1100,height=700`) — without it, Chrome doesn't reliably create a standalone popup and can open the presenter as just another tab in the same browser window instead of a separate window you can drag to a second monitor. Added `popup` (and an explicit `about:blank` URL) to match.
+
 **Exported presenter is always a separate window, and only in the notes export** (#42)
 Two refinements to the exported HTML presenter. It now **always** opens as a separate pop-out window — there's no in-page overlay fallback; if the browser blocks the popup you're asked to allow pop-ups for the file. And the **without-Speaker-Notes** export no longer has a presenter at all: `P` does nothing and the on-screen hint drops it, since a presenter view without notes is pointless. Driven by a `window.__DEK_PRESENTER` flag baked into the file.
 
