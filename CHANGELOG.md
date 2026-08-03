@@ -39,6 +39,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Drag a chapter's header to reorder the whole group at once** (#42)
+Only individual slide rows were draggable in the navigator — moving a whole chapter meant dragging every one of its slides out one at a time. A chapter's slides are always a contiguous run by definition, so its header is now draggable too: grab it and drop it before/after another chapter (or between any two slides) to relocate the entire run in one move, reusing the same block-reorder the multi-select drag already had. Dropping a dragged chapter onto another chapter's header inserts it before/after that chapter (top half vs. bottom half of the header); dragging a single loose slide onto a header still joins that group, unchanged.
+
 **Fixed: couldn't drag an image onto Image – Full** (#42)
 Dropping an image anywhere on an Image – Full slide silently did nothing, while the same drag worked fine on Image + Caption. Cause: the title/caption overlay div sits `position: absolute; inset: 0` — covering the *entire* slide, not just the strip where its text actually sits — with no `pointer-events: none`, so it caught every `dragover`/`drop` before the image underneath ever saw them. Image + Caption never had this problem because its caption is sized to a small corner box, not the whole frame. The overlay itself is now `pointer-events: none`, with the title/caption text boxes set back to `pointer-events: auto` so they stay clickable/editable — drops now reach the image everywhere the overlay has no visible content.
 

@@ -131,16 +131,26 @@ function commitRename(e: Entry & { kind: 'header' }) {
 // ── drag & drop reorder ──
 const dragFrom = ref<number | null>(null)
 const dragSet = ref<number[]>([]) // all indices being dragged (multi-select aware)
+const draggingGroup = ref(false) // dragging a whole chapter (its header), not a loose slide
 const dropBefore = ref<number | null>(null) // insertion index in slide array
 const dropHeader = ref<number | null>(null) // runId of a header being hovered
 
 function onDragStart(index: number) {
   dragFrom.value = index
+  draggingGroup.value = false
   // if dragging a slide that's part of a multi-selection, move the whole set
   dragSet.value =
     props.selected.includes(index) && props.selected.length > 1
       ? [...props.selected].sort((a, b) => a - b)
       : [index]
+}
+// Dragging a chapter's header moves the whole run as one block — a group's
+// slides are always contiguous, so this is exactly `reorder`'s existing
+// block-move, just seeded with the header's own indices instead of one slide.
+function onHeaderDragStart(header: Entry & { kind: 'header' }) {
+  dragFrom.value = header.indices[0]
+  dragSet.value = header.indices
+  draggingGroup.value = true
 }
 function onSlideDragOver(e: DragEvent, index: number) {
   e.preventDefault()
@@ -149,10 +159,19 @@ function onSlideDragOver(e: DragEvent, index: number) {
   const after = e.clientY > r.top + r.height / 2
   dropBefore.value = after ? index + 1 : index
 }
-function onHeaderDragOver(e: DragEvent, runId: number) {
+function onHeaderDragOver(e: DragEvent, header: Entry & { kind: 'header' }) {
   e.preventDefault()
-  dropBefore.value = null
-  dropHeader.value = runId
+  if (draggingGroup.value) {
+    // Reordering one chapter past another: drop in the top/bottom half of the
+    // target header to land the dragged chapter before/after it.
+    dropHeader.value = null
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const after = e.clientY > r.top + r.height / 2
+    dropBefore.value = after ? header.indices[header.indices.length - 1] + 1 : header.indices[0]
+  } else {
+    dropBefore.value = null
+    dropHeader.value = header.runId
+  }
 }
 function onDrop() {
   if (dragFrom.value == null) return cleanupDrag()
@@ -169,6 +188,7 @@ function onDrop() {
 function cleanupDrag() {
   dragFrom.value = null
   dragSet.value = []
+  draggingGroup.value = false
   dropBefore.value = null
   dropHeader.value = null
 }
@@ -259,14 +279,18 @@ function toggleCollapseAll() {
     >
     <div class="virtual" :style="{ height: totalHeight + 'px' }">
     <template v-for="e in visibleEntries" :key="e.key">
-      <!-- group header -->
+      <!-- group header: draggable so a whole chapter can be reordered as a block -->
       <div
         v-if="e.kind === 'header'"
         class="grp"
-        :class="{ 'drop-into': dropHeader === e.runId }"
+        :class="{ 'drop-into': dropHeader === e.runId, dragging: draggingGroup && dragSet[0] === e.indices[0] }"
         :style="{ transform: `translateY(${e.top}px)`, height: e.height + 'px' }"
-        @dragover="onHeaderDragOver($event, e.runId)"
+        draggable="true"
+        title="Drag to reorder this chapter"
+        @dragstart="onHeaderDragStart(e)"
+        @dragover="onHeaderDragOver($event, e)"
       >
+        <div v-if="dropBefore === e.indices[0]" class="drop-line top" />
         <button class="chev" @click="toggleCollapse(e.runId)">{{ collapsed.has(e.runId) ? '▸' : '▾' }}</button>
         <input
           v-if="renaming === e.runId"
@@ -349,11 +373,13 @@ function toggleCollapseAll() {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   color: rgba(230, 236, 242, 0.7);
+  cursor: grab;
 }
 .grp.drop-into {
   background: rgba(127, 199, 255, 0.12);
   border-radius: 6px;
 }
+.grp.dragging { opacity: 0.4; }
 .chev {
   background: none;
   border: none;
