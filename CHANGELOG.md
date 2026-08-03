@@ -6,6 +6,9 @@
 
 ### Opening & saving
 
+**A failed folder listing no longer looks identical to an empty folder** (#42)
+`refresh()` in the Open/Save/Import panel ran unguarded — if listing a folder ever threw (a permission lapse, a path that no longer resolves, …), the error vanished silently and the panel just showed "No decks here yet," indistinguishable from a folder that's genuinely empty. It's now routed through the same error-surfacing path every other action in the panel already uses, so a real failure shows an actual message instead of masquerading as nothing being there.
+
 **Open/Save/Import can browse into subfolders, not just the granted root** (#42)
 The workspace browser only ever scanned one flat level — a subfolder that wasn't itself a `.dek` bundle was invisible and unreachable, so organizing decks into course/category folders (e.g. `S1_Design & Gestalt/Week 01…dek`, `Week 02…dek`) meant every deck below the top level simply never showed up unless the *exact* folder was the granted root. The panel now lists real subfolders alongside decks (📁, click to browse in) with a clickable breadcrumb back up to the root, and Open/Save As/Import all operate relative to whatever folder is currently browsed — so you can navigate into a course folder and open, save, or import right there, without re-granting a different root via "Change folder…" each time. `listWorkspaceSubfolders`/`resolveWorkspacePath` in `fsdir.ts`; `+2` tests.
 

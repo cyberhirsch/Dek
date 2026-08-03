@@ -39,24 +39,6 @@ const folderName = computed(() =>
   state.value.status === 'ready' || state.value.status === 'prompt' ? state.value.name : '',
 )
 
-async function refresh() {
-  state.value = await workspaceState()
-  if (state.value.status === 'ready') {
-    const l = await listWorkspace(path.value)
-    folders.value = l.folders
-    decks.value = l.decks
-  } else {
-    folders.value = []
-    decks.value = []
-  }
-  if (props.mode === 'save' && ready.value) {
-    await nextTick()
-    nameInput.value?.focus()
-    nameInput.value?.select()
-  }
-}
-onMounted(refresh)
-
 function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
 }
@@ -71,6 +53,30 @@ async function guard(fn: () => Promise<void>) {
     busy.value = false
   }
 }
+
+// Listing can fail (a nested folder's permission lapsing mid-session, a bad
+// path after the folder it pointed at was moved/deleted, etc.) — routed
+// through guard() so a failure surfaces as a visible message instead of
+// silently leaving the list empty with no explanation.
+async function refresh() {
+  await guard(async () => {
+    state.value = await workspaceState()
+    if (state.value.status === 'ready') {
+      const l = await listWorkspace(path.value)
+      folders.value = l.folders
+      decks.value = l.decks
+    } else {
+      folders.value = []
+      decks.value = []
+    }
+    if (props.mode === 'save' && ready.value) {
+      await nextTick()
+      nameInput.value?.focus()
+      nameInput.value?.select()
+    }
+  })
+}
+onMounted(refresh)
 
 const onChoose = () => guard(async () => { await chooseWorkspace(); path.value = []; await refresh() })
 const onReconnect = () => guard(async () => { await reconnectWorkspace(); await refresh() })
