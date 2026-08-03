@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Focus } from '../core/types'
+import { clampPan, panBounds } from '../render/pan'
 
 const props = defineProps<{
   src?: string
@@ -16,14 +17,54 @@ const emit = defineEmits<{
   file: [f: File]
 }>()
 
+// Measured live: the picture's intrinsic size (once loaded) and the frame's
+// rendered size. Together they say how much of the picture is hidden outside
+// the frame, which is exactly how far a pan may travel — see render/pan.ts.
+const root = ref<HTMLElement | null>(null)
+const imgEl = ref<HTMLImageElement | null>(null)
+const natural = ref({ w: 0, h: 0 })
+const frameSize = ref({ w: 0, h: 0 })
+let frameObserver: ResizeObserver | null = null
+
+function readNatural() {
+  const img = imgEl.value
+  if (img?.naturalWidth) natural.value = { w: img.naturalWidth, h: img.naturalHeight }
+}
+function readFrame() {
+  const el = root.value
+  if (el) frameSize.value = { w: el.clientWidth, h: el.clientHeight }
+}
+function boundsFor(scale: number) {
+  return panBounds(natural.value, frameSize.value, props.fit ?? 'cover', scale)
+}
+/** Whether there's any hidden overflow left to drag into view at all. */
+const canPan = computed(() => {
+  const b = boundsFor(props.focus?.scale ?? 1)
+  return b.x > 0.5 || b.y > 0.5
+})
+
+onMounted(() => {
+  readNatural() // a cached image can already be complete before @load fires
+  readFrame()
+  frameObserver = new ResizeObserver(readFrame)
+  if (root.value) frameObserver.observe(root.value)
+})
+onUnmounted(() => frameObserver?.disconnect())
+
 const style = computed(() => {
   const f = props.focus ?? { x: 0, y: 0, scale: 1 }
   const filters = [props.desaturate && 'grayscale(1)', props.invert && 'invert(1)'].filter(Boolean)
+  // Clamp on render too, not just while dragging: decks saved before pan was
+  // bounded can hold an off-frame focus, and this pulls them back into view
+  // without rewriting stored data.
+  const b = boundsFor(f.scale)
+  const x = clampPan(f.x, b.x)
+  const y = clampPan(f.y, b.y)
   return {
     width: '100%',
     height: '100%',
     objectFit: props.fit ?? 'cover',
-    transform: `translate(${f.x}px, ${f.y}px) scale(${f.scale})`,
+    transform: `translate(${x}px, ${y}px) scale(${f.scale})`,
     transformOrigin: 'center',
     ...(filters.length ? { filter: filters.join(' ') } : {}),
   } as Record<string, string>
@@ -42,14 +83,22 @@ function onMouseDown(e: MouseEvent) {
   dragging.value = true
   start = { x: e.clientX, y: e.clientY }
   const f = curFocus()
-  origin = { x: f.x, y: f.y }
+  // Start from the clamped position the user can actually see, so a drag that
+  // begins on a stored out-of-bounds focus doesn't jump.
+  const b = boundsFor(f.scale)
+  origin = { x: clampPan(f.x, b.x), y: clampPan(f.y, b.y) }
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
 }
 function onMove(e: MouseEvent) {
   if (!dragging.value) return
   const f = curFocus()
-  emit('update:focus', { ...f, x: origin.x + (e.clientX - start.x), y: origin.y + (e.clientY - start.y) })
+  const b = boundsFor(f.scale)
+  emit('update:focus', {
+    ...f,
+    x: clampPan(origin.x + (e.clientX - start.x), b.x),
+    y: clampPan(origin.y + (e.clientY - start.y), b.y),
+  })
 }
 function onUp() {
   dragging.value = false
@@ -66,7 +115,10 @@ function onWheel(e: WheelEvent) {
   // can't reveal more of a cover image (that content is already fitted). So 1 is
   // the floor: zoom in to crop/frame, never out past the natural fit.
   const scale = Math.max(1, Math.min(5, +(f.scale + (e.deltaY < 0 ? 0.06 : -0.06)).toFixed(2)))
-  emit('update:focus', { ...f, scale })
+  // Zooming back out shrinks the pannable range, so re-clamp: otherwise the
+  // picture stays stranded at an offset that's now off-frame.
+  const b = boundsFor(scale)
+  emit('update:focus', { ...f, scale, x: clampPan(f.x, b.x), y: clampPan(f.y, b.y) })
 }
 
 // ── drop to replace ──
@@ -98,15 +150,16 @@ function onPick(e: Event) {
 
 <template>
   <div
+    ref="root"
     class="fi"
-    :class="{ editable, pannable: editable && pannable, dragging }"
+    :class="{ editable, pannable: editable && pannable && canPan, dragging }"
     @mousedown="onMouseDown"
     @wheel="onWheel"
     @dragover.prevent="editable && (over = true)"
     @dragleave.prevent="onDragLeave($event)"
     @drop.prevent="editable && onDrop($event)"
   >
-    <img v-if="src" :src="src" :style="style" alt="" draggable="false" />
+    <img v-if="src" ref="imgEl" :src="src" :style="style" alt="" draggable="false" @load="readNatural" />
     <div v-else class="img-empty" :class="{ clickable: editable }" @click="editable && pick()">
       {{ editable ? '＋ click or drop an image' : 'no image' }}
     </div>
@@ -117,7 +170,11 @@ function onPick(e: Event) {
     <input ref="fileEl" type="file" accept="image/*" class="fi-input" @change="onPick" />
 
     <div v-if="over" class="fi-drop">drop to replace</div>
-    <div v-if="editable && pannable && src" class="fi-hint">drag to pan · scroll to zoom · click ⇄ or drop to replace</div>
+    <!-- "drag to pan" only when there's hidden overflow to drag into view;
+         a fully-visible picture has nothing to pan to, so zoom leads instead. -->
+    <div v-if="editable && pannable && src" class="fi-hint">
+      {{ canPan ? 'drag to pan · scroll to zoom' : 'scroll to zoom in, then drag to pan' }} · click ⇄ or drop to replace
+    </div>
   </div>
 </template>
 
