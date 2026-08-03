@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import EditableText from './EditableText.vue'
+import { opticalMarginLeft } from '../render/optical'
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +46,32 @@ function apply(size: number, reserveButton: boolean) {
   el.style.height = reserveButton ? 'calc(100% - 28px)' : '100%'
 }
 
+// Optical margin correction: only meaningful for left-aligned italic display
+// type (Cormorant headings) — centered/right-aligned text has no single
+// reference edge to correct against, and upright body/mono text doesn't have
+// the diagonal-stroke indent this compensates for. Both are read straight off
+// the actual computed style, so this applies itself automatically to whatever
+// heading uses FittedText — no per-usage opt-in to remember. A nonzero shift
+// needs `overflow-x` relaxed on the frame, or the correction (which nudges the
+// line a few px into what's normally reserved padding) would just get clipped
+// by the same box it's trying to escape; `overflow-y` stays governed by the
+// stylesheet's `hidden`, since only the left-edge concern applies here.
+function applyOpticalMargin() {
+  const host = frame.value
+  // `contentClass` (where the italic heading rule actually lives, e.g. `.mark`)
+  // lands on this child via Vue's attribute fallthrough, not on `.fitted-text-body`
+  // itself — checking the wrapper's own computed style would never see it.
+  const target = body.value?.firstElementChild as HTMLElement | null
+  if (!target || !host) return
+  const cs = getComputedStyle(target)
+  const text = `${props.prefix}${props.modelValue ?? ''}`
+  const shift = cs.fontStyle === 'italic' && cs.textAlign !== 'center' && cs.textAlign !== 'right'
+    ? opticalMarginLeft(text, cs.font)
+    : 0
+  target.style.marginLeft = shift ? `${shift}px` : ''
+  host.style.overflowX = shift ? 'visible' : ''
+}
+
 function fit() {
   const el = body.value
   const host = frame.value
@@ -55,6 +82,7 @@ function fit() {
   if (!overflows(el)) {
     fitSize.value = base
     shrunk.value = false
+    applyOpticalMargin()
     return
   }
 
@@ -64,6 +92,7 @@ function fit() {
   apply(lo, props.splittable)
   if (overflows(el)) {
     fitSize.value = lo
+    applyOpticalMargin()
     return
   }
   for (let i = 0; i < 12 && hi - lo > 0.25; i += 1) {
@@ -75,6 +104,7 @@ function fit() {
   const result = Math.floor(lo * 10) / 10
   apply(result, props.splittable)
   fitSize.value = result
+  applyOpticalMargin()
 }
 
 function scheduleFit() {
