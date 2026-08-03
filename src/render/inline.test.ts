@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inlineMd } from './inline'
+import { inlineMd, parseContent, rowsToContent } from './inline'
 
 describe('inlineMd links', () => {
   it('renders [text](url) as a safe anchor', () => {
@@ -20,6 +20,37 @@ describe('inlineMd links', () => {
 
   it('escapes HTML before linkifying so markup cannot be injected', () => {
     expect(inlineMd('[a](https://x)<script>')).toContain('&lt;script&gt;')
+  })
+})
+
+describe('parseContent', () => {
+  // Content round-trips through parseContent on every keystroke while a bullet
+  // list is being live-edited (row text → rowsToContent → slide.content →
+  // parseContent → back into the row's own prop). Stripping a trailing space
+  // here used to delete the character the user had just pressed mid-typing —
+  // e.g. typing "foo " to start a new word glued it straight to the next one.
+  it('keeps a trailing space on a bullet row', () => {
+    expect(parseContent('- foo ')).toEqual([{ text: 'foo ', bullet: true }])
+  })
+
+  it('keeps a trailing space on a plain row', () => {
+    expect(parseContent('foo ')).toEqual([{ text: 'foo ', bullet: false }])
+  })
+
+  it('still strips leading indentation on a plain row', () => {
+    expect(parseContent('   foo')).toEqual([{ text: 'foo', bullet: false }])
+  })
+
+  it('still drops whitespace-only lines', () => {
+    expect(parseContent('- a\n   \n- b')).toEqual([
+      { text: 'a', bullet: true },
+      { text: 'b', bullet: true },
+    ])
+  })
+
+  it('round-trips a trailing space through rowsToContent unchanged', () => {
+    const rows = parseContent('- foo ')
+    expect(parseContent(rowsToContent(rows))).toEqual(rows)
   })
 })
 

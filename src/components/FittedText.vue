@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import EditableText from './EditableText.vue'
 
 const props = withDefaults(
@@ -79,7 +79,12 @@ function fit() {
 
 function scheduleFit() {
   cancelAnimationFrame(animationFrame)
-  animationFrame = requestAnimationFrame(() => void nextTick(fit))
+  // fit() only reads/writes real DOM refs (already current by the time typing
+  // fires the MutationObserver), so it doesn't need to wait for a Vue nextTick
+  // on top of the animation frame — that extra tick widens the window where a
+  // just-typed character can render clipped (still at the old font size, one
+  // paint before fit() catches up and shrinks it to fit).
+  animationFrame = requestAnimationFrame(fit)
 }
 
 onMounted(() => {

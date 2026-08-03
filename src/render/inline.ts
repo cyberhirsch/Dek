@@ -78,16 +78,22 @@ export interface ContentRow {
 
 /** Parse a Markdown `content` block into rows. A line starting with `- ` (or `* `)
  *  is a bullet; any other non-empty line is a plain paragraph. Blank lines are
- *  dropped (they only separate). The raw text per row keeps inline markdown. */
+ *  dropped (they only separate). The raw text per row keeps inline markdown.
+ *
+ *  Trailing whitespace is NEVER stripped here: this runs on every keystroke
+ *  (live editing round-trips content → parseContent → back into the row the
+ *  user is typing in), so eating a trailing space silently deleted the very
+ *  character someone had just pressed, mid-word — e.g. typing "foo " to start
+ *  a new word would lose the space and immediately glue "foo" to whatever came
+ *  next. Only leading whitespace (indentation) is trimmed. */
 export function parseContent(content: string | undefined): ContentRow[] {
   if (!content) return []
   const rows: ContentRow[] = []
   for (const raw of content.split('\n')) {
-    const line = raw.replace(/\s+$/, '')
-    if (!line.trim()) continue
-    const m = line.match(/^\s*[-*]\s+(.*)$/)
+    if (!raw.trim()) continue
+    const m = raw.match(/^\s*[-*]\s+(.*)$/)
     if (m) rows.push({ text: m[1], bullet: true })
-    else rows.push({ text: line.trim(), bullet: false })
+    else rows.push({ text: raw.replace(/^\s+/, ''), bullet: false })
   }
   return rows
 }
