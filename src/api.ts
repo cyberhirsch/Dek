@@ -33,6 +33,7 @@ import {
   ensureCanonicalAssets,
   fsDirBackend,
   listWorkspaceDecks,
+  listWorkspaceSubfolders,
   loadActiveFolder,
   loadWorkspace,
   openWorkspaceDeck,
@@ -42,6 +43,7 @@ import {
   rememberDirectory,
   rememberWorkspace,
   requestDirectoryPermission,
+  resolveWorkspacePath,
   saveAsFolder,
   supportsDir,
 } from './storage/fsdir'
@@ -390,17 +392,30 @@ export async function reconnectWorkspace(): Promise<boolean> {
   return requestDirectoryPermission(ws)
 }
 
-/** The decks in the workspace, for the in-app Open panel. */
-export async function listWorkspace(): Promise<DeckEntry[]> {
+/** The workspace folder currently being browsed — the granted root, then down
+ *  through whatever subfolder path the Open/Save panel has navigated into
+ *  (e.g. a course folder holding several weeks' decks). */
+async function workspaceFolder(path: string[]): Promise<DirHandle | null> {
   const ws = await getWorkspace()
-  return ws ? listWorkspaceDecks(ws) : []
+  if (!ws) return null
+  return path.length ? resolveWorkspacePath(ws, path) : ws
 }
 
-/** Open a deck from the workspace by its bundle folder name. No dialog. */
-export async function openWorkspaceFile(file: string): Promise<Deck> {
-  const ws = await getWorkspace()
-  if (!ws) throw new Error('No decks folder chosen yet.')
-  const { backend, deck, bundle } = await openWorkspaceDeck(ws, file)
+/** The subfolders and decks at a path inside the workspace, for the in-app
+ *  Open/Save panel's folder browsing. */
+export async function listWorkspace(path: string[] = []): Promise<{ folders: string[]; decks: DeckEntry[] }> {
+  const dir = await workspaceFolder(path)
+  if (!dir) return { folders: [], decks: [] }
+  const [folders, decks] = await Promise.all([listWorkspaceSubfolders(dir), listWorkspaceDecks(dir)])
+  return { folders, decks }
+}
+
+/** Open a deck from the workspace by its bundle folder name, at an optional
+ *  subfolder path. No dialog. */
+export async function openWorkspaceFile(file: string, path: string[] = []): Promise<Deck> {
+  const dir = await workspaceFolder(path)
+  if (!dir) throw new Error('No decks folder chosen yet.')
+  const { backend, deck, bundle } = await openWorkspaceDeck(dir, file)
   override = backend
   setCurrent(BUNDLE_MD)
   await clearActiveFile()
@@ -408,11 +423,12 @@ export async function openWorkspaceFile(file: string): Promise<Deck> {
   return deck
 }
 
-/** Save the deck as a new `<name>.dek` bundle in the workspace. No dialog. */
-export async function saveWorkspaceFile(name: string, config: DeckConfig, slides: Slide[]): Promise<Deck> {
-  const ws = await getWorkspace()
-  if (!ws) throw new Error('No decks folder chosen yet.')
-  const { backend, deck, bundle } = await createWorkspaceDeck(ws, name, { config, slides })
+/** Save the deck as a new `<name>.dek` bundle in the workspace, at an optional
+ *  subfolder path. No dialog. */
+export async function saveWorkspaceFile(name: string, config: DeckConfig, slides: Slide[], path: string[] = []): Promise<Deck> {
+  const dir = await workspaceFolder(path)
+  if (!dir) throw new Error('No decks folder chosen yet.')
+  const { backend, deck, bundle } = await createWorkspaceDeck(dir, name, { config, slides })
   override = backend
   setCurrent(BUNDLE_MD)
   await clearActiveFile()
@@ -427,10 +443,10 @@ export async function saveWorkspaceFile(name: string, config: DeckConfig, slides
  *  matter which backend the active deck lives in (workspace, server, browser) —
  *  only the source has to be a workspace bundle, since that's what's listable
  *  without a file dialog. */
-export async function importSlidesFromWorkspaceDeck(file: string): Promise<Slide[]> {
-  const ws = await getWorkspace()
-  if (!ws) throw new Error('No decks folder chosen yet.')
-  const { deck } = await openWorkspaceDeck(ws, file)
+export async function importSlidesFromWorkspaceDeck(file: string, path: string[] = []): Promise<Slide[]> {
+  const dir = await workspaceFolder(path)
+  if (!dir) throw new Error('No decks folder chosen yet.')
+  const { deck } = await openWorkspaceDeck(dir, file)
   const backend = await active()
   const map = new Map<string, string>()
   for (const ref of collectAssetRefs(deck.slides)) {

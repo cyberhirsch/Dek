@@ -5,7 +5,9 @@ import {
   directoryForFile,
   ensureCanonicalAssets,
   listWorkspaceDecks,
+  listWorkspaceSubfolders,
   openWorkspaceDeck,
+  resolveWorkspacePath,
   type DirHandle,
 } from './fsdir'
 import type { Deck } from '../core/types'
@@ -123,6 +125,27 @@ describe('workspace', () => {
     const list = await listWorkspaceDecks(ws)
     expect(list.map((d) => d.name)).toEqual(['Lukas', 'VoluLab Chiemgau'])
     expect(list.map((d) => d.file)).toEqual(['Lukas.dek', 'VoluLab Chiemgau.dek'])
+  })
+
+  it('lists subfolders but excludes .dek bundles from them', async () => {
+    const ws = new MockDirHandle('decks')
+    await ws.getDirectoryHandle('S1_Design & Gestalt', { create: true })
+    await ws.getDirectoryHandle('S2_Typography', { create: true })
+    await ws.getDirectoryHandle('Lukas.dek', { create: true }) // a deck, not a subfolder
+
+    const folders = await listWorkspaceSubfolders(ws)
+    expect(folders).toEqual(['S1_Design & Gestalt', 'S2_Typography'])
+  })
+
+  it('walks a subfolder path and lists the decks inside it', async () => {
+    const ws = new MockDirHandle('decks')
+    const course = (await ws.getDirectoryHandle('S1_Design & Gestalt', { create: true })) as MockDirHandle
+    await course.getDirectoryHandle('Week 01 - Gestalt Principles.dek', { create: true })
+    await course.getDirectoryHandle('Week 02 - Visual Hierarchy.dek', { create: true })
+
+    const resolved = await resolveWorkspacePath(ws, ['S1_Design & Gestalt'])
+    const decks = await listWorkspaceDecks(resolved)
+    expect(decks.map((d) => d.name)).toEqual(['Week 01 - Gestalt Principles', 'Week 02 - Visual Hierarchy'])
   })
 
   it('creates a named bundle with deck.md + Assets and titles it from the folder', async () => {

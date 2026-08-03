@@ -212,33 +212,33 @@ function isAbort(e: unknown) {
 const deckBrowser = ref<'open' | 'save' | 'import' | null>(null)
 // Set by openSlideImport(): which slide to insert the imported ones after.
 const importAt = ref<number | null>(null)
-async function onBrowserOpen(file: string) {
+async function onBrowserOpen(e: { file: string; path: string[] }) {
   error.value = ''
   try {
-    applyDeck(await openWorkspaceFile(file))
+    applyDeck(await openWorkspaceFile(e.file, e.path))
     reconnectName.value = null
     deckBrowser.value = null
-  } catch (e) {
-    if (!isAbort(e)) error.value = `Open failed: ${(e as Error).message}`
+  } catch (err) {
+    if (!isAbort(err)) error.value = `Open failed: ${(err as Error).message}`
   }
 }
-async function onBrowserSave(name: string) {
+async function onBrowserSave(e: { name: string; path: string[] }) {
   if (!deck.value) return
   error.value = ''
   try {
-    applyDeck(await saveWorkspaceFile(name, deck.value.config, deck.value.slides))
+    applyDeck(await saveWorkspaceFile(e.name, deck.value.config, deck.value.slides, e.path))
     saveStatus.value = 'saved'
     reconnectName.value = null
     deckBrowser.value = null
-  } catch (e) {
-    if (!isAbort(e)) error.value = (e as Error).message
+  } catch (err) {
+    if (!isAbort(err)) error.value = (err as Error).message
   }
 }
-async function onBrowserImport(file: string) {
+async function onBrowserImport(pick: { file: string; path: string[] }) {
   if (!deck.value) return
   error.value = ''
   try {
-    const slides = await importSlidesFromWorkspaceDeck(file)
+    const slides = await importSlidesFromWorkspaceDeck(pick.file, pick.path)
     if (slides.length) {
       snap('add')
       const at = (importAt.value ?? current.value) + 1

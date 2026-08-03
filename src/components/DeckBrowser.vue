@@ -17,18 +17,22 @@ import {
 
 const props = defineProps<{ mode: 'open' | 'save' | 'import'; currentName?: string }>()
 const emit = defineEmits<{
-  'open-deck': [file: string]
-  'save-deck': [name: string]
-  'import-deck': [file: string]
+  'open-deck': [e: { file: string; path: string[] }]
+  'save-deck': [e: { name: string; path: string[] }]
+  'import-deck': [e: { file: string; path: string[] }]
   close: []
 }>()
 
 const state = ref<WorkspaceState>({ status: 'none' })
+const folders = ref<string[]>([])
 const decks = ref<DeckEntry[]>([])
 const busy = ref(false)
 const err = ref('')
 const saveName = ref(props.currentName ?? '')
 const nameInput = ref<HTMLInputElement | null>(null)
+// Subfolder path currently being browsed, relative to the granted workspace
+// root (e.g. a course folder holding several weeks' decks). [] = the root.
+const path = ref<string[]>([])
 
 const ready = computed(() => state.value.status === 'ready')
 const folderName = computed(() =>
@@ -37,7 +41,14 @@ const folderName = computed(() =>
 
 async function refresh() {
   state.value = await workspaceState()
-  decks.value = state.value.status === 'ready' ? await listWorkspace() : []
+  if (state.value.status === 'ready') {
+    const l = await listWorkspace(path.value)
+    folders.value = l.folders
+    decks.value = l.decks
+  } else {
+    folders.value = []
+    decks.value = []
+  }
   if (props.mode === 'save' && ready.value) {
     await nextTick()
     nameInput.value?.focus()
@@ -61,13 +72,22 @@ async function guard(fn: () => Promise<void>) {
   }
 }
 
-const onChoose = () => guard(async () => { await chooseWorkspace(); await refresh() })
+const onChoose = () => guard(async () => { await chooseWorkspace(); path.value = []; await refresh() })
 const onReconnect = () => guard(async () => { await reconnectWorkspace(); await refresh() })
-const onForget = () => guard(async () => { await forgetWorkspace(); await refresh() })
+const onForget = () => guard(async () => { await forgetWorkspace(); path.value = []; await refresh() })
 
+function openFolder(name: string) {
+  path.value = [...path.value, name]
+  void refresh()
+}
+/** Jump to an ancestor in the breadcrumb: -1 is the root, 0 the first segment, etc. */
+function jumpTo(i: number) {
+  path.value = path.value.slice(0, i + 1)
+  void refresh()
+}
 function onOpen(file: string) {
-  if (props.mode === 'import') emit('import-deck', file)
-  else emit('open-deck', file)
+  if (props.mode === 'import') emit('import-deck', { file, path: path.value })
+  else emit('open-deck', { file, path: path.value })
 }
 function onSave() {
   const name = saveName.value.trim()
@@ -75,7 +95,7 @@ function onSave() {
     nameInput.value?.focus()
     return
   }
-  emit('save-deck', name)
+  emit('save-deck', { name, path: path.value })
 }
 </script>
 
@@ -84,7 +104,14 @@ function onSave() {
     <div class="db">
       <header class="db-head">
         <span class="db-title">{{ mode === 'save' ? 'Save deck' : mode === 'import' ? 'Import slides…' : 'Open deck' }}</span>
-        <span v-if="ready" class="db-folder" :title="folderName">📁 {{ folderName }}</span>
+        <button v-if="ready && path.length" class="db-up" title="Up one level" @click="jumpTo(path.length - 2)">‹</button>
+        <nav v-if="ready" class="db-crumbs">
+          <button class="db-crumb" :class="{ cur: !path.length }" :title="folderName" @click="jumpTo(-1)">📁 {{ folderName }}</button>
+          <template v-for="(seg, i) in path" :key="i">
+            <span class="db-crumb-sep">›</span>
+            <button class="db-crumb" :class="{ cur: i === path.length - 1 }" :title="seg" @click="jumpTo(i)">{{ seg }}</button>
+          </template>
+        </nav>
         <button class="db-x" title="Close (Esc)" @click="emit('close')">✕</button>
       </header>
 
@@ -101,9 +128,20 @@ function onSave() {
         <button class="db-primary" :disabled="busy" @click="onReconnect">Reconnect</button>
       </div>
 
-      <!-- the deck list -->
+      <!-- the folder + deck list -->
       <template v-else>
         <div class="db-list">
+          <button
+            v-for="f in folders"
+            :key="f"
+            class="db-item db-folder-item"
+            @click="openFolder(f)"
+            @dblclick="openFolder(f)"
+          >
+            <span class="db-item-icon">📁</span>
+            <span class="db-item-name">{{ f }}</span>
+            <span class="db-item-chev">›</span>
+          </button>
           <button
             v-for="d in decks"
             :key="d.file"
@@ -114,7 +152,7 @@ function onSave() {
             <span class="db-item-icon">◈</span>
             <span class="db-item-name">{{ d.name }}</span>
           </button>
-          <div v-if="!decks.length" class="db-list-empty">
+          <div v-if="!folders.length && !decks.length" class="db-list-empty">
             {{ mode === 'import' ? 'No other decks here to import from.' : 'No decks here yet — save one below.' }}
           </div>
         </div>
@@ -178,14 +216,56 @@ function onSave() {
 .db-title {
   font-size: 14px;
 }
-.db-folder {
+.db-up {
+  background: none;
+  border: none;
+  color: rgba(230, 236, 242, 0.6);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0 2px;
+  flex: none;
+}
+.db-up:hover {
+  color: rgba(230, 236, 242, 0.9);
+}
+.db-crumbs {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
-  color: rgba(230, 236, 242, 0.5);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
   white-space: nowrap;
+}
+.db-crumb {
+  background: none;
+  border: none;
+  color: rgba(230, 236, 242, 0.5);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 4px;
+  border-radius: 5px;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: none;
+}
+.db-crumb:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(230, 236, 242, 0.85);
+}
+.db-crumb.cur {
+  color: rgba(230, 236, 242, 0.85);
+  cursor: default;
+}
+.db-crumb.cur:hover {
+  background: none;
+}
+.db-crumb-sep {
+  color: rgba(230, 236, 242, 0.3);
+  font-size: 11px;
+  flex: none;
 }
 .db-x {
   background: none;
@@ -240,9 +320,18 @@ function onSave() {
   font-size: 11px;
 }
 .db-item-name {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.db-folder-item .db-item-icon {
+  color: rgba(230, 236, 242, 0.6);
+}
+.db-item-chev {
+  flex: none;
+  color: rgba(230, 236, 242, 0.35);
+  font-size: 13px;
 }
 .db-list-empty {
   padding: 30px 12px;

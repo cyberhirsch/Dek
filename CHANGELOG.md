@@ -6,6 +6,9 @@
 
 ### Opening & saving
 
+**Open/Save/Import can browse into subfolders, not just the granted root** (#42)
+The workspace browser only ever scanned one flat level — a subfolder that wasn't itself a `.dek` bundle was invisible and unreachable, so organizing decks into course/category folders (e.g. `S1_Design & Gestalt/Week 01…dek`, `Week 02…dek`) meant every deck below the top level simply never showed up unless the *exact* folder was the granted root. The panel now lists real subfolders alongside decks (📁, click to browse in) with a clickable breadcrumb back up to the root, and Open/Save As/Import all operate relative to whatever folder is currently browsed — so you can navigate into a course folder and open, save, or import right there, without re-granting a different root via "Change folder…" each time. `listWorkspaceSubfolders`/`resolveWorkspacePath` in `fsdir.ts`; `+2` tests.
+
 **A warning banner explains when Open/Save As can't save real files** (#42)
 Without the File System Access API, Dek silently falls back to browser local storage — decks aren't real files on disk, and the whole Open/Save As workspace flow disappears from the deck menu with nothing but a small note if you happen to open it. There's now a dismissible banner at startup that explains this plainly and gives an actual fix: on a Chromium-based browser (Chrome, Edge, Brave, Opera) it points at the "File System Access API" / "Experimental Web Platform features" flag, since the API is usually on by default there and its absence means it's off or the browser is outdated; on Safari or Firefox it says plainly that the feature isn't supported and suggests switching browsers, since no flag will fix that. Dismissal is remembered (`localStorage`) so it won't nag on every load.
 

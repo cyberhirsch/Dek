@@ -72,13 +72,32 @@ export async function clearWorkspace(): Promise<void> {
   await idbSet(WORKSPACE, undefined)
 }
 
-/** The `.dek` bundles in the workspace, newest-name-sorted for the picker. */
+/** The `.dek` bundles directly inside `dir` (one level, no recursion). */
 export async function listWorkspaceDecks(dir: DirHandle): Promise<DeckEntry[]> {
   const out: DeckEntry[] = []
   for await (const h of dir.values()) {
     if (isDir(h) && /\.dek$/i.test(h.name)) out.push({ file: h.name, name: bundleDeckName(h.name) })
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Subfolders of `dir` that are organizational (NOT themselves a `.dek` bundle) —
+ *  e.g. a course folder holding several weeks' decks. Lets the Open/Save panel
+ *  browse into them instead of only ever seeing a flat list of the granted root. */
+export async function listWorkspaceSubfolders(dir: DirHandle): Promise<string[]> {
+  const out: string[] = []
+  for await (const h of dir.values()) {
+    if (isDir(h) && !/\.dek$/i.test(h.name)) out.push(h.name)
+  }
+  return out.sort((a, b) => a.localeCompare(b))
+}
+
+/** Walk from the workspace root down through a subfolder path (each segment a
+ *  plain folder name, not a `.dek` bundle) to the folder currently being browsed. */
+export async function resolveWorkspacePath(dir: DirHandle, path: string[]): Promise<DirHandle> {
+  let cur = dir
+  for (const name of path) cur = await cur.getDirectoryHandle(name)
+  return cur
 }
 
 /** Open a bundle in the workspace by its folder name. The deck's display name is
