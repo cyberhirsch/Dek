@@ -114,6 +114,13 @@ describe('bakeToElements geometry contract', () => {
     expect(img.link).toBe('https://x.io')
   })
 
+  it('carries invert/desaturate onto the baked box (so bake-to-freeform preserves the filter)', () => {
+    const els = bakeToElements({ layout: 'image-full', image: 'a.png', imageInvert: true, imageDesaturate: true })
+    const img = boxes(els).find((b) => b.src === 'a.png')!
+    expect(img.invert).toBe(true)
+    expect(img.desaturate).toBe(true)
+  })
+
   it('carries a gallery cell link onto its baked box', () => {
     const els = bakeToElements({
       layout: 'gallery',

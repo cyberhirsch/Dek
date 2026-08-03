@@ -210,14 +210,14 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       // The image keeps its full height; an optional caption sits just below it,
       // in the bottom margin (there's ~PAD_Y of room under the column).
       const drawnImgH = Math.min(imgH, colH)
-      if (slide.image) els.push(image(slide.image, imgX, y, imgW, drawnImgH, { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: slide.imageLink }))
+      if (slide.image) els.push(image(slide.image, imgX, y, imgW, drawnImgH, { focus: slide.focus, radius: 12, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: slide.imageLink, invert: slide.imageInvert, desaturate: slide.imageDesaturate }))
       if (slide.caption) els.push(text(slide.caption, imgX, y + drawnImgH + 12, imgW, Math.round(18 * BODY_LH), { size: 18, color: 'rgba(230,236,242,0.85)' }))
       els.push(text(content, textX, y, textW, colH, listStyle(bodySize)))
       break
     }
     case 'image-full': {
       // full-bleed image; overlay text bottom-anchored inside the pad
-      if (slide.image) els.push(image(slide.image, 0, 0, STAGE_W, STAGE_H, { focus: slide.focus, link: slide.imageLink }))
+      if (slide.image) els.push(image(slide.image, 0, 0, STAGE_W, STAGE_H, { focus: slide.focus, link: slide.imageLink, invert: slide.imageInvert, desaturate: slide.imageDesaturate }))
       const capH = slide.caption ? 22 * BODY_LH : 0
       let bottom = STAGE_H - PAD_Y
       if (slide.caption) {
@@ -229,7 +229,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
     }
     case 'image-caption': {
       // .l-image-caption: frame inset 60px, caption chip 80px into a corner
-      if (slide.image) els.push(image(slide.image, 60, 60, STAGE_W - 120, STAGE_H - 120, { fit: 'contain', focus: slide.focus, radius: 12, link: slide.imageLink }))
+      if (slide.image) els.push(image(slide.image, 60, 60, STAGE_W - 120, STAGE_H - 120, { fit: 'contain', focus: slide.focus, radius: 12, link: slide.imageLink, invert: slide.imageInvert, desaturate: slide.imageDesaturate }))
       if (slide.caption) {
         const pos = slide.captionPos ?? 'bottom-right'
         const capH = 18 * BODY_LH

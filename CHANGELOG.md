@@ -39,6 +39,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Invert / Desaturate in the image right-click menu** (#42)
+Two new toggles alongside Fit: Cover/Contain in every image context menu — the single layout image on Text + Image / Image – Full / Image + Caption, and any freeform canvas box carrying a picture. Both are independent CSS-filter toggles (can combine — an inverted grayscale image is just both checked), applied via `FramedImage`'s `filter` so they show correctly while editing, presenting, and in the standalone-HTML/ZIP export (which renders the same components). Portraits and gallery cells don't get the toggle, matching Fit's existing single-image-only scope. Layout-image state travels across layout switches and bake-to-freeform (same `MOD_SUPPORT`/`KNOWN_FIELDS` treatment as `imageFit`/`imageLink`), and clears when the image is replaced or removed. **Known limitation**: PPTX export can't carry these — PowerPoint's picture-recolor options don't map to arbitrary CSS filters, and baking a real filtered image would need an async pixel re-encode this export path doesn't support — so an inverted/desaturated image exports to `.pptx` at its original colors.
+
 **Drag a chapter's header to reorder the whole group at once** (#42)
 Only individual slide rows were draggable in the navigator — moving a whole chapter meant dragging every one of its slides out one at a time. A chapter's slides are always a contiguous run by definition, so its header is now draggable too: grab it and drop it before/after another chapter (or between any two slides) to relocate the entire run in one move, reusing the same block-reorder the multi-select drag already had. Dropping a dragged chapter onto another chapter's header inserts it before/after that chapter (top half vs. bottom half of the header); dragging a single loose slide onto a header still joins that group, unchanged.
 

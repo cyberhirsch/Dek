@@ -948,8 +948,11 @@ function elementItems(index: number): CtxEntry[] {
       { divider: true },
       { label: 'Fit: Cover', check: (b.fit ?? 'cover') === 'cover', action: () => patchElementAt(index, { fit: 'cover' }) },
       { label: 'Fit: Contain', check: b.fit === 'contain', action: () => patchElementAt(index, { fit: 'contain' }) },
+      { divider: true },
+      { label: 'Invert', check: !!b.invert, action: () => patchElementAt(index, { invert: !b.invert }) },
+      { label: 'Desaturate', check: !!b.desaturate, action: () => patchElementAt(index, { desaturate: !b.desaturate }) },
       { label: 'Replace Image…', action: () => replaceImageAt(index) },
-      { label: 'Remove Image', action: () => patchElementAt(index, { src: undefined, fit: undefined, focus: undefined }) },
+      { label: 'Remove Image', action: () => patchElementAt(index, { src: undefined, fit: undefined, focus: undefined, invert: undefined, desaturate: undefined }) },
     )
   }
   return items
@@ -997,13 +1000,16 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
     )
     if (fieldImageLink(s, t)) items.push({ label: 'Remove Link', action: () => setFieldLink(t, undefined) })
   }
-  // Fit only makes sense for the single framed image; portraits/gallery are grids.
+  // Fit/Invert/Desaturate only make sense for the single framed image; portraits/gallery are grids.
   if (t.field === 'image') {
     const fit = s.imageFit ?? (s.layout === 'image-caption' ? 'contain' : 'cover')
     items.push(
       { divider: true },
       { label: 'Fit: Cover', check: fit === 'cover', action: () => patchSlide({ imageFit: 'cover' }) },
       { label: 'Fit: Contain', check: fit === 'contain', action: () => patchSlide({ imageFit: 'contain' }) },
+      { divider: true },
+      { label: 'Invert', check: !!s.imageInvert, action: () => patchSlide({ imageInvert: !s.imageInvert }) },
+      { label: 'Desaturate', check: !!s.imageDesaturate, action: () => patchSlide({ imageDesaturate: !s.imageDesaturate }) },
     )
   }
   items.push(
@@ -1056,7 +1062,7 @@ function removeFieldImage(t: ImageField) {
   const s = deck.value?.slides[current.value]
   if (!s) return
   if (t.field === 'image') {
-    patchSlide({ image: undefined, focus: undefined, imageFit: undefined })
+    patchSlide({ image: undefined, focus: undefined, imageFit: undefined, imageInvert: undefined, imageDesaturate: undefined })
   } else if (t.field === 'portraits') {
     const portraits = [...(s.portraits ?? [])]
     portraits.splice(t.index ?? -1, 1)

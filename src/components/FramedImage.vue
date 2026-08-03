@@ -6,6 +6,8 @@ const props = defineProps<{
   src?: string
   focus?: Focus
   fit?: 'cover' | 'contain'
+  invert?: boolean
+  desaturate?: boolean
   editable?: boolean
   pannable?: boolean // allow pan/zoom (only single-image layouts)
 }>()
@@ -16,12 +18,14 @@ const emit = defineEmits<{
 
 const style = computed(() => {
   const f = props.focus ?? { x: 0, y: 0, scale: 1 }
+  const filters = [props.desaturate && 'grayscale(1)', props.invert && 'invert(1)'].filter(Boolean)
   return {
     width: '100%',
     height: '100%',
     objectFit: props.fit ?? 'cover',
     transform: `translate(${f.x}px, ${f.y}px) scale(${f.scale})`,
     transformOrigin: 'center',
+    ...(filters.length ? { filter: filters.join(' ') } : {}),
   } as Record<string, string>
 })
 

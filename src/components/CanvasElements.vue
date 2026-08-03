@@ -657,6 +657,8 @@ defineExpose({ commitEdit })
           :src="asBox(el).src"
           :focus="asBox(el).focus"
           :fit="asBox(el).fit ?? 'cover'"
+          :invert="asBox(el).invert"
+          :desaturate="asBox(el).desaturate"
         />
         <!-- a box with no picture but a `qr:` URL draws the code instead -->
         <QrCode v-else-if="asBox(el).qr" :text="asBox(el).qr as string" />

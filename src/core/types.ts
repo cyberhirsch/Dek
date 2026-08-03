@@ -96,6 +96,9 @@ export interface BoxElement extends ElementBase {
   src?: string
   fit?: 'cover' | 'contain'
   focus?: Focus
+  /** CSS-filter-style image adjustments, independently toggleable. */
+  invert?: boolean
+  desaturate?: boolean
   /** A URL rendered as a QR code filling the box. The *link* is stored, never a
    *  generated image, so `deck.md` stays readable and editing the URL redraws
    *  the code (the same contract as `diagram`'s Mermaid `code`). */
@@ -206,6 +209,10 @@ export interface Slide {
   /** Makes the layout image (`image` field) clickable in present/export — the
    *  layout counterpart of a freeform box's `link`. `http(s)`/`mailto` only. */
   imageLink?: string
+  /** CSS-filter-style adjustments for the layout image, independently
+   *  toggleable — the layout counterpart of a freeform box's `invert`/`desaturate`. */
+  imageInvert?: boolean
+  imageDesaturate?: boolean
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus

@@ -244,7 +244,7 @@ watch(
         </div>
         <div class="img-col">
           <div class="frame-img" @contextmenu="onImageCtx">
-            <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+            <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :invert="slide.imageInvert" :desaturate="slide.imageDesaturate" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
             <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
           </div>
           <FittedText
@@ -267,7 +267,7 @@ watch(
     <!-- image-full -->
     <div v-else-if="slide.layout === 'image-full'" class="dek-pad l-image-full">
       <div class="bg" @contextmenu="onImageCtx">
-        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'cover'" :invert="slide.imageInvert" :desaturate="slide.imageDesaturate" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
         <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
       </div>
       <div v-if="slide.title || slide.caption || editable" class="overlay">
@@ -279,7 +279,7 @@ watch(
     <!-- image-caption -->
     <div v-else-if="slide.layout === 'image-caption'" class="dek-pad l-image-caption">
       <div class="frame" @contextmenu="onImageCtx">
-        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'contain'" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
+        <FramedImage :src="slide.image" :focus="slide.focus" :fit="slide.imageFit ?? 'contain'" :invert="slide.imageInvert" :desaturate="slide.imageDesaturate" :editable="editable" pannable @update:focus="setFocus" @file="emit('upload', { field: 'image', file: $event })" />
         <a v-if="!editable && safeLink(slide.imageLink)" class="img-link" :href="safeLink(slide.imageLink)" target="_blank" rel="noopener noreferrer" />
       </div>
       <FittedText v-if="editable || slide.caption" class="fit-photo-caption cap" :class="slide.captionPos ?? 'bottom-right'" content-class="photo-caption" :model-value="slide.caption" :editable="editable" placeholder="Caption / credit" :base-size="18" :min-size="10" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
