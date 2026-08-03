@@ -477,6 +477,10 @@
     rgba(7, 8, 9, 0.4) 45%,
     rgba(7, 8, 9, 0) 70%
   );
+  /* This scrim spans the whole slide (inset: 0) even though only its bottom
+     edge has visible content, which silently ate every dragover/drop meant for
+     the image underneath. Only the title/caption boxes need real hit-testing. */
+  pointer-events: none;
 }
 .l-image-full .overlay h1 {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
@@ -485,12 +489,14 @@
   width: 100%;
   height: 78px;
   flex: none;
+  pointer-events: auto;
 }
 .l-image-full .fit-image-caption {
   width: 100%;
   height: 58px;
   margin-top: 8px;
   flex: none;
+  pointer-events: auto;
 }
 .l-image-full .overlay .cap {
   font-size: 22px;

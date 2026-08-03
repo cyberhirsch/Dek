@@ -39,6 +39,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Fixed: couldn't drag an image onto Image – Full** (#42)
+Dropping an image anywhere on an Image – Full slide silently did nothing, while the same drag worked fine on Image + Caption. Cause: the title/caption overlay div sits `position: absolute; inset: 0` — covering the *entire* slide, not just the strip where its text actually sits — with no `pointer-events: none`, so it caught every `dragover`/`drop` before the image underneath ever saw them. Image + Caption never had this problem because its caption is sized to a small corner box, not the whole frame. The overlay itself is now `pointer-events: none`, with the title/caption text boxes set back to `pointer-events: auto` so they stay clickable/editable — drops now reach the image everywhere the overlay has no visible content.
+
 **Presenter view's slide preview and notes text now fill the space the divider gives them** (#42)
 Dragging the divider between the current-slide preview and the notes/next-slide pane used to just add or remove empty margin — the current-slide preview was pinned at a fixed 640px and the notes text at a fixed 16px regardless of how much room the drag left them. Both now track the divider: the current-slide preview fills whatever space remains (capped so its 16:9 shape still fits the available height), the "Next" preview tracks the side pane's width, and the notes text scales between 15–26px with the side pane's width. Recomputed on window resize too.
 
