@@ -191,6 +191,37 @@ describe('blankSlide', () => {
       expect(back.slides[0].layout).toBe(id)
     }
   })
+
+  it('blanks a table as a uniform 3x3 grid of empty cells', () => {
+    const s = blankSlide('table')
+    expect(s.tableRows).toBe(3)
+    expect(s.tableCols).toBe(3)
+    expect(s.tableCells).toHaveLength(9)
+  })
+
+  it('round-trips a table with custom column widths and mixed text/image/merged cells', () => {
+    const deck = {
+      config: defaultConfig(),
+      slides: [
+        {
+          layout: 'table' as const,
+          title: 'Specs',
+          tableRows: 2,
+          tableCols: 2,
+          tableColWidths: [0.3, 0.7],
+          tableRowHeights: [0.5, 0.5],
+          tableCells: [
+            { text: 'Merged', colspan: 2 },
+            { covered: true },
+            { image: 'a.jpg', link: 'https://x.io' },
+            { text: 'plain' },
+          ],
+        },
+      ],
+    }
+    const back = parseDeck(serializeDeck(deck))
+    expect(back.slides[0]).toEqual(deck.slides[0])
+  })
 })
 
 describe('parse errors', () => {

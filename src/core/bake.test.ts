@@ -130,10 +130,67 @@ describe('bakeToElements geometry contract', () => {
     expect(img.link).toBe('https://y.io')
   })
 
+  it('bakes a uniform table (no tableColWidths/RowHeights) into evenly-divided rects', () => {
+    // Image cells (not text) so INSET_X/Y compensation doesn't skew the edges
+    // being compared here — that inset math is already locked by other tests.
+    const els = bakeToElements({
+      layout: 'table',
+      tableRows: 2,
+      tableCols: 2,
+      tableCells: [{ image: 'a.png' }, { image: 'b.png' }, { image: 'c.png' }, { image: 'd.png' }],
+    })
+    const boxesBySrc = (src: string) => boxes(els).find((b) => b.src === src)!
+    const a = boxesBySrc('a.png')
+    const b = boxesBySrc('b.png')
+    const c = boxesBySrc('c.png')
+    // even columns: b starts exactly where a's width ends
+    expect(b.x).toBeCloseTo(a.x + a.w, 5)
+    expect(a.w).toBeCloseTo(b.w, 5)
+    // even rows: c starts exactly where a's height ends
+    expect(c.y).toBeCloseTo(a.y + a.h, 5)
+    expect(a.h).toBeCloseTo(c.h, 5)
+  })
+
+  it('bakes non-uniform tableColWidths/RowHeights at their cumulative-fraction offsets', () => {
+    const els = bakeToElements({
+      layout: 'table',
+      tableRows: 1,
+      tableCols: 2,
+      tableCells: [{ image: 'a.png' }, { image: 'b.png' }],
+      tableColWidths: [0.25, 0.75],
+    })
+    const a = boxes(els).find((b) => b.src === 'a.png')!
+    const b = boxes(els).find((b) => b.src === 'b.png')!
+    // the narrow column is a third the width of the wide one (0.25 vs 0.75)
+    expect(b.w / a.w).toBeCloseTo(3, 5)
+    expect(b.x).toBeCloseTo(a.x + a.w, 5)
+  })
+
+  it('bakes a merged cell as one rect spanning its tracks, and skips its covered neighbors', () => {
+    const els = bakeToElements({
+      layout: 'table',
+      tableRows: 2,
+      tableCols: 2,
+      tableCells: [
+        { image: 'merged.png', colspan: 2 },
+        { covered: true },
+        { image: 'c.png' },
+        { image: 'd.png' },
+      ],
+    })
+    const merged = boxes(els).find((b) => b.src === 'merged.png')!
+    const c = boxes(els).find((b) => b.src === 'c.png')!
+    const d = boxes(els).find((b) => b.src === 'd.png')!
+    // spans the full grid width, same as the combined width of both columns below it
+    expect(merged.w).toBeCloseTo(c.w + d.w, 5)
+    // no element at all was emitted for the covered placeholder cell
+    expect(boxes(els)).toHaveLength(3)
+  })
+
   it('produces finite geometry for every layout, even with empty fields', () => {
     const layouts: Slide['layout'][] = [
       'cover', 'section', 'statement', 'speaker', 'text', 'text-image',
-      'image-full', 'image-caption', 'video-embed', 'gallery', 'diagram',
+      'image-full', 'image-caption', 'video-embed', 'gallery', 'diagram', 'table',
     ]
     for (const layout of layouts) {
       const els = bakeToElements({ layout })

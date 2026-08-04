@@ -862,20 +862,7 @@ function onInsert(what: 'video' | 'diagram' | 'table') {
   if (!deck.value) return
   if (what === 'video') addSlide('video-embed')
   else if (what === 'diagram') addSlide('diagram')
-  else {
-    // table: a freeform slide seeded with an editable HTML table
-    snap('add')
-    const body =
-      '<table style="width:100%; border-collapse:collapse; font-size:1.2rem;">\n' +
-      '  <tr><th>Column A</th><th>Column B</th></tr>\n' +
-      '  <tr><td>—</td><td>—</td></tr>\n' +
-      '  <tr><td>—</td><td>—</td></tr>\n' +
-      '</table>'
-    deck.value.slides.splice(current.value + 1, 0, { layout: 'freeform', body })
-    current.value += 1
-    selected.value = [current.value]
-    void saveWholeDeck()
-  }
+  else addSlide('table')
 }
 function toggleSelectedBullets() {
   bulletFormatCommand.value += 1
@@ -893,7 +880,7 @@ function closeCtx() {
 // its own input down in CanvasElements; the menu can't reach that one). The
 // target is either a freeform box element or one of the slide's image fields
 // (the single `image`, or a `portraits` / `gallery` slot by index).
-type ImageField = { field: 'image' | 'portraits' | 'gallery'; index?: number }
+type ImageField = { field: 'image' | 'portraits' | 'gallery' | 'table'; index?: number }
 const ctxImgInput = ref<HTMLInputElement | null>(null)
 const ctxImgTarget = ref<{ kind: 'element'; index: number } | ({ kind: 'field' } & ImageField) | null>(null)
 function replaceImageAt(index: number) {
@@ -972,6 +959,7 @@ function multiItems(): CtxEntry[] {
 function fieldImageSrc(s: Slide, t: ImageField): string | undefined {
   if (t.field === 'image') return s.image
   if (t.field === 'portraits') return s.portraits?.[t.index ?? -1]
+  if (t.field === 'table') return s.tableCells?.[t.index ?? -1]?.image
   const it = s.items?.[t.index ?? -1]
   if (typeof it === 'string') return it
   if (it && typeof it === 'object' && 'image' in it) return (it as { image?: string }).image
@@ -985,15 +973,17 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
   const s = deck.value?.slides[current.value]
   if (!s) return []
   const src = fieldImageSrc(s, t)
-  if (!src) return []
+  // An empty table cell still gets a menu — just the one action to fill it —
+  // unlike other image fields, which have no "field with no image yet" state.
+  if (!src) return t.field === 'table' ? [{ label: 'Add Image…', action: () => replaceFieldImage(t) }] : []
   const items: CtxEntry[] = [
     { label: 'Copy Image', action: () => void copyImageSrc(src) },
     { label: 'Paste Image', action: () => pasteFieldImage(t) },
     { label: 'Download Image', action: () => void downloadImageSrc(src) },
   ]
-  // Links apply to the single image and gallery cells (both have a link field);
-  // portraits are a plain string array with nowhere to store one.
-  if (t.field === 'image' || t.field === 'gallery') {
+  // Links apply to the single image, gallery cells, and table cells (all have
+  // a link field); portraits are a plain string array with nowhere to store one.
+  if (t.field === 'image' || t.field === 'gallery' || t.field === 'table') {
     items.push(
       { divider: true },
       { label: 'Add Link (from Clipboard)', action: () => addFieldLink(t) },
@@ -1026,6 +1016,7 @@ function fieldImageLink(s: Slide, t: ImageField): string | undefined {
     const it = s.items?.[t.index ?? -1]
     return it && typeof it === 'object' && 'link' in it ? (it as { link?: string }).link : undefined
   }
+  if (t.field === 'table') return s.tableCells?.[t.index ?? -1]?.link
   return undefined
 }
 async function addFieldLink(t: ImageField) {
@@ -1050,6 +1041,9 @@ function setFieldLink(t: ImageField, link: string | undefined) {
       return next
     })
     patchSlide({ items })
+  } else if (t.field === 'table') {
+    const cells = (s.tableCells ?? []).map((c, i) => (i === t.index ? { ...c, link } : c))
+    patchSlide({ tableCells: cells })
   }
 }
 async function pasteFieldImage(t: ImageField) {
@@ -1067,6 +1061,11 @@ function removeFieldImage(t: ImageField) {
     const portraits = [...(s.portraits ?? [])]
     portraits.splice(t.index ?? -1, 1)
     patchSlide({ portraits })
+  } else if (t.field === 'table') {
+    // Cells are positional in a fixed grid — clear in place rather than
+    // splicing, which would shift every later cell into the wrong slot.
+    const cells = (s.tableCells ?? []).map((c, i) => (i === t.index ? { ...c, image: undefined, link: undefined } : c))
+    patchSlide({ tableCells: cells })
   } else {
     const items = [...(s.items ?? [])]
     items.splice(t.index ?? -1, 1)
@@ -1102,7 +1101,7 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery'; imageIndex?: number }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number }) {
   if (!editMode.value) return
   if (p.kind === 'image') {
     const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex })
@@ -1454,7 +1453,7 @@ function renameGroup(e: { indices: number[]; name: string }) {
 }
 
 // ── image upload ──
-async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }) {
+async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number }) {
   if (!deck.value) return
   const dataUrl = await fileToOptimizedDataUrl(e.file)
   const url = await uploadImage(e.file.name, dataUrl)
@@ -1479,6 +1478,9 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     })
     if (e.index != null && items[e.index]) items[e.index].image = url
     patchSlide({ items })
+  } else if (e.field === 'table') {
+    const cells = (slide.tableCells ?? []).map((c, i) => (i === e.index ? { ...c, image: url, text: undefined } : c))
+    patchSlide({ tableCells: cells })
   }
 }
 </script>

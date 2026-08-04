@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Layouts
+
+**New Table layout** (#43)
+Dek gains a real, structured **Table** layout — rows/columns set from a top-bar stepper (Rows/Cols), a genuine `tableRows`/`tableCols`/`tableCells` data model (not a raw HTML `<table>` dropped into a freeform slide, which is what "Insert → ▦ Table" used to do). Each cell holds text or an image, wired through the same right-click image menu every other image field already has (Copy/Paste/Download/Add Link/Replace/Remove, plus an "Add Image…" entry for an empty cell). Shrinking the grid warns before dropping any cell with real content, mirroring the Review panel's own asset-loss guard. Table cell images are fully tracked by the orphan-asset scanner from day one — the exact bug class (`elements[].src` not walked) that once caused the Review panel to offer deleting images still in use. Layout-switch pooling lets a table's content flow into/out of Gallery and Text (image cells ⇄ gallery items, text cells ⇄ bullet lines) so converting layouts doesn't lose data. Draggable dividers and cell merging are follow-up work, not part of this pass. New `src/core/table.ts`; `+22` tests across `table`, `analyze`, `bake`, `deck`, and `convert`.
+
 ### Opening & saving
 
 **A failed folder listing no longer looks identical to an empty folder** (#42)

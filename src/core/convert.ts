@@ -14,10 +14,10 @@
 // → semantic best-effort un-bakes (first text box→heading, rest→prose, images→
 // image/gallery, etc.), parking leftover canvas objects under `stash.elements`.
 
-import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, GalleryItem } from './types'
+import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, GalleryItem, TableCell } from './types'
 import { bakeToElements } from './bake'
 
-type Slot = 'heading' | 'lede' | 'prose' | 'caption' | 'image' | 'gallery' | 'video' | 'diagram' | 'portraits'
+type Slot = 'heading' | 'lede' | 'prose' | 'caption' | 'image' | 'gallery' | 'video' | 'diagram' | 'portraits' | 'table'
 
 /** Which concrete field each layout uses for each slot it supports. */
 const LAYOUT_FIELDS: Record<LayoutId, Partial<Record<Slot, string>>> = {
@@ -32,6 +32,7 @@ const LAYOUT_FIELDS: Record<LayoutId, Partial<Record<Slot, string>>> = {
   'video-embed': { caption: 'caption', video: 'video' },
   gallery: { heading: 'title', gallery: 'items' },
   diagram: { heading: 'title', diagram: 'code' },
+  table: { heading: 'title', table: 'tableCells' },
   freeform: {},
 }
 
@@ -40,14 +41,15 @@ const LAYOUT_FIELDS: Record<LayoutId, Partial<Record<Slot, string>>> = {
 // writing" at different scales, so they fill in for each other.
 const SLOT_CANDIDATES: Record<Slot, string[]> = {
   heading: ['title', 'name'],
-  lede: ['text', 'subtitle', 'content'],
-  prose: ['content', 'text', 'subtitle'],
+  lede: ['text', 'subtitle', 'content', 'tableCells'],
+  prose: ['content', 'text', 'subtitle', 'tableCells'],
   caption: ['caption', 'cite', 'byline', 'role'],
   image: ['image'],
-  gallery: ['items', 'image'],
+  gallery: ['items', 'image', 'tableCells'],
   video: ['video'],
   diagram: ['code'],
   portraits: ['portraits'],
+  table: ['tableCells', 'items', 'content', 'image'],
 }
 
 // Modifier fields travel with their parent media slot; parked if the target can't use them.
@@ -61,6 +63,10 @@ const MOD_SUPPORT: Record<string, LayoutId[]> = {
   captionPos: ['image-caption'],
   columns: ['gallery'],
   poster: ['video-embed'],
+  tableRows: ['table'],
+  tableCols: ['table'],
+  tableColWidths: ['table'],
+  tableRowHeights: ['table'],
 }
 const MOD_FIELDS = Object.keys(MOD_SUPPORT)
 
@@ -178,11 +184,48 @@ export function convertLayout(slide: Slide, to: LayoutId): Slide {
   return base
 }
 
+/** A cell that genuinely has content — as opposed to a blank one a fresh
+ *  table starts with, or a placeholder covered by a merge — worth carrying
+ *  into another layout's text/image slot. */
+function isLiveCell(c: unknown): c is TableCell {
+  return !!c && typeof c === 'object' && !(c as TableCell).covered && (!!(c as TableCell).text?.trim() || !!(c as TableCell).image)
+}
+
 /** Coerce a pool value into the shape the target slot's field expects. */
 function adaptValue(slot: Slot, fromField: string, value: unknown): unknown {
-  // A single image seeding a gallery becomes a one-item list.
-  if (slot === 'gallery' && fromField === 'image' && typeof value === 'string') {
-    return [{ image: value } as GalleryItem]
+  // A single image seeding a gallery (or a table) becomes a one-item list.
+  if ((slot === 'gallery' || slot === 'table') && fromField === 'image' && typeof value === 'string') {
+    return slot === 'gallery' ? [{ image: value } as GalleryItem] : [{ image: value } as TableCell]
+  }
+  // Gallery items seeding a table: same image, same link, one cell each.
+  if (slot === 'table' && fromField === 'items' && Array.isArray(value)) {
+    return value.map((it): TableCell =>
+      typeof it === 'string' ? { image: it } : { image: (it as GalleryItem).image, link: (it as GalleryItem).link },
+    )
+  }
+  // A table's cells seeding a gallery: only the ones that actually hold a
+  // picture translate — a gallery item has nowhere to put plain cell text.
+  if (slot === 'gallery' && fromField === 'tableCells' && Array.isArray(value)) {
+    return (value as unknown[])
+      .filter((c): c is TableCell => isLiveCell(c) && !!(c as TableCell).image)
+      .map((c): GalleryItem => ({ image: c.image!, link: c.link }))
+  }
+  // Text's bullet lines seeding a table: one cell per line, dropping the `- `
+  // marker (matches parseContent's own bullet/plain split).
+  if (slot === 'table' && fromField === 'content' && typeof value === 'string') {
+    return value
+      .split('\n')
+      .map((l) => l.replace(/^\s*[-*]\s+/, '').trim())
+      .filter(Boolean)
+      .map((text): TableCell => ({ text }))
+  }
+  // A table's cell text seeding a prose/lede block: one bullet line per cell
+  // that actually has text (an image-only cell contributes nothing here).
+  if ((slot === 'prose' || slot === 'lede') && fromField === 'tableCells' && Array.isArray(value)) {
+    return (value as unknown[])
+      .filter((c): c is TableCell => isLiveCell(c) && !(c as TableCell).image)
+      .map((c) => `- ${c.text}`)
+      .join('\n')
   }
   return value
 }

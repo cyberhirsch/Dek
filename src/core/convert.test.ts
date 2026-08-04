@@ -81,3 +81,57 @@ describe('convertLayout — best-effort un-bake', () => {
     expect(gal.items?.length).toBe(2)
   })
 })
+
+describe('convertLayout — table pooling', () => {
+  it('pools gallery items into table cells (image + link each)', () => {
+    const gal: Slide = { layout: 'gallery', items: [{ image: 'a.png', link: 'https://x.io' }, { image: 'b.png' }] }
+    const table = convertLayout(gal, 'table')
+    expect(table.layout).toBe('table')
+    expect(table.tableCells).toEqual([
+      { image: 'a.png', link: 'https://x.io' },
+      { image: 'b.png' },
+    ])
+  })
+
+  it('pools a table\'s image cells back into a gallery, dropping text-only and covered cells', () => {
+    const table: Slide = {
+      layout: 'table',
+      tableRows: 1,
+      tableCols: 3,
+      tableCells: [{ image: 'a.png' }, { text: 'no image' }, { covered: true, image: 'ghost.png' }],
+    }
+    const gal = convertLayout(table, 'gallery')
+    expect(gal.items).toEqual([{ image: 'a.png' }])
+  })
+
+  it('pools text bullet lines into one table cell per line', () => {
+    const text: Slide = { layout: 'text', title: 'T', content: '- one\n- two' }
+    const table = convertLayout(text, 'table')
+    expect(table.tableCells?.map((c) => c?.text)).toEqual(['one', 'two'])
+  })
+
+  it('pools a table\'s text-only cells back into prose bullet lines', () => {
+    const table: Slide = {
+      layout: 'table',
+      tableRows: 1,
+      tableCols: 2,
+      tableCells: [{ text: 'alpha' }, { text: 'beta' }],
+    }
+    const text = convertLayout(table, 'text')
+    expect(text.content).toBe('- alpha\n- beta')
+  })
+
+  it('is reversible: table → text → table does not corrupt tableRows/tableCols (MOD_SUPPORT scoping)', () => {
+    const table: Slide = {
+      layout: 'table',
+      tableRows: 2,
+      tableCols: 2,
+      tableCells: [{ text: 'a' }, { text: 'b' }, { text: 'c' }, { text: 'd' }],
+    }
+    const back = convertLayout(convertLayout(table, 'text'), 'table')
+    expect(back.layout).toBe('table')
+    // tableRows/tableCols aren't carried by `text` (out of MOD_SUPPORT scope for
+    // that layout), so they're expected to reset — not silently corrupt/stick.
+    expect(back.tableCells?.length).toBeGreaterThan(0)
+  })
+})

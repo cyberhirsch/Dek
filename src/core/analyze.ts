@@ -1,4 +1,4 @@
-import type { Deck, GalleryItem, LayoutId, Slide } from './types'
+import type { Deck, GalleryItem, LayoutId, Slide, TableCell } from './types'
 import { LAYOUT_IDS } from './types'
 
 export type IssueKind = 'schema' | 'asset' | 'review'
@@ -58,11 +58,14 @@ type Field =
   | 'code'
   | 'body'
   | 'group'
+  | 'tableRows'
+  | 'tableCols'
+  | 'tableCells'
 
 interface LayoutRule {
   required?: Field[]
   image?: Field[]
-  list?: 'text' | 'gallery'
+  list?: 'text' | 'gallery' | 'table'
 }
 
 const RULES: Record<LayoutId, LayoutRule> = {
@@ -77,6 +80,7 @@ const RULES: Record<LayoutId, LayoutRule> = {
   'video-embed': { required: ['video'], image: ['poster'] },
   gallery: { required: ['items'], image: ['items'], list: 'gallery' },
   diagram: { required: ['code'] },
+  table: { required: ['tableCells'], list: 'table' },
   freeform: {},
 }
 
@@ -96,6 +100,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   'video-embed': ['video', 'poster', 'image', 'caption'],
   gallery: ['title', 'items', 'columns'],
   diagram: ['title', 'code'],
+  table: ['title', 'tableRows', 'tableCols', 'tableCells'],
   freeform: ['body', 'elements'],
 }
 
@@ -137,6 +142,10 @@ function isGalleryItem(v: unknown): v is GalleryItem {
   return !!v && typeof v === 'object' && typeof (v as GalleryItem).image === 'string'
 }
 
+function isTableCell(v: unknown): v is TableCell {
+  return !!v && typeof v === 'object'
+}
+
 function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   const n = index + 1
   if (!LAYOUT_IDS.includes(slide.layout)) {
@@ -176,6 +185,20 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
       const missing = slide.items.filter((it) => typeof it !== 'string' && !isGalleryItem(it)).length
       if (missing) issue(issues, n, 'warning', 'schema', 'Gallery contains items without an image.', 'items')
       if (slide.items.length > 6) issue(issues, n, 'info', 'review', 'Dense gallery may need review.', 'items')
+    }
+  }
+
+  if (rule.list === 'table') {
+    const rows = slide.tableRows
+    const cols = slide.tableCols
+    if (!Array.isArray(slide.tableCells)) {
+      issue(issues, n, 'warning', 'schema', 'Expected table cells.', 'tableCells')
+    } else {
+      if (typeof rows === 'number' && typeof cols === 'number' && slide.tableCells.length !== rows * cols) {
+        issue(issues, n, 'warning', 'schema', `Table has ${slide.tableCells.length} cells but tableRows×tableCols is ${rows}×${cols}.`, 'tableCells')
+      }
+      const bad = slide.tableCells.filter((c) => !isTableCell(c)).length
+      if (bad) issue(issues, n, 'warning', 'schema', 'Table contains malformed cells.', 'tableCells')
     }
   }
 
@@ -239,6 +262,13 @@ function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef
     } else if (isGalleryItem(item)) {
       addAsset(assets, item.image, n, `items[${i}].image`)
     }
+  }
+  // Table cell images. Skipping `covered` placeholders isn't optional here —
+  // this exact function has a documented history of missing a new per-element
+  // image location (see the `elements[]` note just below) and the Review
+  // panel offering to delete images that were still genuinely in use.
+  for (const [i, cell] of (slide.tableCells ?? []).entries()) {
+    if (cell && !cell.covered && cell.image) addAsset(assets, cell.image, n, `tableCells[${i}].image`)
   }
   // Freeform canvas images live on `elements[]`, not the semantic image fields.
   // Missing them here made every canvas/baked image look unreferenced — i.e. an

@@ -12,6 +12,7 @@ export type LayoutId =
   | 'video-embed'
   | 'gallery'
   | 'diagram'
+  | 'table'
   | 'freeform'
 
 export const LAYOUT_IDS: LayoutId[] = [
@@ -26,6 +27,7 @@ export const LAYOUT_IDS: LayoutId[] = [
   'video-embed',
   'gallery',
   'diagram',
+  'table',
   'freeform',
 ]
 
@@ -53,6 +55,25 @@ export interface TextItem {
   text: string
   /** Defaults to true for legacy string items. */
   bullet?: boolean
+}
+
+/** One cell of a `table` layout. Holds either `text` or `image` (image wins if
+ *  both are set, matching how image-caption/gallery already treat "image
+ *  present → show image") — no `kind` discriminator, so it stays a plain,
+ *  hand-editable YAML object like `GalleryItem`. */
+export interface TableCell {
+  text?: string
+  image?: string
+  /** Makes the cell clickable in present/export (http(s)/mailto only). */
+  link?: string
+  /** How many grid columns/rows this cell spans, from its own position.
+   *  Default 1. Only meaningful on the cell that "owns" a merge (top-left). */
+  colspan?: number
+  rowspan?: number
+  /** True for a grid position covered by another cell's span — has no content
+   *  of its own and isn't rendered; kept as a placeholder so the flat
+   *  `tableCells` array stays aligned to `tableRows * tableCols`. */
+  covered?: boolean
 }
 
 // ── Free-positioned canvas elements ──────────────────────────────────────────
@@ -216,6 +237,16 @@ export interface Slide {
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus
+  // table: a flat, row-major grid of cells (index = row*tableCols+col).
+  // tableColWidths/tableRowHeights are fractions of the grid summing to 1;
+  // omitted means uniform. Distinct from gallery's `columns` (which is an
+  // item-count-driven hint, not an authoritative dimension the cell array
+  // must match).
+  tableRows?: number
+  tableCols?: number
+  tableCells?: TableCell[]
+  tableColWidths?: number[]
+  tableRowHeights?: number[]
   // diagram: Mermaid source
   code?: string
   // freeform

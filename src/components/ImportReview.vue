@@ -24,6 +24,7 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
   'video-embed': 'Video',
   gallery: 'Gallery',
   diagram: 'Diagram',
+  table: 'Table',
   freeform: 'Freeform',
 }
 

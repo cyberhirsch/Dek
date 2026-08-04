@@ -265,6 +265,42 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       })
       break
     }
+    case 'table': {
+      // .l-table: a CSS grid whose track sizes come from tableColWidths/
+      // tableRowHeights (fractions of the grid, uniform when absent) — mirror
+      // that cumulative-fraction math here rather than gallery's uniform
+      // division, since a table's dividers are draggable to non-uniform sizes.
+      const cells = slide.tableCells ?? []
+      const cols = Math.max(1, slide.tableCols ?? 1)
+      const rows = Math.max(1, slide.tableRows ?? Math.ceil(cells.length / cols))
+      let y = PAD_Y
+      if (title) {
+        els.push(text(title, PAD_X, y, INNER_W, H1_H, { ...HEAD }))
+        y += H1_H + 24
+      }
+      const gridH = STAGE_H - PAD_Y - y
+      const colFracs = slide.tableColWidths ?? Array(cols).fill(1 / cols)
+      const rowFracs = slide.tableRowHeights ?? Array(rows).fill(1 / rows)
+      const colX: number[] = [PAD_X]
+      for (const f of colFracs) colX.push(colX[colX.length - 1] + f * INNER_W)
+      const rowY: number[] = [y]
+      for (const f of rowFracs) rowY.push(rowY[rowY.length - 1] + f * gridH)
+
+      cells.forEach((cell, i) => {
+        if (!cell || cell.covered) return
+        const r = Math.floor(i / cols)
+        const c = i % cols
+        const span = Math.min(cell.colspan ?? 1, cols - c)
+        const rspan = Math.min(cell.rowspan ?? 1, rows - r)
+        const cx = colX[c]
+        const cy = rowY[r]
+        const cw = (colX[Math.min(c + span, cols)] ?? colX[cols]) - cx
+        const ch = (rowY[Math.min(r + rspan, rows)] ?? rowY[rows]) - cy
+        if (cell.image) els.push(image(cell.image, cx, cy, cw, ch, { link: cell.link }))
+        else if (cell.text) els.push(text(cell.text, cx, cy, cw, ch, { size: 22, align: 'center' }))
+      })
+      break
+    }
     case 'video-embed': {
       // .l-video-embed: 60px padding, 16:9 frame centred, caption +14 below
       const PADV = 60

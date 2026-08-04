@@ -240,4 +240,80 @@ describe('analyzeDeck', () => {
     expect(analyzeDeck(deck, []).issues.some((i) => i.message.includes('not found'))).toBe(false)
     expect(analyzeDeck(deck).issues.some((i) => i.message.includes('not found'))).toBe(false)
   })
+
+  it('accepts a well-formed table slide with no "field isn\'t rendered" warnings', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'table',
+          title: 'Grid',
+          tableRows: 2,
+          tableCols: 2,
+          tableCells: [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }],
+        },
+      ],
+    }
+
+    const a = analyzeDeck(deck)
+
+    expect(a.issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
+
+  // Highest-priority case: this is the exact regression class that once let the
+  // Review panel offer to delete an image that was still in use by a slide.
+  it('does not orphan a table cell image', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'table',
+          tableRows: 1,
+          tableCols: 2,
+          tableCells: [{ image: '/Deck Assets/cell.jpg' }, { text: '' }],
+        },
+      ],
+    }
+
+    const a = analyzeDeck(deck, ['cell.jpg'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'tableCells[0].image'))).toBe(true)
+  })
+
+  it('reports a table cell image as orphaned once the cell is removed', () => {
+    // The inverse of the above: proves the shrink confirm-dialog's premise —
+    // dropping a cell for real does surface as an orphan on the next scan. A
+    // second slide keeps a live local reference so this isn't mistaken for the
+    // "deck references no local files" empty-folder guard above.
+    const deck: Deck = {
+      config: {},
+      slides: [
+        { layout: 'table', tableRows: 1, tableCols: 1, tableCells: [{ text: '' }] },
+        { layout: 'image-full', image: '/Deck Assets/kept.jpg' },
+      ],
+    }
+
+    const a = analyzeDeck(deck, ['cell.jpg', 'kept.jpg'])
+
+    expect(a.assets.filter((x) => x.kind === 'orphan').map((x) => x.filename)).toEqual(['cell.jpg'])
+  })
+
+  it('skips covered (merge-placeholder) cells when collecting table assets', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'table',
+          tableRows: 1,
+          tableCols: 2,
+          tableCells: [{ image: '/Deck Assets/a.jpg', colspan: 2 }, { covered: true, image: '/Deck Assets/a.jpg' }],
+        },
+      ],
+    }
+
+    const a = analyzeDeck(deck, ['a.jpg'])
+
+    expect(a.assets.filter((x) => x.kind !== 'orphan')).toHaveLength(1)
+  })
 })

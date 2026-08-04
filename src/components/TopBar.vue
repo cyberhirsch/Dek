@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
+import { reflowTableCells, resizeWouldDropContent } from '../core/table'
 import { DEFAULT_THEME, type ThemeId } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
 import ColorPicker from './ColorPicker.vue'
@@ -66,6 +67,25 @@ const IMAGE_FIT_LAYOUTS: LayoutId[] = ['text-image', 'image-full', 'image-captio
 const showImageFit = computed(() => !!slide.value && IMAGE_FIT_LAYOUTS.includes(slide.value.layout))
 const imageFit = computed(() => slide.value?.imageFit ?? (slide.value?.layout === 'image-caption' ? 'contain' : 'cover'))
 
+// ── table rows/cols stepper ──
+const tableCols = computed(() => slide.value?.tableCols ?? 1)
+const tableRows = computed(() => slide.value?.tableRows ?? Math.ceil((slide.value?.tableCells?.length ?? 0) / tableCols.value))
+function resizeTable(rows: number, cols: number) {
+  rows = Math.max(1, Math.min(20, Math.round(rows)))
+  cols = Math.max(1, Math.min(20, Math.round(cols)))
+  if (rows === tableRows.value && cols === tableCols.value) return
+  const cells = slide.value?.tableCells ?? []
+  const oldCols = tableCols.value
+  if (resizeWouldDropContent(cells, oldCols, rows, cols) && !window.confirm('Shrinking the table will remove content from some cells. Continue?')) return
+  emit('patch', {
+    tableRows: rows,
+    tableCols: cols,
+    tableCells: reflowTableCells(cells, oldCols, rows, cols),
+    tableColWidths: undefined,
+    tableRowHeights: undefined,
+  })
+}
+
 const LAYOUT_LABELS: Record<LayoutId, string> = {
   cover: 'Cover',
   section: 'Section',
@@ -78,6 +98,7 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
   'video-embed': 'Video',
   gallery: 'Gallery',
   diagram: 'Diagram',
+  table: 'Table',
   freeform: 'Freeform',
 }
 
@@ -359,6 +380,22 @@ const themeSwatches = computed(() => {
           <button v-for="c in ['auto', 2, 3, 4]" :key="c"
             :class="{ on: (slide.columns ?? 'auto') === c }"
             @click="emit('patch', { columns: c as any })">{{ c }}</button>
+        </div>
+      </template>
+
+      <template v-if="slide?.layout === 'table'">
+        <span class="div" />
+        <label class="lbl">Rows</label>
+        <div class="num-spin" title="Rows">
+          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows - 1, tableCols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <input class="spin-val" type="number" min="1" max="20" :value="tableRows" @change="resizeTable(+($event.target as HTMLInputElement).value, tableCols)" />
+          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows + 1, tableCols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+        </div>
+        <label class="lbl">Cols</label>
+        <div class="num-spin" title="Columns">
+          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols - 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <input class="spin-val" type="number" min="1" max="20" :value="tableCols" @change="resizeTable(tableRows, +($event.target as HTMLInputElement).value)" />
+          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols + 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
         </div>
       </template>
     </div>

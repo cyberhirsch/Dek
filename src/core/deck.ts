@@ -162,6 +162,8 @@ export function blankSlide(layout: LayoutId = 'text'): Slide {
       return { layout, title: '', columns: 'auto', items: [] }
     case 'diagram':
       return { layout, title: '', code: 'flowchart LR\n  A[Start] --> B[Step]\n  B --> C[End]' }
+    case 'table':
+      return { layout, title: '', tableRows: 3, tableCols: 3, tableCells: Array.from({ length: 9 }, () => ({ text: '' })) }
     case 'freeform':
       return { layout, elements: [] }
   }

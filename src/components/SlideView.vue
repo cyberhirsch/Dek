@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../core/types'
+import type { Slide, DeckConfig, GalleryItem, TableCell, Focus, SlideElement } from '../core/types'
 import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
@@ -31,7 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
-  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery'; file: File; index?: number }]
+  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number }]
   'update:elements': [els: SlideElement[]]
   'update:selectedEl': [sel: number[]]
   'create-element': [el: SlideElement]
@@ -40,7 +40,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery'; imageIndex?: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -68,21 +68,30 @@ const listBaseSize = computed(() =>
   props.slide.layout === 'text-image' && (props.slide.imageRatio ?? '16:9') === '16:9' ? 21 : 26,
 )
 
+// table
+const tableCells = computed<TableCell[]>(() => props.slide.tableCells ?? [])
+const tableCols = computed(() => Math.max(1, props.slide.tableCols ?? 1))
+const tableRows = computed(() => Math.max(1, props.slide.tableRows ?? Math.ceil(tableCells.value.length / tableCols.value)))
+const tableColWidths = computed(() => props.slide.tableColWidths ?? Array(tableCols.value).fill(1 / tableCols.value))
+const tableRowHeights = computed(() => props.slide.tableRowHeights ?? Array(tableRows.value).fill(1 / tableRows.value))
+
 function patch(p: Partial<Slide>) {
   emit('patch', p)
 }
 // Right-clicking a layout image opens Dek's own image menu (Copy/Paste/Fit/…)
 // instead of the browser's native one — the same actions the freeform canvas
 // offers, wired to the slide's image field. Only in edit mode, and only when an
-// image is present. `target` names the multi-image slots (portraits / gallery);
-// omit it for the single `image` field.
-function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; index: number }) {
+// image is present. `target` names the multi-image slots (portraits / gallery /
+// table); omit it for the single `image` field.
+function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery' | 'table'; index: number }) {
   if (!props.editable) return
   const src = !target
     ? props.slide.image
     : target.field === 'portraits'
       ? props.slide.portraits?.[target.index]
-      : galleryItems.value[target.index]?.image
+      : target.field === 'table'
+        ? tableCells.value[target.index]?.image
+        : galleryItems.value[target.index]?.image
   if (!src) return
   e.preventDefault()
   emit('ctxmenu', {
@@ -143,6 +152,27 @@ function removeGalleryItem(i: number) {
 }
 function setFocus(f: Focus) {
   patch({ focus: f })
+}
+
+// table ops
+function setTableCellText(i: number, text: string) {
+  const cells = tableCells.value.map((c, j) => (j === i ? { ...c, text } : c))
+  patch({ tableCells: cells })
+}
+// A cell with an image gets the normal image menu (reused via onImageCtx); an
+// empty one only offers "Add Image" — but not while the user has text
+// selected there, since that selection should bubble up to onTextCtx's own
+// Bold/Italic/Add Link menu instead.
+function onTableCellCtx(e: MouseEvent, index: number) {
+  if (!props.editable) return
+  if (tableCells.value[index]?.image) {
+    onImageCtx(e, { field: 'table', index })
+    return
+  }
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount && !sel.isCollapsed) return
+  e.preventDefault()
+  emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image', imageField: 'table', imageIndex: index })
 }
 
 // video-embed
@@ -355,6 +385,23 @@ watch(
   A[Shoot] --> B[Edit] --> C[Grade]"
           @update:model-value="patch({ code: $event })"
         />
+      </div>
+    </div>
+
+    <!-- table -->
+    <div v-else-if="slide.layout === 'table'" class="dek-pad l-table">
+      <FittedText v-if="editable || slide.title" class="fit-table-title" content-class="table-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
+      <div class="table-grid" :style="{ gridTemplateColumns: tableColWidths.map((w) => w * 100 + '%').join(' '), gridTemplateRows: tableRowHeights.map((h) => h * 100 + '%').join(' ') }">
+        <template v-for="(cell, i) in tableCells" :key="i">
+          <div v-if="!cell.covered" class="table-cell" :style="{ gridColumn: 'span ' + (cell.colspan ?? 1), gridRow: 'span ' + (cell.rowspan ?? 1) }" @contextmenu="onTableCellCtx($event, i)">
+            <template v-if="cell.image">
+              <FramedImage :src="cell.image" :editable="editable" @file="emit('upload', { field: 'table', file: $event, index: i })" />
+              <a v-if="!editable && safeLink(cell.link)" class="img-link" :href="safeLink(cell.link)" target="_blank" rel="noopener noreferrer" />
+            </template>
+            <EditableText v-else-if="editable" class="table-cell-text" :model-value="cell.text" @update:model-value="setTableCellText(i, $event)" />
+            <div v-else-if="cell.text" class="table-cell-text">{{ cell.text }}</div>
+          </div>
+        </template>
       </div>
     </div>
 
