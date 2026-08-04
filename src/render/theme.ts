@@ -27,3 +27,13 @@ export function themeVars(config: DeckConfig): Record<string, string> {
     '--dek-link-visited': withAlpha(accent, 0.72),
   }
 }
+
+/** Resolve an element's `font` field to a CSS family. The 'heading'/'body'
+ *  tokens stay tokens (so a theme swap re-fonts everything); anything else is
+ *  treated as a literal family name. Shared by every element renderer — a
+ *  second copy is how a canvas table and a canvas text box drift apart. */
+export function resolveFont(font?: string): string {
+  if (!font || font === 'body') return 'var(--dek-font-body)'
+  if (font === 'heading') return 'var(--dek-font-heading)'
+  return `'${font}', sans-serif`
+}

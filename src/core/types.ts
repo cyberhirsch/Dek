@@ -82,7 +82,7 @@ export interface TableCell {
 // space (top-left origin) so they scale with the slide. The moment a slide is
 // edited freely (an element added or moved), its `layout` flips to `freeform`.
 
-export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram'
+export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram' | 'table'
 
 /** The active canvas tool. 'text', 'rect' and 'image' all create a `box`. */
 export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow' | 'image'
@@ -178,7 +178,27 @@ export interface DiagramElement extends ElementBase {
   code: string
 }
 
-export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement
+/**
+ * A table as a single canvas object, so the `table` layout can bake to freeform
+ * and un-bake back without the grid collapsing into loose text/image boxes.
+ * Mirrors the `table` layout's own fields (flat row-major `cells`, fractional
+ * track sizes) — one data shape, one renderer (`TableGrid.vue`), used by both.
+ */
+export interface TableElement extends ElementBase {
+  type: 'table'
+  rows: number
+  cols: number
+  cells: TableCell[]
+  /** Fractions of the element's width/height, summing to 1; omitted ⇒ uniform. */
+  colWidths?: number[]
+  rowHeights?: number[]
+  /** Cell typography. `font` takes the 'heading'/'body' theme tokens like a box;
+   *  `size` is the *base* size — cell text shrinks below it to fit, never above. */
+  font?: string
+  size?: number
+}
+
+export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement | TableElement
 
 /** A partial patch of an element's style fields (everything except `type`). */
 export type ElementPatch = Partial<
@@ -186,7 +206,8 @@ export type ElementPatch = Partial<
     Omit<ArrowElement, 'type'> &
     Omit<ImageElement, 'type'> &
     Omit<VideoElement, 'type'> &
-    Omit<DiagramElement, 'type'>
+    Omit<DiagramElement, 'type'> &
+    Omit<TableElement, 'type'>
 >
 
 /**
@@ -247,6 +268,10 @@ export interface Slide {
   tableCells?: TableCell[]
   tableColWidths?: number[]
   tableRowHeights?: number[]
+  /** Cell typography for the whole table: a 'heading'/'body' theme token (or a
+   *  literal family), and the *base* size cell text shrinks down from to fit. */
+  tableFont?: string
+  tableSize?: number
   // diagram: Mermaid source
   code?: string
   // freeform

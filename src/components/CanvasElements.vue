@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, CanvasTool } from '../core/types'
+import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, TableElement, CanvasTool } from '../core/types'
 import { inlineMd, htmlToInline } from '../render/inline'
 import { newElementRect, newArrow, defaultSize } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
 import FramedImage from './FramedImage.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
+import TableGrid from './TableGrid.vue'
 import BoxText from './BoxText.vue'
 import QrCode from './QrCode.vue'
 import { safeLink, urlFromDataTransfer } from '../render/qr'
+import { resolveFont } from '../render/theme'
 
 const STAGE_W = 1280
 const STAGE_H = 720
@@ -208,11 +210,6 @@ function boxStyle(el: SlideElement) {
     s.borderRadius = (el.radius ?? 0) + 'px'
   }
   return s
-}
-function resolveFont(font?: string): string {
-  if (!font || font === 'body') return 'var(--dek-font-body)'
-  if (font === 'heading') return 'var(--dek-font-heading)'
-  return `'${font}', sans-serif`
 }
 function textStyle(el: BoxElement) {
   const deco = [el.underline ? 'underline' : '', el.strike ? 'line-through' : ''].filter(Boolean).join(' ')
@@ -571,9 +568,15 @@ function onRotateDown(e: PointerEvent, i: number) {
 // ── text inline editing ──
 function onElementDblClick(i: number) {
   if (!props.editable) return
-  if (props.elements[i].type !== 'box') return
+  const type = props.elements[i].type
+  if (type !== 'box' && type !== 'table') return
   editing.value = i
   emit('update:selected', [i])
+  // A table's cells are their own editable fields (TableGrid) — there's no
+  // single contenteditable to focus, and `editing` alone unlocks them. The
+  // caret dance below is box-only; `commitEdit` finds no [data-edit] node for a
+  // table and just clears the editing flag, which is the correct exit.
+  if (type !== 'box') return
   nextTick(() => {
     const node = root.value?.querySelector<HTMLElement>(`[data-edit="${i}"]`)
     if (node) {
@@ -617,12 +620,24 @@ function isFileVideo(el: VideoElement) {
   return parseVideo(el.video)?.provider === 'file'
 }
 
+/** Edit one cell of a canvas table, re-emitting the whole element array the same
+ *  way `commitEdit` does for box text — so it lands on the identical undo /
+ *  autosave path as every other canvas edit. */
+function setTableCellText(elIndex: number, cellIndex: number, text: string) {
+  const el = props.elements[elIndex]
+  if (el?.type !== 'table') return
+  const next = props.elements.map((e) => ({ ...e }))
+  ;(next[elIndex] as TableElement).cells = el.cells.map((c, j) => (j === cellIndex ? { ...c, text } : c))
+  emit('update:elements', next)
+}
+
 // type-narrowing helpers for the template
 const asBox = (el: SlideElement) => el as BoxElement
 const asArrow = (el: SlideElement) => el as ArrowElement
 const asImage = (el: SlideElement) => el as ImageElement
 const asVideo = (el: SlideElement) => el as VideoElement
 const asDiagram = (el: SlideElement) => el as DiagramElement
+const asTable = (el: SlideElement) => el as TableElement
 
 defineExpose({ commitEdit })
 </script>
@@ -745,6 +760,23 @@ defineExpose({ commitEdit })
       <div v-else-if="el.type === 'diagram'" class="el-diagram">
         <MermaidDiagram :code="asDiagram(el).code" />
       </div>
+
+      <!-- table — the same grid the `table` layout renders, so baking to
+           freeform (and back) doesn't change how it looks -->
+      <TableGrid
+        v-else-if="el.type === 'table'"
+        :class="{ editing: editing === i }"
+        :cells="asTable(el).cells"
+        :rows="asTable(el).rows"
+        :cols="asTable(el).cols"
+        :col-widths="asTable(el).colWidths"
+        :row-heights="asTable(el).rowHeights"
+        :font="asTable(el).font"
+        :size="asTable(el).size"
+        :editable="editable && editing === i"
+        :safe-link="safeLink"
+        @cell-text="(ci, t) => setTableCellText(i, ci, t)"
+      />
 
       <!-- selection chrome (transform handles only for a single selection) -->
       <template v-if="editable && single === i && editing == null">
@@ -967,6 +999,16 @@ defineExpose({ commitEdit })
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+/* A canvas table fills its element box. Until it's double-clicked into editing,
+   the cells must not swallow pointer events — otherwise a cell's editable text
+   or image frame eats the drag and the element can't be moved or selected. */
+.el > .table-grid {
+  pointer-events: none;
+  overflow: hidden;
+}
+.el > .table-grid.editing {
+  pointer-events: auto;
 }
 /* selection */
 .el.selected::after {

@@ -755,6 +755,8 @@
 }
 
 /* ── Layout: table ──────────────────────────────────────────────── */
+/* Shared by the `table` layout and the `table` canvas element (TableGrid.vue),
+   so a table looks identical before and after baking to freeform. */
 .l-table {
   display: flex;
   flex-direction: column;
@@ -770,27 +772,49 @@
   flex: 1;
   min-height: 0;
   width: 100%;
+  height: 100%;
+  /* The hairline is drawn once per grid and once per cell's right/bottom edge
+     (below), so interior rules stay 1px instead of doubling where cells meet. */
+  border-top: 1px solid var(--dek-line);
+  border-left: 1px solid var(--dek-line);
 }
 .table-cell {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 14px;
   overflow: hidden;
-  border: 1px solid rgba(230, 236, 242, 0.12);
+  border-right: 1px solid var(--dek-line);
+  border-bottom: 1px solid var(--dek-line);
 }
-.table-cell .frame {
-  position: absolute;
-  inset: 0;
+/* An image cell is full-bleed to its rules — the padding is for text only, and
+   letting a picture keep it made every image sit in a floating inset box. */
+.table-cell.has-image {
+  padding: 0;
+}
+.table-cell-fit {
+  width: 100%;
+  height: 100%;
 }
 .table-cell-text {
-  font-family: var(--dek-font-body);
-  font-size: 22px;
-  line-height: 1.4;
-  text-align: center;
-  color: var(--dek-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
+  /* min-height, NOT height: the box must be free to grow past the cell so
+     FittedText's scrollHeight/clientHeight overflow check can see that the text
+     doesn't fit and shrink it. A fixed height clamps the child, the parent never
+     reports overflow, and the autoshrink silently never fires. */
+  min-height: 100%;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--dek-text);
+  /* family comes from the grid (theme token via TableGrid), so a per-table font
+     choice cascades to every cell without restating it here */
+  font-family: inherit;
 }
 
 /* ── Layout: diagram (Mermaid) ─────────────────────────────────── */

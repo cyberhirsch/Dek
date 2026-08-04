@@ -299,6 +299,54 @@ describe('analyzeDeck', () => {
     expect(a.assets.filter((x) => x.kind === 'orphan').map((x) => x.filename)).toEqual(['cell.jpg'])
   })
 
+  // Same regression class as the layout case above, one nesting level deeper:
+  // once a table is baked to freeform its pictures live in elements[].cells[].
+  it('does not orphan an image inside a baked (canvas) table element', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'freeform',
+          elements: [
+            {
+              type: 'table',
+              x: 0, y: 0, w: 100, h: 100, rotation: 0,
+              rows: 1, cols: 2,
+              cells: [{ image: '/Deck Assets/baked.jpg' }, { text: '' }],
+            },
+          ],
+        },
+      ],
+    }
+
+    const a = analyzeDeck(deck, ['baked.jpg'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'elements[0].cells[0].image'))).toBe(true)
+  })
+
+  it('accepts a table slide with dragged track sizes and custom typography', () => {
+    // tableColWidths/RowHeights/Font/Size must all be in KNOWN_FIELDS — otherwise
+    // every table with a dragged divider raises a bogus "isn't rendered" warning.
+    const deck: Deck = {
+      config: {},
+      slides: [
+        {
+          layout: 'table',
+          tableRows: 1,
+          tableCols: 2,
+          tableCells: [{ text: 'a' }, { text: 'b' }],
+          tableColWidths: [0.3, 0.7],
+          tableRowHeights: [1],
+          tableFont: 'heading',
+          tableSize: 30,
+        },
+      ],
+    }
+
+    expect(analyzeDeck(deck).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
+
   it('skips covered (merge-placeholder) cells when collecting table assets', () => {
     const deck: Deck = {
       config: {},

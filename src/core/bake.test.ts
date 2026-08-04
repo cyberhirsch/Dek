@@ -6,7 +6,7 @@
 // instead of silently shifting every baked slide.
 import { describe, expect, it } from 'vitest'
 import { bakeToElements } from './bake'
-import type { BoxElement, Slide, SlideElement } from './types'
+import type { BoxElement, Slide, SlideElement, TableElement } from './types'
 
 const boxes = (els: SlideElement[]) => els.filter((e): e is BoxElement => e.type === 'box')
 const withContent = (els: SlideElement[], text: string) =>
@@ -130,61 +130,46 @@ describe('bakeToElements geometry contract', () => {
     expect(img.link).toBe('https://y.io')
   })
 
-  it('bakes a uniform table (no tableColWidths/RowHeights) into evenly-divided rects', () => {
-    // Image cells (not text) so INSET_X/Y compensation doesn't skew the edges
-    // being compared here — that inset math is already locked by other tests.
-    const els = bakeToElements({
-      layout: 'table',
-      tableRows: 2,
-      tableCols: 2,
-      tableCells: [{ image: 'a.png' }, { image: 'b.png' }, { image: 'c.png' }, { image: 'd.png' }],
-    })
-    const boxesBySrc = (src: string) => boxes(els).find((b) => b.src === src)!
-    const a = boxesBySrc('a.png')
-    const b = boxesBySrc('b.png')
-    const c = boxesBySrc('c.png')
-    // even columns: b starts exactly where a's width ends
-    expect(b.x).toBeCloseTo(a.x + a.w, 5)
-    expect(a.w).toBeCloseTo(b.w, 5)
-    // even rows: c starts exactly where a's height ends
-    expect(c.y).toBeCloseTo(a.y + a.h, 5)
-    expect(a.h).toBeCloseTo(c.h, 5)
+  it('bakes a table to ONE table element, not a scatter of boxes', () => {
+    // The grid has to survive as a grid: decomposing into per-cell boxes here
+    // would make table -> freeform a one-way trip (see the convert.ts round-trip
+    // test), and would lose merges, track sizes, and cell typography.
+    const cells = [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }]
+    const els = bakeToElements({ layout: 'table', title: 'Grid', tableRows: 2, tableCols: 2, tableCells: cells })
+    const tables = els.filter((e): e is TableElement => e.type === 'table')
+    expect(tables).toHaveLength(1)
+    expect(tables[0].rows).toBe(2)
+    expect(tables[0].cols).toBe(2)
+    expect(tables[0].cells).toEqual(cells)
+    // the title still bakes as its own heading box above the grid
+    const head = withContent(els, 'Grid')!
+    expect(head.font).toBe('heading')
+    expect(tables[0].y).toBeGreaterThan(head.y)
   })
 
-  it('bakes non-uniform tableColWidths/RowHeights at their cumulative-fraction offsets', () => {
+  it('carries track sizes and cell typography onto the baked table element', () => {
     const els = bakeToElements({
       layout: 'table',
       tableRows: 1,
       tableCols: 2,
-      tableCells: [{ image: 'a.png' }, { image: 'b.png' }],
+      tableCells: [{ text: 'A' }, { text: 'B' }],
       tableColWidths: [0.25, 0.75],
+      tableFont: 'heading',
+      tableSize: 30,
     })
-    const a = boxes(els).find((b) => b.src === 'a.png')!
-    const b = boxes(els).find((b) => b.src === 'b.png')!
-    // the narrow column is a third the width of the wide one (0.25 vs 0.75)
-    expect(b.w / a.w).toBeCloseTo(3, 5)
-    expect(b.x).toBeCloseTo(a.x + a.w, 5)
+    const t = els.find((e): e is TableElement => e.type === 'table')!
+    expect(t.colWidths).toEqual([0.25, 0.75])
+    expect(t.font).toBe('heading')
+    expect(t.size).toBe(30)
   })
 
-  it('bakes a merged cell as one rect spanning its tracks, and skips its covered neighbors', () => {
-    const els = bakeToElements({
-      layout: 'table',
-      tableRows: 2,
-      tableCols: 2,
-      tableCells: [
-        { image: 'merged.png', colspan: 2 },
-        { covered: true },
-        { image: 'c.png' },
-        { image: 'd.png' },
-      ],
-    })
-    const merged = boxes(els).find((b) => b.src === 'merged.png')!
-    const c = boxes(els).find((b) => b.src === 'c.png')!
-    const d = boxes(els).find((b) => b.src === 'd.png')!
-    // spans the full grid width, same as the combined width of both columns below it
-    expect(merged.w).toBeCloseTo(c.w + d.w, 5)
-    // no element at all was emitted for the covered placeholder cell
-    expect(boxes(els)).toHaveLength(3)
+  it('omits track/typography fields entirely when the table uses defaults', () => {
+    const els = bakeToElements({ layout: 'table', tableRows: 1, tableCols: 1, tableCells: [{ text: 'A' }] })
+    const t = els.find((e): e is TableElement => e.type === 'table')!
+    // absent, not `undefined` keys — keeps the serialized .md clean
+    expect('colWidths' in t).toBe(false)
+    expect('font' in t).toBe(false)
+    expect('size' in t).toBe(false)
   })
 
   it('produces finite geometry for every layout, even with empty fields', () => {

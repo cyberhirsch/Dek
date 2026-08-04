@@ -121,6 +121,54 @@ describe('convertLayout — table pooling', () => {
     expect(text.content).toBe('- alpha\n- beta')
   })
 
+  it('round-trips table → freeform → table losslessly (the table-object contract)', () => {
+    const table: Slide = {
+      layout: 'table',
+      title: 'Specs',
+      tableRows: 2,
+      tableCols: 2,
+      tableCells: [
+        { text: 'Merged', colspan: 2 },
+        { covered: true },
+        { image: 'a.jpg', link: 'https://x.io' },
+        { text: 'plain' },
+      ],
+      tableColWidths: [0.3, 0.7],
+      tableRowHeights: [0.4, 0.6],
+      tableFont: 'heading',
+      tableSize: 30,
+    }
+
+    const ff = convertLayout(table, 'freeform')
+    // exactly one table object on the canvas — the grid stayed a grid
+    expect(ff.elements!.filter((e) => e.type === 'table')).toHaveLength(1)
+
+    const back = convertLayout(ff, 'table')
+    expect(back.layout).toBe('table')
+    expect(back.tableCells).toEqual(table.tableCells)
+    expect(back.tableRows).toBe(2)
+    expect(back.tableCols).toBe(2)
+    expect(back.tableColWidths).toEqual([0.3, 0.7])
+    expect(back.tableRowHeights).toEqual([0.4, 0.6])
+    expect(back.tableFont).toBe('heading')
+    expect(back.tableSize).toBe(30)
+    expect(back.title).toBe('Specs')
+    // nothing had to be parked to survive the trip
+    expect(back.stash?.elements).toBeUndefined()
+  })
+
+  it('un-bakes a hand-placed canvas table into the table layout', () => {
+    const ff: Slide = {
+      layout: 'freeform',
+      elements: [
+        { type: 'table', x: 0, y: 0, w: 100, h: 100, rotation: 0, rows: 1, cols: 2, cells: [{ text: 'a' }, { text: 'b' }] },
+      ],
+    }
+    const table = convertLayout(ff, 'table')
+    expect(table.tableCells).toEqual([{ text: 'a' }, { text: 'b' }])
+    expect(table.tableCols).toBe(2)
+  })
+
   it('is reversible: table → text → table does not corrupt tableRows/tableCols (MOD_SUPPORT scoping)', () => {
     const table: Slide = {
       layout: 'table',

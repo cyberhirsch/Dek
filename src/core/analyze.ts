@@ -100,7 +100,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   'video-embed': ['video', 'poster', 'image', 'caption'],
   gallery: ['title', 'items', 'columns'],
   diagram: ['title', 'code'],
-  table: ['title', 'tableRows', 'tableCols', 'tableCells'],
+  table: ['title', 'tableRows', 'tableCols', 'tableCells', 'tableColWidths', 'tableRowHeights', 'tableFont', 'tableSize'],
   freeform: ['body', 'elements'],
 }
 
@@ -274,11 +274,18 @@ function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef
   // Missing them here made every canvas/baked image look unreferenced — i.e. an
   // "orphan" the Review panel would offer to delete. They ARE references.
   for (const [i, el] of (slide.elements ?? []).entries()) {
-    const e = el as { type: string; src?: string; video?: string; poster?: string }
+    const e = el as { type: string; src?: string; video?: string; poster?: string; cells?: TableCell[] }
     if (e.type === 'box' || e.type === 'image') addAsset(assets, e.src, n, `elements[${i}].src`)
     else if (e.type === 'video') {
       addAsset(assets, e.video, n, `elements[${i}].video`)
       addAsset(assets, e.poster, n, `elements[${i}].poster`)
+    } else if (e.type === 'table') {
+      // A baked table keeps its pictures inside the element's own cells — one
+      // more nesting level than `elements[].src`, and exactly the shape of the
+      // bug described above. Walk it.
+      for (const [c, cell] of (e.cells ?? []).entries()) {
+        if (cell && !cell.covered && cell.image) addAsset(assets, cell.image, n, `elements[${i}].cells[${c}].image`)
+      }
     }
   }
 }

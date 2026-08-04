@@ -14,7 +14,7 @@
 // → semantic best-effort un-bakes (first text box→heading, rest→prose, images→
 // image/gallery, etc.), parking leftover canvas objects under `stash.elements`.
 
-import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, GalleryItem, TableCell } from './types'
+import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, TableElement, GalleryItem, TableCell } from './types'
 import { bakeToElements } from './bake'
 
 type Slot = 'heading' | 'lede' | 'prose' | 'caption' | 'image' | 'gallery' | 'video' | 'diagram' | 'portraits' | 'table'
@@ -67,6 +67,8 @@ const MOD_SUPPORT: Record<string, LayoutId[]> = {
   tableCols: ['table'],
   tableColWidths: ['table'],
   tableRowHeights: ['table'],
+  tableFont: ['table'],
+  tableSize: ['table'],
 }
 const MOD_FIELDS = Object.keys(MOD_SUPPORT)
 
@@ -108,12 +110,26 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
   const dia = elements.find((e): e is DiagramElement => e.type === 'diagram')
   if (dia) fields.code = dia.code
 
+  // A canvas table un-bakes straight back into the `table` layout's own fields —
+  // the round trip that makes table ⇄ freeform lossless.
+  const tbl = elements.find((e): e is TableElement => e.type === 'table')
+  if (tbl) {
+    fields.tableCells = tbl.cells
+    fields.tableRows = tbl.rows
+    fields.tableCols = tbl.cols
+    if (tbl.colWidths) fields.tableColWidths = tbl.colWidths
+    if (tbl.rowHeights) fields.tableRowHeights = tbl.rowHeights
+    if (tbl.font) fields.tableFont = tbl.font
+    if (tbl.size != null) fields.tableSize = tbl.size
+  }
+
   // Everything not consumed above (arrows, contentless shape boxes) is leftover.
   for (const e of elements) {
     if (isTextBox(e)) continue
     if (isImgBox(e)) continue
     if (e.type === 'video' && e === vid) continue
     if (e.type === 'diagram' && e === dia) continue
+    if (e.type === 'table' && e === tbl) continue
     leftover.push(e)
   }
   return { fields, leftover }

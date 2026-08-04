@@ -10,6 +10,7 @@ import EditableText from './EditableText.vue'
 import FittedText from './FittedText.vue'
 import FittedTextList from './FittedTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
+import TableGrid from './TableGrid.vue'
 import CanvasElements from './CanvasElements.vue'
 import type { CanvasTool } from '../core/types'
 import '../styles/slide.css'
@@ -72,8 +73,6 @@ const listBaseSize = computed(() =>
 const tableCells = computed<TableCell[]>(() => props.slide.tableCells ?? [])
 const tableCols = computed(() => Math.max(1, props.slide.tableCols ?? 1))
 const tableRows = computed(() => Math.max(1, props.slide.tableRows ?? Math.ceil(tableCells.value.length / tableCols.value)))
-const tableColWidths = computed(() => props.slide.tableColWidths ?? Array(tableCols.value).fill(1 / tableCols.value))
-const tableRowHeights = computed(() => props.slide.tableRowHeights ?? Array(tableRows.value).fill(1 / tableRows.value))
 
 function patch(p: Partial<Slide>) {
   emit('patch', p)
@@ -391,18 +390,20 @@ watch(
     <!-- table -->
     <div v-else-if="slide.layout === 'table'" class="dek-pad l-table">
       <FittedText v-if="editable || slide.title" class="fit-table-title" content-class="table-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
-      <div class="table-grid" :style="{ gridTemplateColumns: tableColWidths.map((w) => w * 100 + '%').join(' '), gridTemplateRows: tableRowHeights.map((h) => h * 100 + '%').join(' ') }">
-        <template v-for="(cell, i) in tableCells" :key="i">
-          <div v-if="!cell.covered" class="table-cell" :style="{ gridColumn: 'span ' + (cell.colspan ?? 1), gridRow: 'span ' + (cell.rowspan ?? 1) }" @contextmenu="onTableCellCtx($event, i)">
-            <template v-if="cell.image">
-              <FramedImage :src="cell.image" :editable="editable" @file="emit('upload', { field: 'table', file: $event, index: i })" />
-              <a v-if="!editable && safeLink(cell.link)" class="img-link" :href="safeLink(cell.link)" target="_blank" rel="noopener noreferrer" />
-            </template>
-            <EditableText v-else-if="editable" class="table-cell-text" :model-value="cell.text" @update:model-value="setTableCellText(i, $event)" />
-            <div v-else-if="cell.text" class="table-cell-text">{{ cell.text }}</div>
-          </div>
-        </template>
-      </div>
+      <TableGrid
+        :cells="tableCells"
+        :rows="tableRows"
+        :cols="tableCols"
+        :col-widths="slide.tableColWidths"
+        :row-heights="slide.tableRowHeights"
+        :font="slide.tableFont"
+        :size="slide.tableSize"
+        :editable="editable"
+        :safe-link="safeLink"
+        @cell-text="setTableCellText"
+        @cell-file="(i, f) => emit('upload', { field: 'table', file: f, index: i })"
+        @cell-ctx="onTableCellCtx"
+      />
     </div>
 
     <!-- freeform — a bare canvas; content lives in the elements overlay below -->

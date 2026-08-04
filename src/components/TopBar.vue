@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, CanvasTool, ElementPatch } from '../core/types'
+import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
-import { reflowTableCells, resizeWouldDropContent } from '../core/table'
+import { TABLE_CELL_SIZE, reflowTableCells, resizeWouldDropContent } from '../core/table'
 import { DEFAULT_THEME, type ThemeId } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
 import ColorPicker from './ColorPicker.vue'
@@ -129,6 +129,7 @@ const FONTS = computed(() => [
 ])
 const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selectedElement as BoxElement) : null))
 const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
+const tableEl = computed(() => (props.selectedElement?.type === 'table' ? (props.selectedElement as TableElement) : null))
 function upd(p: ElementPatch) {
   emit('update-element', p)
 }
@@ -141,12 +142,20 @@ const themeDefaultText = computed(() => props.deck.config.theme?.text ?? DEFAULT
 // Font size steps through the token type scale rather than ±1, so the buttons
 // move between sizes that actually read as distinct. The field stays free-type.
 function stepFontSize(dir: 1 | -1) {
-  const cur = box.value?.size ?? 28
-  const next =
-    dir > 0
-      ? (TYPE_SCALE.find((s) => s > cur) ?? cur)
-      : ([...TYPE_SCALE].reverse().find((s) => s < cur) ?? cur)
-  upd({ size: next })
+  upd({ size: stepScale(box.value?.size ?? 28, dir) })
+}
+/** Next/previous size on the token type scale, so the ± buttons land on sizes
+ *  that actually read as distinct instead of drifting by 1px. */
+function stepScale(cur: number, dir: 1 | -1): number {
+  return dir > 0
+    ? (TYPE_SCALE.find((s) => s > cur) ?? cur)
+    : ([...TYPE_SCALE].reverse().find((s) => s < cur) ?? cur)
+}
+function stepTableSize(dir: 1 | -1) {
+  emit('patch', { tableSize: stepScale(slide.value?.tableSize ?? TABLE_CELL_SIZE, dir) })
+}
+function updTableSize(dir: 1 | -1) {
+  upd({ size: stepScale(tableEl.value?.size ?? TABLE_CELL_SIZE, dir) })
 }
 // Swatches offered in the color picker: the deck theme's own colors first, then
 // a couple of neutral anchors. De-duped, falling back to the built-in defaults.
@@ -326,6 +335,22 @@ const themeSwatches = computed(() => {
         </div>
       </template>
 
+      <!-- selected canvas table: same typography controls as the table layout,
+           since it's the same grid once it's been baked to freeform -->
+      <template v-if="tableEl">
+        <span class="div" />
+        <div class="seg style-seg">
+          <select class="sel font" title="Cell font" :value="tableEl.font ?? 'body'" @change="upd({ font: ($event.target as HTMLSelectElement).value })">
+            <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
+          </select>
+          <div class="num-step" title="Cell text size (shrinks to fit)">
+            <button class="step-btn" title="Smaller" @mousedown.prevent="updTableSize(-1)">−</button>
+            <input class="step-val" type="number" min="8" max="120" :value="tableEl.size ?? TABLE_CELL_SIZE" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
+            <button class="step-btn" title="Larger" @mousedown.prevent="updTableSize(1)">+</button>
+          </div>
+        </div>
+      </template>
+
       <!-- any selected element: z-order -->
       <template v-if="selectedElement">
         <span class="div" />
@@ -396,6 +421,18 @@ const themeSwatches = computed(() => {
           <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols - 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
           <input class="spin-val" type="number" min="1" max="20" :value="tableCols" @change="resizeTable(tableRows, +($event.target as HTMLInputElement).value)" />
           <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols + 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+        </div>
+        <span class="div" />
+        <div class="seg style-seg">
+          <select class="sel font" title="Cell font" :value="slide.tableFont ?? 'body'" @change="emit('patch', { tableFont: ($event.target as HTMLSelectElement).value })">
+            <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
+          </select>
+          <!-- Base size: cell text shrinks below it to fit, never above -->
+          <div class="num-step" title="Cell text size (shrinks to fit)">
+            <button class="step-btn" title="Smaller" @mousedown.prevent="stepTableSize(-1)">−</button>
+            <input class="step-val" type="number" min="8" max="120" :value="slide.tableSize ?? TABLE_CELL_SIZE" @input="emit('patch', { tableSize: +($event.target as HTMLInputElement).value })" />
+            <button class="step-btn" title="Larger" @mousedown.prevent="stepTableSize(1)">+</button>
+          </div>
         </div>
       </template>
     </div>
