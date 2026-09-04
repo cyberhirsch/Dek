@@ -4,6 +4,7 @@
 // share one folder without clashing. Images load as object URLs for display; on
 // save every reference is normalized to the deck's exact sibling Assets folder.
 import { parseDeck, serializeDeck } from '../core/deck'
+import { createBaseline, type DiskRead } from './conflict'
 import type { Deck } from '../core/types'
 import {
   BUNDLE_ASSETS,
@@ -483,18 +484,30 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     }
   }
 
+  // See ./conflict — refuses a write that would clobber an external edit.
+  const baseline = createBaseline()
+
+  async function readDisk(): Promise<DiskRead> {
+    const f = await (await dir.getFileHandle(md)).getFile()
+    return { text: await f.text(), mtime: f.lastModified }
+  }
   async function readMd(): Promise<Deck> {
-    return parseDeck(await (await dir.getFileHandle(md)).getFile().then((f) => f.text()))
+    const { text } = await readDisk()
+    baseline.adopt(text)
+    return parseDeck(text)
   }
   async function writeMd(deck: Deck) {
     const restored = {
       ...deck,
       slides: deck.slides.map((slide) => mapSlideAssetRefs(slide, (ref) => urlToPath.get(ref) ?? ref)),
     }
+    await baseline.guard(readDisk)
+    const text = serializeDeck(restored)
     const h = await dir.getFileHandle(md, { create: true })
     const ws = await h.createWritable()
-    await ws.write(serializeDeck(restored))
+    await ws.write(text)
     await ws.close()
+    baseline.adopt(text)
   }
 
   async function hydrate(deck: Deck): Promise<Deck> {
@@ -548,6 +561,12 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     async loadDeck(file) {
       await pickMd(file)
       return hydrate(await readMd())
+    },
+    async externalChangePending() {
+      return baseline.changed(readDisk)
+    },
+    async adoptBaseline() {
+      await baseline.refresh(readDisk)
     },
     async saveDeck(_file, deck) {
       await writeMd(deck)

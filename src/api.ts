@@ -152,11 +152,14 @@ export async function saveDeck(config: DeckConfig, slides: Slide[]): Promise<voi
 }
 
 /** True when the active deck file changed on disk since we last read/wrote it —
- *  an external LLM or text-editor edit. Only the dev-server backend tracks this
- *  (real files); every other backend reports false. Used to live-refresh an idle
- *  browser and to warn before an overwrite. */
+ *  an external LLM or text-editor edit. The handle-based backends compare the
+ *  file's contents; the dev-server backend compares mtimes; anything that cannot
+ *  tell reports false. Used to live-refresh an idle browser and to warn before an
+ *  overwrite. */
 export async function externalChangePending(): Promise<boolean> {
-  if ((await active()) !== serverBackend) return false
+  const backend = await active()
+  if (backend.externalChangePending) return backend.externalChangePending()
+  if (backend !== serverBackend) return false
   const base = serverBaseMtime()
   if (base == null) return false
   const disk = await fetchServerDeckMtime(currentFile)
@@ -165,7 +168,12 @@ export async function externalChangePending(): Promise<boolean> {
 
 /** Adopt an on-disk mtime as the new baseline — used when the user chooses to
  *  overwrite an externally-changed file, so the retried save passes the guard. */
-export function adoptDiskBaseline(mtime: number): void {
+export async function adoptDiskBaseline(mtime: number): Promise<void> {
+  // Handle-based backends track their baseline as content, so they re-read the
+  // file rather than trust a timestamp; the server backend adopts the mtime it
+  // was handed. Either way the next save is then a deliberate overwrite.
+  const b = await active()
+  if (b.adoptBaseline) return b.adoptBaseline()
   setServerBaseMtime(mtime)
 }
 

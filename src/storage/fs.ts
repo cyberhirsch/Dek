@@ -3,6 +3,7 @@
 // app switches to it when the user runs Open/Save As. Images are inlined as data
 // URLs so the deck stays a single portable file.
 import { parseDeck, serializeDeck } from '../core/deck'
+import { createBaseline, type DiskRead } from './conflict'
 import type { Deck } from '../core/types'
 import { idbGet, idbSet } from './idb'
 import type { StorageBackend } from './types'
@@ -83,14 +84,26 @@ export async function requestFilePermission(h: FileHandle): Promise<boolean> {
 /** A StorageBackend bound to a single local file handle. */
 export function fsBackend(handle: FileHandle): StorageBackend {
   let h = handle
+  // What we last saw on disk. Checked before every write so an edit made by a
+  // text editor or an agent is refused rather than silently overwritten.
+  const baseline = createBaseline()
 
+  async function readDisk(): Promise<DiskRead> {
+    const f = await h.getFile()
+    return { text: await f.text(), mtime: f.lastModified }
+  }
   async function read(): Promise<Deck> {
-    return parseDeck(await (await h.getFile()).text())
+    const { text } = await readDisk()
+    baseline.adopt(text)
+    return parseDeck(text)
   }
   async function write(deck: Deck): Promise<void> {
+    await baseline.guard(readDisk)
+    const text = serializeDeck(deck)
     const ws = await h.createWritable()
-    await ws.write(serializeDeck(deck))
+    await ws.write(text)
     await ws.close()
+    baseline.adopt(text)
   }
 
   return {
@@ -113,8 +126,15 @@ export function fsBackend(handle: FileHandle): StorageBackend {
     async uploadAsset(_file, _filename, dataUrl) {
       return dataUrl
     },
+    async externalChangePending() {
+      return baseline.changed(readDisk)
+    },
+    async adoptBaseline() {
+      await baseline.refresh(readDisk)
+    },
     async saveAs(name, deck) {
       h = await pickSave(`${name || 'deck'}.md`)
+      baseline.reset() // different file — nothing of its history to protect
       const cfg = { ...deck.config, deck: name || deck.config.deck }
       await write({ ...deck, config: cfg })
       return h.name

@@ -31,4 +31,12 @@ export interface StorageBackend {
   listAssets?(): Promise<string[]>
   /** Delete a single file from the assets folder by name. */
   deleteAsset?(filename: string): Promise<void>
+  /** True when the file changed on disk since this backend last read or wrote
+   *  it. Polled while the tab is idle so an external edit can be picked up
+   *  without the user saving first. Backends that cannot tell omit it. */
+  externalChangePending?(): Promise<boolean>
+  /** Take what is on disk right now as the new save baseline, so the next write
+   *  is a deliberate overwrite. Called when the user answers the conflict
+   *  dialog with "keep mine". Backends that cannot detect conflicts omit it. */
+  adoptBaseline?(): Promise<void>
 }

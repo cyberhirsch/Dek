@@ -501,7 +501,7 @@ async function onSaveConflict(mtime: number, retry: () => Promise<void>) {
         'Cancel — discard your unsaved change and load the version on disk.',
     )
     if (keepMine) {
-      adoptDiskBaseline(mtime)
+      await adoptDiskBaseline(mtime)
       await retry()
     } else {
       await reloadDeckFromDisk()

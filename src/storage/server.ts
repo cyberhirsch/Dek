@@ -1,20 +1,17 @@
 // Dev-server backend — talks to the Vite middleware API in vite.config.ts.
 import type { Deck } from '../core/types'
+import { DeckConflictError } from './conflict'
 import type { DeckRef, StorageBackend } from './types'
 
 function q(file?: string) {
   return file ? `?file=${encodeURIComponent(file)}` : ''
 }
 
-/** Thrown when a save is refused because the deck file changed on disk since we
- *  last read it (an external LLM / editor edit). `mtime` is the on-disk time now,
- *  so a caller that decides to overwrite anyway can adopt it and retry. */
-export class DeckConflictError extends Error {
-  constructor(public mtime: number) {
-    super('deck file changed on disk')
-    this.name = 'DeckConflictError'
-  }
-}
+// Thrown when a save is refused because the deck file changed on disk since we
+// last read it (an external LLM / editor edit). Defined in ./conflict so the
+// handle-based backends raise the *same* class — App.vue narrows with
+// `instanceof`, and a second declaration would silently never match.
+export { DeckConflictError } from './conflict'
 
 // The mtime of the deck the server backend last read or wrote. Sent with each
 // save so the server can reject a write that would clobber an external edit, and
