@@ -16,6 +16,9 @@ Dek gains a real, structured **Table** layout — rows/columns set from a top-ba
 
 ### Opening & saving
 
+**Reloading keeps you on the slide you were on** (#43)
+`current` was a plain `ref(0)` with nothing restoring it, so every F5 — including the automatic reload after an HMR-less change — dropped you back at slide 1 of a long deck. The slide index is now remembered per deck and restored on startup, and on the one-click re-grant path too (re-granting access to the deck you already had open is a resumption, not opening a new deck). Opening a genuinely different deck still starts at the top. Kept in `localStorage`, not in `deck.md`: a cursor position is this browser's view state, not deck content — writing it into the file would dirty it on every arrow key and show up in git. The key pairs the backend's file name with the deck's display name, because every `.dek` bundle's inner file is called `deck.md` and keying on that alone would make all bundles share one position. A remembered index is clamped to the current slide count, so a deck that has since shrunk can't restore out of bounds. New `src/storage/position.ts`; `+6` tests.
+
 **A failed folder listing no longer looks identical to an empty folder** (#42)
 `refresh()` in the Open/Save/Import panel ran unguarded — if listing a folder ever threw (a permission lapse, a path that no longer resolves, …), the error vanished silently and the panel just showed "No decks here yet," indistinguishable from a folder that's genuinely empty. It's now routed through the same error-surfacing path every other action in the panel already uses, so a real failure shows an actual message instead of masquerading as nothing being there.
 

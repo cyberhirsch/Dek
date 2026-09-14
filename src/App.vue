@@ -27,7 +27,9 @@ import {
   saveWorkspaceFile,
   importSlidesFromWorkspaceDeck,
   supportsDir,
+  getCurrentFile,
 } from './api'
+import { deckKey, readSlidePos, writeSlidePos } from './storage/position'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
 import { useImport } from './composables/useImport'
@@ -176,6 +178,10 @@ onMounted(async () => {
     // dialogs. If Chrome downgraded the grant, `onReconnectFolder` offers a
     // one-click re-grant instead of a picker.
     deck.value = (await restoreLocalDeck()) ?? (await fetchDeck())
+    // Land back on the slide this deck was left on, rather than slide 1.
+    // Only on the initial restore: opening a *different* deck later goes
+    // through applyDeck(), which deliberately starts at the top.
+    restoreSlidePos()
     reconnectName.value = await pendingLocalGrant()
     void refreshDiskAssets()
   } catch (e) {
@@ -205,6 +211,27 @@ function applyDeck(d: Deck) {
   saveStatus.value = 'saved'
   void refreshDiskAssets()
 }
+
+// ── remembered slide position (per deck, this browser only) ──
+/** Identity of the open deck. The backend's file name alone collides — every
+ *  `.dek` bundle's inner file is `deck.md` — so it's paired with the display
+ *  name, which for a bundle is its folder. */
+function currentDeckKey(): string {
+  return deckKey(getCurrentFile(), deck.value?.config.deck)
+}
+function restoreSlidePos() {
+  const count = deck.value?.slides.length ?? 0
+  if (!count) return
+  const at = readSlidePos(currentDeckKey(), count)
+  current.value = at
+  selected.value = [at]
+  anchor = at
+}
+// Persist on every move. Cheap (one small string) and it means a crash or an
+// F5 mid-edit both land back in the same place.
+watch(current, (n) => {
+  if (deck.value) writeSlidePos(currentDeckKey(), n)
+})
 function isAbort(e: unknown) {
   return (e as { name?: string })?.name === 'AbortError'
 }
@@ -259,7 +286,12 @@ async function onReconnectFolder() {
   error.value = ''
   try {
     const restored = await reconnectLocalDeck()
-    if (restored) applyDeck(restored)
+    if (restored) {
+      applyDeck(restored)
+      // Re-granting access to the deck you already had open is a resumption,
+      // not opening a new deck — keep the slide you were on.
+      restoreSlidePos()
+    }
     reconnectName.value = await pendingLocalGrant()
   } catch (e) {
     if (!isAbort(e)) error.value = `Reconnect failed: ${(e as Error).message}`
