@@ -241,7 +241,6 @@
   height: 280px;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .l-speaker .portraits img {
@@ -382,7 +381,6 @@
   overflow: hidden;
   border: 1px solid var(--dek-line);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  background: rgba(255, 255, 255, 0.03);
 }
 /* A transparent anchor laid over a layout image, so the picture is clickable in
    present/export (never while editing — the anchor isn't rendered then, so a
@@ -514,7 +512,6 @@
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--dek-line);
-  background: rgba(255, 255, 255, 0.03);
 }
 .l-image-caption .cap {
   position: absolute;
@@ -665,7 +662,6 @@
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--dek-line);
-  background: rgba(255, 255, 255, 0.03);
   min-height: 0;
 }
 .gallery-cell .frame img {

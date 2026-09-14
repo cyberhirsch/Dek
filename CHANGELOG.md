@@ -6,6 +6,9 @@
 
 ### Layouts
 
+**Transparent images no longer sit on a grey square** (#43)
+Every image frame — text-image, image-caption, gallery cells, speaker portraits — painted a translucent white fill (3–4% white) behind the picture. Over the near-black ground that reads as mid-grey, which an opaque photo hides completely but a PNG or SVG with an alpha channel lets straight through: transparent artwork appeared to sit on a grey card instead of on the slide. The fills are gone; frames keep their hairline border and radius, so an empty frame still reads as a frame.
+
 **Tables are real canvas objects, with their own typography** (#43)
 Three things, all one change underneath. **A table is now a first-class canvas object** (`type: 'table'`), so converting a Table slide to Freeform keeps it a table — editable, movable, resizable as one unit — and converting back restores the layout with its cells, merges, dragged track sizes and typography intact. Previously baking to Freeform exploded the grid into loose text and image boxes: a one-way trip that lost the structure. **Cell typography is configurable** — pick the heading or body face and a base text size for the whole table, from the top bar (for the layout) or with the object selected (on the canvas). **Cell text auto-shrinks to fit**, using the same fitting the layouts' headings and bullets already use, so a long entry stays inside its cell instead of overflowing a fixed grid track. The layout and the canvas object share one renderer (`TableGrid.vue`) and one geometry module, so they can't drift apart, and PPTX export flattens a table to one shape per cell (rules included) rather than dropping it.
 
