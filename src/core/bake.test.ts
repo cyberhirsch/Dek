@@ -130,6 +130,25 @@ describe('bakeToElements geometry contract', () => {
     expect(img.link).toBe('https://y.io')
   })
 
+  it('bakes a framed video as a centred 16:9 frame with its caption below', () => {
+    const els = bakeToElements({ layout: 'video-embed', video: 'https://youtu.be/x', caption: 'Fig 2.' })
+    const vid = els.find((e) => e.type === 'video')!
+    expect(vid.w / vid.h).toBeCloseTo(16 / 9, 3)
+    expect(vid.x).toBeGreaterThan(0) // inset, not full-bleed
+    const cap = withContent(els, 'Fig 2.')!
+    expect(cap.y).toBeGreaterThanOrEqual(vid.y + vid.h)
+  })
+
+  it('bakes a fullscreen video edge-to-edge and drops the caption', () => {
+    const els = bakeToElements({ layout: 'video-embed', video: 'https://youtu.be/x', caption: 'Fig 2.', videoFit: 'full' })
+    const vid = els.find((e) => e.type === 'video')!
+    expect([vid.x, vid.y, vid.w, vid.h]).toEqual([0, 0, 1280, 720])
+    // the stage is itself 16:9, so full-bleed is still 16:9
+    expect(vid.w / vid.h).toBeCloseTo(16 / 9, 3)
+    // nowhere for a caption to sit on a full-bleed frame
+    expect(withContent(els, 'Fig 2.')).toBeUndefined()
+  })
+
   it('bakes a table to ONE table element, not a scatter of boxes', () => {
     // The grid has to survive as a grid: decomposing into per-cell boxes here
     // would make table -> freeform a one-way trip (see the convert.ts round-trip

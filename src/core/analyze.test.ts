@@ -325,6 +325,18 @@ describe('analyzeDeck', () => {
     expect(a.assets.some((x) => x.uses.some((u) => u.field === 'elements[0].cells[0].image'))).toBe(true)
   })
 
+  it('accepts both video flavors without a "field isn\'t rendered" warning', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [
+        { layout: 'video-embed', video: 'https://youtu.be/x', caption: 'c' },
+        { layout: 'video-embed', video: 'https://youtu.be/y', videoFit: 'full' },
+      ],
+    }
+
+    expect(analyzeDeck(deck).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
+
   it('accepts a table slide with dragged track sizes and custom typography', () => {
     // tableColWidths/RowHeights/Font/Size must all be in KNOWN_FIELDS — otherwise
     // every table with a dragged divider raises a bogus "isn't rendered" warning.

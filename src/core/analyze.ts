@@ -97,7 +97,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   'text-image': ['title', 'content', 'steps', 'image', 'side', 'imageRatio', 'focus', 'imageFit', 'imageLink', 'imageInvert', 'imageDesaturate', 'caption'],
   'image-full': ['image', 'title', 'caption', 'focus', 'imageFit', 'imageLink', 'imageInvert', 'imageDesaturate'],
   'image-caption': ['image', 'caption', 'captionPos', 'focus', 'imageFit', 'imageLink', 'imageInvert', 'imageDesaturate'],
-  'video-embed': ['video', 'poster', 'image', 'caption'],
+  'video-embed': ['video', 'poster', 'image', 'caption', 'videoFit'],
   gallery: ['title', 'items', 'columns'],
   diagram: ['title', 'code'],
   table: ['title', 'tableRows', 'tableCols', 'tableCells', 'tableColWidths', 'tableRowHeights', 'tableFont', 'tableSize'],

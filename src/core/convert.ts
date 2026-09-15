@@ -63,6 +63,7 @@ const MOD_SUPPORT: Record<string, LayoutId[]> = {
   captionPos: ['image-caption'],
   columns: ['gallery'],
   poster: ['video-embed'],
+  videoFit: ['video-embed'],
   tableRows: ['table'],
   tableCols: ['table'],
   tableColWidths: ['table'],

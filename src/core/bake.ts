@@ -296,6 +296,11 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       break
     }
     case 'video-embed': {
+      // .l-video-embed.full: edge-to-edge, no caption (nowhere to put one).
+      if (slide.videoFit === 'full') {
+        els.push(video(slide.video ?? '', 0, 0, STAGE_W, STAGE_H, slide.poster || undefined))
+        break
+      }
       // .l-video-embed: 60px padding, 16:9 frame centred, caption +14 below
       const PADV = 60
       const availW = STAGE_W - PADV * 2

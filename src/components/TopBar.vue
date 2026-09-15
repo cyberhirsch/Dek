@@ -398,6 +398,15 @@ const themeSwatches = computed(() => {
         </div>
       </template>
 
+      <template v-if="slide?.layout === 'video-embed'">
+        <span class="div" />
+        <label class="lbl">Video</label>
+        <div class="seg">
+          <button title="16:9 frame with a caption below" :class="{ on: (slide.videoFit ?? 'framed') === 'framed' }" @click="emit('patch', { videoFit: 'framed' })">framed</button>
+          <button title="Edge-to-edge 16:9, no caption" :class="{ on: slide.videoFit === 'full' }" @click="emit('patch', { videoFit: 'full' })">fullscreen</button>
+        </div>
+      </template>
+
       <template v-if="slide?.layout === 'gallery'">
         <span class="div" />
         <label class="lbl">Cols</label>

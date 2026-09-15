@@ -175,6 +175,7 @@ function onTableCellCtx(e: MouseEvent, index: number) {
 }
 
 // video-embed
+const videoFit = computed(() => props.slide.videoFit ?? 'framed')
 const pv = computed(() => parseVideo(props.slide.video))
 const posterSrc = computed(() => props.slide.poster || props.slide.image || pv.value?.thumb || '')
 const playing = ref(false)
@@ -315,7 +316,7 @@ watch(
     </div>
 
     <!-- video-embed -->
-    <div v-else-if="slide.layout === 'video-embed'" class="dek-pad l-video-embed">
+    <div v-else-if="slide.layout === 'video-embed'" class="dek-pad l-video-embed" :class="videoFit">
       <div class="vid-frame">
         <!-- player (after clicking play) -->
         <template v-if="playing && pv">
@@ -346,7 +347,10 @@ watch(
           </div>
         </template>
       </div>
-      <FittedText v-if="editable || slide.caption" class="fit-video-caption" content-class="vid-cap" :model-value="slide.caption" :editable="editable" placeholder="Caption (optional)" :base-size="20" :min-size="11" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
+      <!-- Fullscreen bleeds the video to the slide edges, so there is nowhere
+           for a caption to sit — it stays on the slide (and in `stash` terms,
+           in the field) but isn't rendered until you switch back to Framed. -->
+      <FittedText v-if="videoFit === 'framed' && (editable || slide.caption)" class="fit-video-caption" content-class="vid-cap" :model-value="slide.caption" :editable="editable" placeholder="Caption (optional)" :base-size="20" :min-size="11" splittable @update:model-value="patch({ caption: $event })" @split="emit('split', { kind: 'field', field: 'caption' })" />
     </div>
 
     <!-- gallery -->

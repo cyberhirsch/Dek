@@ -6,6 +6,9 @@
 
 ### Layouts
 
+**Video comes in two flavors: Framed and Fullscreen** (#43)
+The video layout now has a **framed / fullscreen** toggle in the top bar. *Framed* is the existing look — a centred 16:9 frame with a hairline border, radius and drop shadow, and a caption below it. *Fullscreen* bleeds the video to the slide edges with no border, radius or shadow, since any of those would draw a visible seam against the slide it's meant to be flush with. Both are 16:9: the stage is itself 16:9, so fullscreen is the same frame with the margin and chrome removed, not a different aspect. A caption isn't rendered in fullscreen — there's nowhere for it to sit — but the text stays on the slide and comes back when you switch to framed. PPTX/HTML export bakes each flavor to matching geometry. `videoFit: framed | full`, defaulting to `framed`, so existing video slides are untouched. `+3` tests.
+
 **Transparent images no longer sit on a grey square** (#43)
 Every image frame — text-image, image-caption, gallery cells, speaker portraits — painted a translucent white fill (3–4% white) behind the picture. Over the near-black ground that reads as mid-grey, which an opaque photo hides completely but a PNG or SVG with an alpha channel lets straight through: transparent artwork appeared to sit on a grey card instead of on the slide. The fills are gone; frames keep their hairline border and radius, so an empty frame still reads as a frame.
 

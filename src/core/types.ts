@@ -241,6 +241,10 @@ export interface Slide {
   // video-embed: a video URL (YouTube/Vimeo/file) + optional poster still
   video?: string
   poster?: string
+  /** video-embed framing. `framed` (the default) centres a bordered 16:9 frame
+   *  with room for a caption; `full` bleeds the video to the slide edges. The
+   *  stage is itself 16:9, so both are 16:9 — `full` just has no margin. */
+  videoFit?: 'framed' | 'full'
   side?: 'left' | 'right'
   /** text-image: aspect ratio of the image frame. */
   imageRatio?: '16:9' | '1:1' | '9:16'

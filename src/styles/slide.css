@@ -532,6 +532,8 @@
 .cap.top-left { top: 80px; left: 80px; }
 
 /* ── Layout: video-embed ───────────────────────────────────────── */
+/* Two flavors, both 16:9 — the stage itself is 16:9, so `full` is the same
+   frame with the margin and chrome taken away, not a different aspect. */
 .dek-pad.l-video-embed {
   padding: 60px;
   justify-content: center;
@@ -547,6 +549,19 @@
   background: #000;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   margin: 0 auto;
+}
+/* Fullscreen: edge-to-edge, no border/radius/shadow — any of those would draw
+   a visible seam against the slide it is supposed to be flush with. */
+.dek-pad.l-video-embed.full {
+  padding: 0;
+}
+.l-video-embed.full .vid-frame {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .l-video-embed iframe,
 .l-video-embed video {
