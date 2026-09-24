@@ -216,10 +216,16 @@ const themeSwatches = computed(() => {
     </div>
 
     <div class="center">
-      <label class="lbl">Layout</label>
-      <select class="sel" :value="slide?.layout" @change="emit('change-layout', ($event.target as HTMLSelectElement).value as LayoutId)">
-        <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
-      </select>
+      <!-- The separate "Layout" label folded into the control itself. The select
+           still carries the real layout as its value — so the current one is
+           marked when the menu opens — while the closed face reads "Layout",
+           which is both shorter and fixed-width regardless of the layout name. -->
+      <div class="sel-face-wrap" :title="`Layout — ${slide ? LAYOUT_LABELS[slide.layout] : ''}`">
+        <select class="sel sel-faced" :value="slide?.layout" @change="emit('change-layout', ($event.target as HTMLSelectElement).value as LayoutId)">
+          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
+        </select>
+        <span class="sel-face">Layout</span>
+      </div>
 
       <span class="div" />
 
@@ -753,4 +759,32 @@ const themeSwatches = computed(() => {
   display: none;
 }
 .sel.font { padding: 4px 6px; }
+
+/* Layout picker: label folded into the control. The select keeps the real
+   layout selected (so it's marked when the menu opens) but renders its own
+   text invisibly; `.sel-face` paints the fixed "Layout" over it. Options are
+   given an explicit colour — they inherit from the select, and the popup would
+   otherwise be transparent too. */
+.sel-face-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.sel-faced {
+  width: 76px;
+  color: transparent;
+}
+.sel-faced option {
+  color: #e6ecf2;
+  background: #1e222b;
+}
+.sel-face {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 11px;
+  color: #e6ecf2;
+  white-space: nowrap;
+}
 </style>
