@@ -60,6 +60,15 @@ function onImgPick(e: Event) {
 
 const slide = computed(() => props.deck.slides[props.index])
 
+// The icon replaces a label, so the tooltip has to carry what the label used to
+// say: both states, and the fact that clicking toggles rather than saves.
+const saveTitle = computed(() => {
+  const state =
+    props.saveStatus === 'saving' ? 'saving…' : props.saveStatus === 'unsaved' ? 'unsaved changes' : 'all changes saved'
+  const mode = props.autosave ? 'Autosave on' : 'Autosave off'
+  return `${mode} — ${state}. Click to turn autosave ${props.autosave ? 'off' : 'on'}. Save now with Ctrl+S (⌘S).`
+})
+
 // The image layouts that carry a single framed image and support a fill/fit
 // toggle. image-caption defaults to `contain` (show the whole photo); the others
 // default to `cover` (fill the frame), matching SlideView's per-layout defaults.
@@ -183,11 +192,23 @@ const themeSwatches = computed(() => {
         @theme="emit('theme', $event)"
       />
       <span class="div" />
-      <label class="chk-auto" title="Autosave. Save now with Ctrl+S (⌘S)">
-        <input type="checkbox" :checked="autosave" @change="emit('toggle-autosave')" />
-        autosave
-        <span class="save-led" :class="saveStatus" />
-      </label>
+      <!-- Autosave + save state in one control: the disk's colour is the state
+           (green saved / amber saving / red unsaved), the slash is autosave
+           being off. Red-with-a-slash is the one combination worth noticing —
+           pending changes and nothing coming to write them. -->
+      <button class="save-btn" :class="saveStatus" :title="saveTitle" @click="emit('toggle-autosave')">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path d="M4 4h12l4 4v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+          <path d="M8 4v5h7V4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          <rect x="7.5" y="13" width="9" height="6" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <!-- The backing stroke is the bar's own colour, so the slash stays
+               readable where it crosses the disk's outlines. -->
+          <template v-if="!autosave">
+            <line x1="3.5" y1="20.5" x2="20.5" y2="3.5" stroke="#14161b" stroke-width="4" stroke-linecap="round" />
+            <line x1="3.5" y1="20.5" x2="20.5" y2="3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </template>
+        </svg>
+      </button>
       <div class="seg">
         <button title="Undo (Ctrl+Z)" :disabled="!canUndo" @click="emit('undo')">↶</button>
         <button title="Redo (Ctrl+Shift+Z)" :disabled="!canRedo" @click="emit('redo')">↷</button>
@@ -559,29 +580,28 @@ const themeSwatches = computed(() => {
   color: rgba(230, 236, 242, 0.65);
   cursor: pointer;
 }
-.chk-auto {
-  display: flex;
+.save-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: rgba(230, 236, 242, 0.65);
-  cursor: pointer;
-  user-select: none;
-}
-.chk-auto input[type='checkbox'] {
-  accent-color: #7fc7ff;
-  cursor: pointer;
-}
-.save-led {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
   flex-shrink: 0;
-  transition: background 0.2s;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.15s;
 }
-.save-led.saved { background: #4ade80; }
-.save-led.saving { background: #facc15; }
-.save-led.unsaved { background: #f87171; }
+.save-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+/* Colour is the save state, never autosave's on/off — the slash carries that,
+   so "unsaved" stays red and legible whichever mode you're in. */
+.save-btn.saved { color: #4ade80; }
+.save-btn.saving { color: #facc15; }
+.save-btn.unsaved { color: #f87171; }
 .topbtn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
