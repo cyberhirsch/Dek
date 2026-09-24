@@ -248,7 +248,14 @@ const themeSwatches = computed(() => {
         </button>
         <input ref="imgInput" type="file" accept="image/*" style="display: none" @change="onImgPick" />
         <div class="grp">
-          <button ref="insertBtn" class="ins" title="Insert…" @click="toggleInsert">＋ Insert ▾</button>
+          <!-- Icon-only, sized to the canvas tool buttons it sits beside. The
+               word and the caret were carrying no information the menu itself
+               doesn't — the tooltip names the contents instead. -->
+          <button ref="insertBtn" class="ins" :class="{ on: insertOpen }" title="Insert a Video, Diagram or Table slide" @click="toggleInsert">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
           <Teleport to="body">
             <div
               v-if="insertOpen"
@@ -638,18 +645,31 @@ const themeSwatches = computed(() => {
 .style-seg { gap: 3px; align-items: center; }
 .tt { font-weight: 700; font-size: 14px; }
 .grp { position: relative; }
+/* Matches .seg button.icon-btn exactly — it sits in that row, so any other
+   size reads as a misalignment rather than a distinction. */
 .ins {
+  width: 31px;
+  height: 29px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(230, 236, 242, 0.85);
   border-radius: 6px;
-  padding: 5px 8px;
   font-family: inherit;
   font-size: 11px;
   cursor: pointer;
-  white-space: nowrap;
 }
 .ins:hover { background: rgba(255, 255, 255, 0.1); }
+/* Held open: same treatment as an active canvas tool, so the button reads as
+   the source of the menu floating next to it. */
+.ins.on {
+  border-color: #7fc7ff;
+  color: #7fc7ff;
+  background: rgba(127, 199, 255, 0.12);
+}
 .menu {
   position: fixed;
   display: flex;

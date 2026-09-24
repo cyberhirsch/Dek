@@ -22,6 +22,9 @@ Dek gains a real, structured **Table** layout — rows/columns set from a top-ba
 
 ### Opening & saving
 
+**Insert is an icon button, matching the tools beside it** (#43)
+"＋ Insert ▾" is now just the ＋, at 31×29 — the exact size of the canvas tool buttons it sits next to, so the row aligns instead of having one odd-width member. The word and the caret were describing the menu that opens anyway; the tooltip names its contents (Video, Diagram, Table). While the menu is open the button takes the same accent treatment as an active canvas tool, so it reads as the source of the panel floating beside it.
+
 **The Layout label folded into its own dropdown** (#43)
 "Layout" was a separate uppercase label sitting beside the layout dropdown, and the dropdown sized itself to its longest entry ("Image + Caption"). Both are gone: the control now reads **Layout** itself, at a fixed width roughly half what it was, freeing space in a top bar that has been getting crowded. The select still carries the real layout as its value, so the current one is marked when the menu opens, and the tooltip names it without opening anything.
 
