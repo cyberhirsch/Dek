@@ -111,7 +111,9 @@ async function refreshDiskAssets() {
     diskAssets.value = []
   }
 }
-const analysis = computed(() => (deck.value ? analyzeDeck(deck.value, diskAssets.value) : null))
+// naturalSize loads any picture it doesn't know yet and is reactive, so the
+// gallery size/crop checks fill in on their own as pictures arrive.
+const analysis = computed(() => (deck.value ? analyzeDeck(deck.value, diskAssets.value, { naturalSize }) : null))
 const reviewCount = computed(() => {
   const c = analysis.value?.counts
   return c ? c.error + c.warning + c.info : 0

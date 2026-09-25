@@ -1,6 +1,7 @@
 import type { Deck, GalleryItem, LayoutId, Slide } from './types'
 import { LAYOUT_IDS } from './types'
 import { tableImages } from './table'
+import { GALLERY_MAX_CROP, GALLERY_MIN_AREA, galleryDisplay } from './gallery'
 
 export type IssueKind = 'schema' | 'asset' | 'review'
 export type IssueSeverity = 'error' | 'warning' | 'info'
@@ -298,6 +299,33 @@ function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef
   }
 }
 
+/**
+ * A gallery can no longer overflow (#52), but it can still fail quietly:
+ * pictures too small to judge from the back of the room, or cropped away by
+ * `cover`. Judged from the real layout, one issue per kind per slide.
+ */
+function galleryFitIssues(slide: Slide, n: number, sizeOf: NonNullable<AnalyzeOptions['naturalSize']>, issues: DeckIssue[]) {
+  const shown = galleryDisplay(slide, sizeOf)
+  const small = shown.filter((p) => p.w * p.h < GALLERY_MIN_AREA)
+  if (small.length) {
+    const least = small.reduce((a, b) => (a.w * a.h <= b.w * b.h ? a : b))
+    issue(
+      issues, n, 'warning', 'review',
+      `${small.length === 1 ? 'A gallery picture shows' : `${small.length} gallery pictures show`} as small as ${Math.round(least.w)}×${Math.round(least.h)} px — too small to judge from the back of the room. Fewer pictures per slide, or labelPos: overlay.`,
+      'items',
+    )
+  }
+  const cropped = shown.filter((p) => p.crop > GALLERY_MAX_CROP)
+  if (cropped.length) {
+    const worst = Math.max(...cropped.map((p) => p.crop))
+    issue(
+      issues, n, 'info', 'review',
+      `Gallery crops away up to ${Math.round(worst * 100)}% of a picture — imageFit: contain shows it whole.`,
+      'items',
+    )
+  }
+}
+
 function assetIssues(assets: AssetRef[], issues: DeckIssue[]) {
   for (const asset of assets) {
     const first = asset.uses[0]
@@ -331,13 +359,20 @@ function orphanAssets(referenced: AssetRef[], diskFiles: string[]): AssetRef[] {
 
 const ASSET_ORDER: Record<AssetKind, number> = { orphan: 0, data: 1, remote: 2, local: 3, blob: 4, unknown: 5 }
 
-export function analyzeDeck(deck: Deck, diskFiles?: string[]): DeckAnalysis {
+export interface AnalyzeOptions {
+  /** Natural image sizes, where known — enables the gallery size and crop
+   *  checks. Pictures without a size are simply not judged. */
+  naturalSize?: (src: string) => { w: number; h: number } | undefined
+}
+
+export function analyzeDeck(deck: Deck, diskFiles?: string[], opts: AnalyzeOptions = {}): DeckAnalysis {
   const issues: DeckIssue[] = []
   const assetMap = new Map<string, AssetRef>()
 
   deck.slides.forEach((slide, index) => {
     validateSlide(slide, index, issues)
     collectAssets(slide, index, assetMap)
+    if (slide.layout === 'gallery' && opts.naturalSize) galleryFitIssues(slide, index + 1, opts.naturalSize, issues)
   })
 
   const referenced = [...assetMap.values()]

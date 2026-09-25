@@ -220,6 +220,42 @@ describe('analyzeDeck', () => {
     expect(msgs).toContain('Gallery item fit must be cover or contain.')
   })
 
+  describe('gallery size and crop (Review)', () => {
+    const sized = (w: number, h: number) => ({ naturalSize: () => ({ w, h }) })
+    const gallery = (n: number, extra: Partial<Deck['slides'][number]> = {}): Deck => ({
+      config: {},
+      slides: [{ layout: 'gallery', title: 'T', items: Array.from({ length: n }, (_, i) => ({ image: `p${i}.png`, label: `${i}` })), ...extra }],
+    })
+
+    it('warns when pictures come out too small to judge', () => {
+      // nine labelled squares: 193×171 each, under the ~250×140 floor
+      const issues = analyzeDeck(gallery(9), undefined, sized(500, 500)).issues
+      expect(issues).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'warning', kind: 'review', message: expect.stringContaining('9 gallery pictures show as small as 193×171') })]))
+    })
+
+    it('gives the room back with badges: the same nine pass as overlay labels', () => {
+      const issues = analyzeDeck(gallery(9, { labelPos: 'overlay' }), undefined, sized(500, 500)).issues
+      expect(issues.some((i) => i.message.includes('too small'))).toBe(false)
+    })
+
+    it('suggests contain when cover crops away more than about a third', () => {
+      // one labelled 4:1 panorama filling a 1060×420 frame: 1 − 1060/1680 = 37% cut away
+      const issues = analyzeDeck(gallery(1), undefined, sized(4000, 1000)).issues
+      expect(issues).toEqual(expect.arrayContaining([expect.objectContaining({ severity: 'info', message: expect.stringContaining('crops away up to 37%') })]))
+      const whole = analyzeDeck(gallery(1, { imageFit: 'contain' }), undefined, sized(4000, 1000)).issues
+      expect(whole.some((i) => i.message.includes('crops away'))).toBe(false)
+    })
+
+    it('counts zoom as cropping, even in contain', () => {
+      const d = gallery(1, { imageFit: 'contain', items: [{ image: 'p.png', focus: { x: 0, y: 0, scale: 2 } }] })
+      expect(analyzeDeck(d, undefined, sized(1600, 900)).issues.some((i) => i.message.includes('crops away up to 75%'))).toBe(true)
+    })
+
+    it('judges nothing without sizes — no guessing', () => {
+      expect(analyzeDeck(gallery(9)).issues.some((i) => i.message.includes('too small'))).toBe(false)
+    })
+  })
+
   it('accepts a well-formed focus', () => {
     const deck: Deck = {
       config: {},

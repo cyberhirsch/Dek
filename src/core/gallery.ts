@@ -164,3 +164,57 @@ export function setGalleryLink(items: Slide['items'], index: number, link: strin
     return link ? { ...rest, link } : rest
   })
 }
+
+// ── what each picture actually shows, for Review (#55) ──────────────────────
+
+export interface PictureDisplay {
+  index: number
+  /** The picture's on-slide size, in stage px (for cover: its frame). */
+  w: number
+  h: number
+  /** Share of the picture cut away by `cover` and zoom, 0..1. */
+  crop: number
+}
+
+/**
+ * How every gallery picture with a known size comes out on the slide, using
+ * the same layout the slide draws (presenting geometry). Pictures whose size
+ * isn't known yet are skipped rather than guessed.
+ */
+export function galleryDisplay(slide: Slide, sizeOf: (src: string) => { w: number; h: number } | undefined): PictureDisplay[] {
+  const items = galleryItemsOf(slide.items)
+  if (!items.length) return []
+  const sizes = items.map((it) => (it.image ? sizeOf(it.image) : undefined))
+  const labelRow = slide.labelPos !== 'overlay' && items.some((it) => it.label)
+  const box = galleryBox(!!(slide.title ?? '').trim())
+  const cols = galleryColumns(slide.columns, items.length, {
+    aspects: sizes.map((s) => (s ? s.w / s.h : undefined)),
+    box,
+    labelRow,
+  })
+  const g = galleryCells(items.length, cols, box, labelRow)
+  const out: PictureDisplay[] = []
+  items.forEach((it, index) => {
+    const size = sizes[index]
+    if (!size) return
+    if (effectiveFit(it, slide.imageFit) === 'contain') {
+      const r = containRect(size, { x: 0, y: 0, w: g.cellW, h: g.frameH })
+      // A zoomed contain picture is cropped by its (hugging) frame.
+      const s = it.focus?.scale && it.focus.scale > 1 ? it.focus.scale : 1
+      out.push({ index, w: r.w, h: r.h, crop: 1 - 1 / (s * s) })
+      return
+    }
+    // cover: the frame is filled; what's cut is the overflow, grown by zoom.
+    const s = it.focus?.scale && it.focus.scale > 0 ? it.focus.scale : 1
+    const k = Math.max(g.cellW / size.w, g.frameH / size.h) * s
+    const shown = Math.min(g.cellW, size.w * k) * Math.min(g.frameH, size.h * k)
+    out.push({ index, w: g.cellW, h: g.frameH, crop: Math.max(0, 1 - shown / (size.w * k * size.h * k)) })
+  })
+  return out
+}
+
+/** Below this on-slide area a picture can't be judged from the back of a
+ *  lecture hall — about 250 × 140 stage px, orientation-agnostic. */
+export const GALLERY_MIN_AREA = 250 * 140
+/** Beyond this share cut away, `contain` is worth suggesting. */
+export const GALLERY_MAX_CROP = 0.35
