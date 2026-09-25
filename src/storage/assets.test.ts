@@ -115,3 +115,62 @@ describe('asset references', () => {
     expect(mapped.elements?.[2]).toMatchObject({ poster: 'resolved:Talk Assets/video.jpg' })
   })
 })
+
+// The mapper is what turns an upload's temporary blob: URL back into an
+// Assets/ path on save. Every location it misses gets saved as a dead blob:
+// URL — the picture is gone after a reload while its file sits orphaned.
+describe('asset references — every image location', () => {
+  const R = (ref: string) => `R:${ref}`
+
+  it('maps images inside a table layout, and leaves text and merge placeholders alone', () => {
+    const s: Slide = { layout: 'table', table: { rows: [['Tool', { image: 'Assets/a.png', link: 'https://x.io' }], [null, 42]] } }
+    expect(mapSlideAssetRefs(s, R).table?.rows).toEqual([
+      ['Tool', { image: 'R:Assets/a.png', link: 'https://x.io' }],
+      [null, 42],
+    ])
+  })
+
+  it('maps images inside a canvas table element', () => {
+    const s: Slide = {
+      layout: 'freeform',
+      elements: [{ type: 'table', x: 0, y: 0, w: 10, h: 10, rotation: 0, table: { rows: [[{ image: 'Assets/b.png' }]] } }],
+    }
+    const el = mapSlideAssetRefs(s, R).elements![0]
+    expect(el.type === 'table' && el.table.rows).toEqual([[{ image: 'R:Assets/b.png' }]])
+  })
+
+  it('maps images parked in stash by a layout switch, and keeps stash free of a layout key', () => {
+    const s: Slide = {
+      layout: 'text',
+      content: '- a',
+      stash: { image: 'Assets/parked.png', items: ['Assets/g.png'], table: { rows: [[{ image: 'Assets/t.png' }]] } },
+    }
+    const stash = mapSlideAssetRefs(s, R).stash as Slide
+    expect(stash.image).toBe('R:Assets/parked.png')
+    expect(stash.items).toEqual(['R:Assets/g.png'])
+    expect(stash.table?.rows).toEqual([[{ image: 'R:Assets/t.png' }]])
+    expect('layout' in stash).toBe(false)
+  })
+
+  it('maps bare-string gallery items — but never text items elsewhere', () => {
+    expect(mapSlideAssetRefs({ layout: 'gallery', items: ['Assets/g.png'] }, R).items).toEqual(['R:Assets/g.png'])
+    expect(mapSlideAssetRefs({ layout: 'text', items: ['a bullet'] }, R).items).toEqual(['a bullet'])
+  })
+
+  it('collects table and stashed images, so Save As copies them into a new bundle', () => {
+    const refs = collectAssetRefs([
+      { layout: 'table', table: { rows: [[{ image: 'Assets/cell.png' }]] } },
+      { layout: 'text', stash: { image: 'Assets/parked.png' } },
+    ])
+    expect(refs.sort()).toEqual(['Assets/cell.png', 'Assets/parked.png'])
+  })
+
+  it('turns an uploaded blob: URL in a table cell back into its Assets path on save', () => {
+    const urlToPath = new Map([['blob:abc', 'Assets/upload_1.png']])
+    const saved = mapSlideAssetRefs(
+      { layout: 'table', table: { rows: [[{ image: 'blob:abc' }]] } },
+      (ref) => urlToPath.get(ref) ?? ref,
+    )
+    expect(saved.table?.rows).toEqual([[{ image: 'Assets/upload_1.png' }]])
+  })
+})

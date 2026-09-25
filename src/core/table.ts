@@ -167,6 +167,20 @@ export function tableImages(t: TableData | undefined | null): Array<{ src: strin
   return out
 }
 
+/** Apply `fn` to every image in a table, leaving everything else as stored.
+ *  Covered placeholders (`null`) carry no image and pass through untouched. */
+export function mapTableImages(t: TableData, fn: (ref: string) => string): TableData {
+  if (!Array.isArray(t.rows)) return t
+  return {
+    ...t,
+    rows: t.rows.map((row) =>
+      rowValues(row).map((v) =>
+        v && typeof v === 'object' && typeof v.image === 'string' ? { ...v, image: fn(v.image) } : v,
+      ),
+    ),
+  }
+}
+
 // ── Markdown text → table ───────────────────────────────────────────────────
 
 /** Split one pipe-table line into cell texts: outer pipes optional, `\|` an

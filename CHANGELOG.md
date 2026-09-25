@@ -62,6 +62,9 @@ Dek gains a real, structured **Table** layout — rows/columns set from a top-ba
 
 ### Opening & saving
 
+**Fixed: images in table cells and in `stash` were saved as dead links inside a bundle** (#48)
+Inside a `.dek` bundle an uploaded image is written to `Assets/` straight away, and the slide briefly holds a temporary `blob:` URL until saving turns it back into the `Assets/…` path. That translation — and the reverse on load, and the list of files Save As copies into a new bundle — all run through one mapper, and it knew nothing about tables or `stash`. So a picture placed in a table cell showed as broken whenever the deck was reopened. One uploaded into a cell was saved to `deck.md` as a `blob:` URL that died with the tab, and its file was left unreferenced in `Assets/`, where the Review panel would offer to delete it. Any image a layout switch had parked in `stash` hit the same path, as did bare-string gallery items. The mapper now covers table layouts, canvas tables, `stash` and string gallery items, and Save As copies all of them. `+6` tests.
+
 **Recent decks in the deck menu** (#49)
 The deck menu's "Decks" section listed the decks in the currently open folder — and since every deck is its own `.dek` bundle, that was only ever the deck already open. It's replaced by **Recent**: your last 10 decks, most recent first, one click to reopen, with the subfolder each lives in shown beneath its name. That line is the only way to tell two "Week 01"s from different courses apart, so an entry is identified by its location, never its name. Decks join the list when opened through *Open deck…* or created with *Save As*. A deck that has since been moved or deleted is dropped from the list when you try it, with a message saying so. A lapsed folder grant leaves the entry in place, because the deck is still there. The old folder list still appears when a plain folder genuinely holds more than one deck.
 
