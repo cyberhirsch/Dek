@@ -285,8 +285,20 @@ A grid of images, for comparisons and contact sheets.
 | Field | Type | Notes |
 |---|---|---|
 | `title` | string | Optional. |
-| `items` | `{image, label, link}[]` | One object per cell. `label` (optional) sits under the picture; `link` (optional) makes the cell clickable while presenting, `http(s)`/`mailto` only. |
-| `columns` | `auto` \| number | `auto` (default) gives one column per image, up to 3. The editor offers 2, 3, 4. |
+| `items` | `{image, label, link, fit, focus}[]` | One object per cell — see below. |
+| `columns` | `auto` \| number | `auto` (default) picks the count that shows the pictures largest (below). A number fixes it; the editor offers 2, 3, 4. |
+| `imageFit` | `cover` \| `contain` | `cover` (default) fills each frame, cropping; `contain` shows every picture whole, in a frame that hugs it. |
+| `labelPos` | `below` \| `overlay` | `below` (default) gives each picture a label row; `overlay` sets a short label as a badge on the picture's corner. |
+
+An **item**:
+
+| Field | Type | Notes |
+|---|---|---|
+| `image` | path | Required. |
+| `label` | string | Optional, plain text. Keep it short, especially with `labelPos: overlay` ("1", "A"). |
+| `link` | URL | Makes the cell clickable while presenting, `http(s)`/`mailto` only. |
+| `fit` | `cover` \| `contain` | Overrides the gallery's `imageFit` for this picture. |
+| `focus` | `{x, y, scale}` | Pan and zoom inside the cell, as on single-image layouts. Usually set in the editor. |
 
 ```yaml
 layout: gallery
@@ -297,11 +309,31 @@ items:
   - { image: Assets/mac.png, label: macOS, link: "https://example.com/mac-screenshots" }
 ```
 
-Write every item as an object: a bare path string (`- Assets/win.png`) is an old
-form Dek doesn't resolve inside a bundle. Cells are always cropped to fill, with
-no per-cell fit, focus, invert, or desaturate.
+Write items as objects. A bare path string (`- Assets/win.png`) still works, but
+it can't carry a label, link, fit or focus.
 
-Past six images the grid gets dense — split it.
+**The grid always fits the slide.** Rows share the height equally — 474 px
+under a title, 580 without — so no gallery runs off the bottom, whatever the
+count or the pictures' shapes. The cost moves to the pictures instead: with
+many rows they get small, and with `cover` a wide picture in a short row is
+cropped hard. Dek's Review panel warns when a picture shows smaller than about
+250 × 140 px, and notes when `cover` (or zoom) cuts away more than about a third
+of one.
+
+**`columns: auto`** tries every column count and keeps the one whose *smallest*
+picture comes out largest. Near-ties go to fewer rows, then fewer columns. Four
+labelled 16:9 pictures come out 2×2, three portraits sit in one row, nine
+squares go five across.
+
+Choosing between the settings:
+
+- **Photos where any crop is fine:** the defaults.
+- **Renders, diagrams or screenshots where every edge matters:**
+  `imageFit: contain`. Each frame hugs its picture, and nothing is cut.
+- **Quiz galleries** ("which one is real?") with labels like "1"–"4":
+  `labelPos: overlay`. Each row gets its 54 px label row back for the pictures.
+- **More than about six pictures:** split the gallery across slides. They get
+  too small to judge from the back of a room.
 
 ---
 
@@ -365,6 +397,7 @@ A **cell** is one of:
 | `""` | A blank cell. |
 | `{ image: Assets/x.png }` | An image, full-bleed to the cell's rules and cropped. Add `link: https://…` to make it clickable while presenting. |
 | `{ text: Q1, colspan: 2 }` | A merge: `colspan`/`rowspan` on the top-left cell of the block. |
+| `{ text: Total, bold: true }` | Emphasis for the whole cell: `bold` and/or `italic`. Flags, not `**` — cell text is plain, so Markdown markers would just show. |
 | `null` (or `~`) | A position covered by a merge. Write one for **every** covered position, so each row keeps its full length. |
 
 **Rows are YAML flow lists, so a comma splits a cell.** Quote any cell that
@@ -394,7 +427,12 @@ table:
     - [D, E, F]
 ```
 
-Merges have no editor UI yet — write them by hand.
+In the editor, all of this has direct controls: drag the dividers between rows
+and columns to size them (that writes `colWidths`/`rowHeights`); right-click a
+cell to insert or delete rows and columns; drag across cells or Shift-click to
+select a block, then right-click for Bold, Italic, Clear and Merge Cells, or
+Unmerge Cells on a merged one. Writing merges by hand is fine too — just keep
+one `null` per covered position.
 
 Keep `font: body`. Cells don't get the heading's italic 300, so `heading` sets
 Cormorant upright and regular — not the heading look the
