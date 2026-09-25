@@ -100,7 +100,7 @@ export interface TableData {
   view?: TableView
 }
 
-export type TableView = 'table' | 'pie'
+export type TableView = 'table' | 'pie' | 'cloud'
 
 // ── Free-positioned canvas elements ──────────────────────────────────────────
 // Any slide may carry an `elements` array: movable / rotatable objects drawn on

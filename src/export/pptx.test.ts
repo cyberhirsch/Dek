@@ -94,6 +94,14 @@ describe('deckToPptx', () => {
     expect(s2).toContain('<a:t>bold</a:t>')
   })
 
+  it('exports slide headings italic — the box-level style, not just inline *markdown*', async () => {
+    // Bake marks every heading `italic: true`. That box-level flag used to be
+    // dropped, so every heading in every PPTX came out upright.
+    const zip = await build(deck)
+    const s2 = await zip.file('ppt/slides/slide2.xml')!.async('string')
+    expect(s2).toMatch(/<a:rPr[^>]* i="1"[^>]*>(?:(?!<\/a:rPr>).)*<\/a:rPr><a:t>Points<\/a:t>/)
+  })
+
   it('embeds a referenced image as a media part with a slide relationship', async () => {
     const zip = await build(deck)
     expect(zip.file('ppt/media/image1.png')).not.toBeNull()
@@ -230,6 +238,15 @@ describe('deckToPptx — tables', () => {
     const xml = await slideXml({ config: { theme }, slides: [{ layout: 'table', table: { view: 'pie', rows: [['Only', 5]] } }] })
     expect(xml).toContain('prst="ellipse"')
     expect(xml).not.toContain('prst="pie"')
+  })
+
+  it('exports a word cloud as one editable text box per word', async () => {
+    const xml = await slideXml({
+      config: { theme },
+      slides: [{ layout: 'table', table: { view: 'cloud', rows: [['Gestalt', 9], ['Closure', 3], ['Figure', 1]] } }],
+    })
+    for (const w of ['Gestalt', 'Closure', 'Figure']) expect(xml).toContain(`<a:t>${w}</a:t>`)
+    expect(() => assertWellFormed(xml, 'slide1.xml')).not.toThrow()
   })
 
   it('emits well-formed XML for a pie slide', async () => {

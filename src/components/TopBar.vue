@@ -194,6 +194,7 @@ function setTableView(view: TableView) {
 const TABLE_VIEWS: Array<{ id: TableView; title: string }> = [
   { id: 'table', title: 'Show the rows as a table' },
   { id: 'pie', title: 'Pie chart — labels from the first column, values from the first numeric one' },
+  { id: 'cloud', title: 'Word cloud — words from the first column, optional weights from a numeric one' },
 ]
 function resizeActiveTable(rows: number, cols: number) {
   const t = activeTable.value

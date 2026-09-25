@@ -6,6 +6,13 @@
 
 ### Layouts
 
+**Tables can be shown as a word cloud** (#48)
+A third table view, *cloud*: words from the first column, sized by an optional numeric column (no numbers means equal weights). Sizes follow a square-root scale, because perceived size tracks area and a word twice the weight shouldn't look four times as big. The largest words are set in the heading face — Cormorant, light italic — and the rest in the table's own face. The three heaviest take the accent colour and everything else stays in dim text. With equal weights nothing is accented, since "the top three" would just be alphabetical. Beyond 60 words the lightest drop, since a denser cloud stops being readable on a slide.
+
+The layout is **deterministic**: largest word first, along an elliptical spiral stretched to the box's shape, each word at the first spot it overlaps nothing. The same table therefore always produces the same cloud — it never reshuffles between renders or when you present. Word widths come from a per-font advance estimate rather than live glyph measurement. That is what makes the slide and the PowerPoint export identical; the cost is slightly looser packing, never an overlap. In PowerPoint each word is its own editable text box.
+
+**Fixed: slide headings exported to PowerPoint upright.** The PPTX writer ignored a text box's own italic/bold/underline/strike — only inline `*Markdown*` styling reached PowerPoint. Bake marks every heading italic, so every heading in every export lost the light italic that the design language is built on. Box-level styling now applies to all of a box's text. `+14` tests.
+
 **Tables can be shown as a pie chart, and have a header row** (#48)
 A table now has a **view** switch in the top bar — *table* or *pie* — and the rows stay the source of truth either way. Switching view never changes the data. The pie reads the first column as labels and the **first mostly-numeric column** as values, so a table can keep a notes column before its numbers. With the new **header** toggle on, the first row names the columns: it's styled as a header in the grid (accent colour and a stronger rule — no bold, no capitals) and skipped as data by the chart. New tables start with a header row.
 

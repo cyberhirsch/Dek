@@ -10,6 +10,7 @@ import { resolveFont } from '../render/theme'
 import FittedText from './FittedText.vue'
 import FramedImage from './FramedImage.vue'
 import PieChart from './PieChart.vue'
+import WordCloud from './WordCloud.vue'
 
 const props = defineProps<{
   table: TableData | undefined
@@ -112,6 +113,7 @@ function onCtx(e: MouseEvent, i: number) {
       </template>
     </div>
     <PieChart v-else-if="view === 'pie'" :table="table" />
+    <WordCloud v-else-if="view === 'cloud'" :table="table" />
     <!-- Editor-only: flip a chart to its data and back. Never rendered while
          presenting or in export. -->
     <button
