@@ -6,6 +6,13 @@
 
 ### Layouts
 
+**Tables can be shown as a pie chart, and have a header row** (#48)
+A table now has a **view** switch in the top bar — *table* or *pie* — and the rows stay the source of truth either way. Switching view never changes the data. The pie reads the first column as labels and the **first mostly-numeric column** as values, so a table can keep a notes column before its numbers. With the new **header** toggle on, the first row names the columns: it's styled as a header in the grid (accent colour and a stronger rule — no bold, no capitals) and skipped as data by the chart. New tables start with a header row.
+
+The pie follows the design language rather than a charting library's defaults: one accent colour stepped down in opacity, so it follows any theme; slices separated by the slide's own ground colour; labels with shares set outside the pie rather than in a legend; more than six categories fold the smallest into a neutral "Other", because angles that small can't be compared. A real slice under 1% reads "<1%", never "0%". Numbers are read as people type them — `42%`, `€ 3,50`, `1.234,5` and `1,234.5` all work. A single comma is decimal, so `1,200` is 1.2, not twelve hundred.
+
+In the editor, **Edit data** flips a chart to its rows in place and **Show chart** flips back. It isn't saved and never appears when presenting or in export. PowerPoint export draws the pie as **native pie shapes**, one per slice, so it stays vector and editable rather than a pasted picture. It shares one geometry module with the slide, so they can't disagree. Header rows export in the accent colour. `+29` tests.
+
 **One table object for the layout and the canvas — stored as rows you can read** (#48)
 A table used to be described twice: the Table layout carried seven flat fields on the slide (`tableRows`, `tableCols`, `tableCells`, `tableColWidths`, …) and the canvas table element carried the same seven under different names. Every feature had to be built on both sides, and they had already drifted — a canvas table had no Rows/Cols stepper, and its cells could take neither an image nor a right-click menu. Both now carry the **same `table` object**, rendered, edited, sized and exported through the same code. Baking to Freeform is a copy, not a translation. The top bar shows one set of table controls for whichever table is active, and canvas table cells get images, links and the cell menu.
 

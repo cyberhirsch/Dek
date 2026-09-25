@@ -313,6 +313,8 @@ export function tableToBoxes(el: TableElement, lineColor = 'rgba(230,236,242,0.1
             size: t?.size ?? TABLE_CELL_SIZE,
             align: 'center' as const,
             valign: 'middle' as const,
+            // header row: the accent colour, as on screen
+            ...(t?.header && i < cols ? { color: 'var(--dek-accent)' } : {}),
           }),
     })
   })

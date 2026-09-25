@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, TableData, CanvasTool, ElementPatch } from '../core/types'
+import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, TableData, TableView, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
 import { TABLE_CELL_SIZE, emptyTable, resizeTable, resizeWouldDropContent, tableShape } from '../core/table'
@@ -186,6 +186,15 @@ function setTable(t: TableData) {
 function patchTable(p: Partial<TableData>) {
   if (activeTable.value) setTable({ ...activeTable.value, ...p })
 }
+/** `table` is the default, so it's stored as absent — deck.md only says
+ *  `view:` when a table is actually shown as something else. */
+function setTableView(view: TableView) {
+  patchTable({ view: view === 'table' ? undefined : view })
+}
+const TABLE_VIEWS: Array<{ id: TableView; title: string }> = [
+  { id: 'table', title: 'Show the rows as a table' },
+  { id: 'pie', title: 'Pie chart — labels from the first column, values from the first numeric one' },
+]
 function resizeActiveTable(rows: number, cols: number) {
   const t = activeTable.value
   if (!t) return
@@ -526,6 +535,19 @@ const themeSwatches = computed(() => {
           <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows, tableDims.cols - 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
           <input class="spin-val" type="number" min="1" max="20" :value="tableDims.cols" @change="resizeActiveTable(tableDims.rows, +($event.target as HTMLInputElement).value)" />
           <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows, tableDims.cols + 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+        </div>
+        <span class="div" />
+        <div class="seg">
+          <button
+            v-for="v in TABLE_VIEWS"
+            :key="v.id"
+            :title="v.title"
+            :class="{ on: (activeTable.view ?? 'table') === v.id }"
+            @click="setTableView(v.id)"
+          >{{ v.id }}</button>
+        </div>
+        <div class="seg">
+          <button title="The first row names the columns — styled as a header, and skipped as data by charts" :class="{ on: !!activeTable.header }" @click="patchTable({ header: activeTable.header ? undefined : true })">header</button>
         </div>
         <span class="div" />
         <div class="seg style-seg">

@@ -3,12 +3,13 @@
 // `table` canvas element (CanvasElements). Both hand it the same `TableData`
 // object and receive the same events back — a table looks and behaves
 // identically wherever it lives, and bakes to freeform and back unchanged.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { TableData } from '../core/types'
 import { TABLE_CELL_MIN_SIZE, TABLE_CELL_SIZE, setTableCell, tableShape, tableTracks } from '../core/table'
 import { resolveFont } from '../render/theme'
 import FittedText from './FittedText.vue'
 import FramedImage from './FramedImage.vue'
+import PieChart from './PieChart.vue'
 
 const props = defineProps<{
   table: TableData | undefined
@@ -35,6 +36,16 @@ const gridStyle = computed(() => ({
   gridTemplateRows: tableTracks(props.table?.rowHeights, shape.value.rows).map((h) => h * 100 + '%').join(' '),
   fontFamily: resolveFont(props.table?.font),
 }))
+
+const view = computed(() => props.table?.view ?? 'table')
+// A chart view is edited through its grid: the toggle shows the rows in place
+// without changing `view`, so you can fix a number and flip straight back.
+// Local and unsaved — it's how you're looking at the slide, not slide content.
+const showData = ref(false)
+const showGrid = computed(() => view.value === 'table' || (props.editable && showData.value))
+
+/** Header row: the first `cols` cells, when the table declares one. */
+const isHeader = (i: number) => !!props.table?.header && i < shape.value.cols
 
 function onText(i: number, text: string) {
   emit('update:table', setTableCell(props.table, i, { text }))
@@ -63,40 +74,54 @@ function onCtx(e: MouseEvent, i: number) {
 </script>
 
 <template>
-  <div class="table-grid" :style="gridStyle">
-    <template v-for="(cell, i) in shape.cells" :key="i">
-      <div
-        v-if="!cell.covered"
-        class="table-cell"
-        :class="{ 'has-image': !!cell.image }"
-        :style="{ gridColumn: 'span ' + (cell.colspan ?? 1), gridRow: 'span ' + (cell.rowspan ?? 1) }"
-        @contextmenu="onCtx($event, i)"
-      >
-        <template v-if="cell.image">
-          <FramedImage :src="cell.image" :editable="editable" @file="emit('cell-file', i, $event)" />
-          <a
-            v-if="!editable && safeLink?.(cell.link)"
-            class="img-link"
-            :href="safeLink(cell.link)"
-            target="_blank"
-            rel="noopener noreferrer"
+  <div class="table-view">
+    <div v-if="showGrid" class="table-grid" :style="gridStyle">
+      <template v-for="(cell, i) in shape.cells" :key="i">
+        <div
+          v-if="!cell.covered"
+          class="table-cell"
+          :class="{ 'has-image': !!cell.image, th: isHeader(i) }"
+          :style="{ gridColumn: 'span ' + (cell.colspan ?? 1), gridRow: 'span ' + (cell.rowspan ?? 1) }"
+          @contextmenu="onCtx($event, i)"
+        >
+          <template v-if="cell.image">
+            <FramedImage :src="cell.image" :editable="editable" @file="emit('cell-file', i, $event)" />
+            <a
+              v-if="!editable && safeLink?.(cell.link)"
+              class="img-link"
+              :href="safeLink(cell.link)"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          </template>
+          <!-- Text autoshrinks from `size` down to the floor, so a long entry
+               stays inside its cell instead of overflowing a fixed grid track. -->
+          <FittedText
+            v-else
+            class="table-cell-fit"
+            content-class="table-cell-text"
+            :model-value="cell.text"
+            :editable="editable"
+            multiline
+            placeholder=""
+            :base-size="baseSize"
+            :min-size="TABLE_CELL_MIN_SIZE"
+            @update:model-value="onText(i, $event)"
           />
-        </template>
-        <!-- Text autoshrinks from `size` down to the floor, so a long entry
-             stays inside its cell instead of overflowing a fixed grid track. -->
-        <FittedText
-          v-else
-          class="table-cell-fit"
-          content-class="table-cell-text"
-          :model-value="cell.text"
-          :editable="editable"
-          multiline
-          placeholder=""
-          :base-size="baseSize"
-          :min-size="TABLE_CELL_MIN_SIZE"
-          @update:model-value="onText(i, $event)"
-        />
-      </div>
-    </template>
+        </div>
+      </template>
+    </div>
+    <PieChart v-else-if="view === 'pie'" :table="table" />
+    <!-- Editor-only: flip a chart to its data and back. Never rendered while
+         presenting or in export. -->
+    <button
+      v-if="editable && view !== 'table'"
+      class="table-view-toggle"
+      :title="showData ? 'Back to the chart' : 'Edit the rows behind this chart'"
+      @pointerdown.stop
+      @click.stop="showData = !showData"
+    >
+      {{ showData ? 'Show chart' : 'Edit data' }}
+    </button>
   </div>
 </template>

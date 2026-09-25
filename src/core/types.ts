@@ -92,7 +92,15 @@ export interface TableData {
    *  and the *base* size cell text shrinks below to fit, never above. */
   font?: string
   size?: number
+  /** The first row names the columns: styled as a header in the grid, and
+   *  skipped as data by the chart views. */
+  header?: boolean
+  /** How the data is shown. The rows stay the source of truth either way —
+   *  switching view never changes them. Default `table`. */
+  view?: TableView
 }
+
+export type TableView = 'table' | 'pie'
 
 // ── Free-positioned canvas elements ──────────────────────────────────────────
 // Any slide may carry an `elements` array: movable / rotatable objects drawn on

@@ -778,10 +778,17 @@
   margin-bottom: 28px;
   flex: none;
 }
-.table-grid {
-  display: grid;
+/* The table's box: holds the grid or a chart, plus the editor's data toggle.
+   It takes the layout's remaining height; the grid or chart fills it. */
+.table-view {
+  position: relative;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+.table-grid {
+  display: grid;
   width: 100%;
   height: 100%;
   /* The hairline is drawn once per grid and once per cell's right/bottom edge
@@ -805,6 +812,39 @@
    letting a picture keep it made every image sit in a floating inset box. */
 .table-cell.has-image {
   padding: 0;
+}
+/* Header row: the accent colour (the system's colour for secondary headings)
+   and a stronger rule beneath — no bold, no capitals, which would fight the
+   quiet type everywhere else on the slide. */
+.table-cell.th .table-cell-text {
+  color: var(--dek-accent);
+}
+.table-cell.th {
+  border-bottom-color: var(--dek-faint);
+}
+/* Editor-only chip that flips a chart to its rows and back. */
+.table-view-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(127, 199, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(7, 8, 9, 0.85);
+  color: var(--dek-accent);
+  font-family: var(--dek-font-body);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+.table-view:hover .table-view-toggle {
+  opacity: 1;
+}
+.table-view-toggle:hover {
+  background: rgba(127, 199, 255, 0.18);
 }
 .table-cell-fit {
   width: 100%;

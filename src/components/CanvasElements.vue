@@ -1005,11 +1005,11 @@ defineExpose({ commitEdit })
 /* A canvas table fills its element box. Until it's double-clicked into editing,
    the cells must not swallow pointer events — otherwise a cell's editable text
    or image frame eats the drag and the element can't be moved or selected. */
-.el > .table-grid {
+.el > .table-view {
   pointer-events: none;
   overflow: hidden;
 }
-.el > .table-grid.editing {
+.el > .table-view.editing {
   pointer-events: auto;
 }
 /* selection */

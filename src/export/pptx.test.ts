@@ -194,6 +194,50 @@ describe('deckToPptx', () => {
   })
 })
 
+describe('deckToPptx — tables', () => {
+  const theme = { bg: '#070809', text: '#e6ecf2', accent: '#7fc7ff', accent2: '#ffb474' }
+
+  async function slideXml(deck: Deck) {
+    const zip = await build(deck)
+    return zip.file('ppt/slides/slide1.xml')!.async('string')
+  }
+
+  it('draws table rules at the hairline weight, not in solid text colour', async () => {
+    const xml = await slideXml({ config: { theme }, slides: [{ layout: 'table', table: { rows: [['a', 'b']] } }] })
+    // the rule is the text colour at 14% alpha — never the bare, opaque colour
+    expect(xml).toMatch(/<a:ln w="\d+"><a:solidFill><a:srgbClr val="E6ECF2"><a:alpha val="14000"\/>/)
+  })
+
+  it('embeds an image that lives inside a table cell', async () => {
+    const zip = await build({ config: { theme }, slides: [{ layout: 'table', table: { rows: [[{ image: '/Assets/cell.png' }, 'x']] } }] })
+    expect(zip.file('ppt/media/image1.png')).not.toBeNull()
+  })
+
+  it('exports a pie as native pie shapes — vector and editable, not a picture', async () => {
+    const xml = await slideXml({
+      config: { theme },
+      slides: [{ layout: 'table', table: { view: 'pie', header: true, rows: [['Tool', 'Share'], ['Maya', 3], ['Blender', 1]] } }],
+    })
+    expect((xml.match(/prst="pie"/g) ?? []).length).toBe(2)
+    expect(xml).not.toContain('<p:pic>')
+    // labels with their shares, header row not charted
+    expect(xml).toContain('Maya  75%')
+    expect(xml).toContain('Blender  25%')
+    expect(xml).not.toContain('Tool')
+  })
+
+  it('draws a one-slice pie as a full ellipse (a zero-angle pie shape renders nothing)', async () => {
+    const xml = await slideXml({ config: { theme }, slides: [{ layout: 'table', table: { view: 'pie', rows: [['Only', 5]] } }] })
+    expect(xml).toContain('prst="ellipse"')
+    expect(xml).not.toContain('prst="pie"')
+  })
+
+  it('emits well-formed XML for a pie slide', async () => {
+    const xml = await slideXml({ config: { theme }, slides: [{ layout: 'table', table: { view: 'pie', rows: [['A', 1], ['B', 2], ['C', 3]] } }] })
+    expect(() => assertWellFormed(xml, 'slide1.xml')).not.toThrow()
+  })
+})
+
 describe('inlineRuns', () => {
   it('splits bold / italic / plain into styled runs', () => {
     expect(inlineRuns('a **b** c')).toEqual([
