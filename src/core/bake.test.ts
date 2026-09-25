@@ -170,6 +170,15 @@ describe('bakeToElements geometry contract', () => {
     expect(full.fit).toBe('contain')
   })
 
+  it("bakes `columns: auto` by the pictures' shapes when their sizes are known", () => {
+    const items = Array.from({ length: 9 }, (_, i) => ({ image: `sq${i}.png` }))
+    const els = boxes(bakeToElements({ layout: 'gallery', title: 'T', items }, { naturalSize: () => ({ w: 500, h: 500 }) }))
+    const pics = els.filter((b) => b.src)
+    // nine squares: five across, in two rows — the same choice the live grid makes
+    expect(new Set(pics.map((b) => b.y)).size).toBe(2)
+    expect(pics.filter((b) => b.y === pics[0].y)).toHaveLength(5)
+  })
+
   it('bakes a gallery written as bare strings — those used to vanish from export', () => {
     const els = bakeToElements({ layout: 'gallery', items: ['a.png', 'b.png'] as never })
     expect(boxes(els).filter((b) => b.src).map((b) => b.src)).toEqual(['a.png', 'b.png'])

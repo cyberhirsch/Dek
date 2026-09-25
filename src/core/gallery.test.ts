@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, containRect, effectiveFit, galleryCells, galleryColumns, galleryItemsOf, replaceGalleryImage, setGalleryFit, setGalleryLink } from './gallery'
+import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, bestColumns, containRect, effectiveFit, galleryBox, galleryCells, galleryColumns, galleryItemsOf, replaceGalleryImage, setGalleryFit, setGalleryLink } from './gallery'
 
 const focus = { x: 10, y: 0, scale: 1.5 }
 
@@ -89,5 +89,61 @@ describe('gallery fit', () => {
   it('containRect leaves the box alone when the size is unknown', () => {
     const box = { x: 1, y: 2, w: 3, h: 4 }
     expect(containRect({ w: 0, h: 0 }, box)).toBe(box)
+  })
+})
+
+describe('bestColumns — the count that shows the pictures largest', () => {
+  const box = { w: 1060, h: 474 }
+  const label = GALLERY_LABEL_H + GALLERY_LABEL_GAP
+  const w169 = 16 / 9
+
+  it('three labelled portraits go in one row', () => {
+    expect(bestColumns([600 / 840, 600 / 840, 600 / 840], box, GALLERY_GAP, label)).toBe(3)
+  })
+
+  it('two 16:9 pictures go side by side', () => {
+    expect(bestColumns([w169, w169], box, GALLERY_GAP, 0)).toBe(2)
+  })
+
+  it('four labelled 16:9 pictures go 2×2 — each 304×171, against 247×139 in a single row', () => {
+    // The spec's table said "4 in one row"; its own scoring rule says 2×2.
+    expect(bestColumns([w169, w169, w169, w169], box, GALLERY_GAP, label)).toBe(2)
+  })
+
+  it('nine squares go five across, in two rows', () => {
+    expect(bestColumns(Array(9).fill(1), box, GALLERY_GAP, 0)).toBe(5)
+  })
+
+  it('scores by the smallest picture, so one panorama does not become a postage stamp', () => {
+    // A 4:1 panorama among squares: a single row would shrink it to a sliver.
+    const c = bestColumns([4, 1, 1], box, GALLERY_GAP, 0)
+    expect(c).toBeLessThan(3)
+  })
+
+  it('one picture is one column', () => {
+    expect(bestColumns([w169], box, GALLERY_GAP, 0)).toBe(1)
+  })
+})
+
+describe('galleryColumns — auto', () => {
+  const fit = (aspects: Array<number | undefined>) => ({ aspects, box: { w: 1060, h: 474 }, labelRow: false })
+
+  it('uses bestColumns once every shape is known', () => {
+    expect(galleryColumns('auto', 9, fit(Array(9).fill(1)))).toBe(5)
+  })
+
+  it('falls back to up to three while any shape is still loading', () => {
+    expect(galleryColumns('auto', 9, fit([...Array(8).fill(1), undefined]))).toBe(3)
+  })
+
+  it('never overrides an explicit count', () => {
+    expect(galleryColumns(2, 9, fit(Array(9).fill(1)))).toBe(2)
+  })
+})
+
+describe('galleryBox', () => {
+  it('matches the stage inside its padding, less the title when there is one', () => {
+    expect(galleryBox(true)).toEqual({ w: 1060, h: 474 })
+    expect(galleryBox(false)).toEqual({ w: 1060, h: 580 })
   })
 })

@@ -4,6 +4,7 @@
 // every cell of a gallery whenever a single picture was replaced.
 
 import type { GalleryItem, Slide } from './types'
+import { BASE } from '../tokens'
 
 // ── geometry — ONE source for the live slide, bake, and PPTX export ──────────
 // The live grid and bake used to size galleries differently: live rows grew to
@@ -49,9 +50,63 @@ export function galleryCells(n: number, cols: number, box: { w: number; h: numbe
   return { rows, cols: c, cellW, cellH, frameH }
 }
 
-/** The gallery's column count: an explicit `columns`, else `auto`. */
-export function galleryColumns(columns: Slide['columns'], n: number): number {
+/** The grid's box on the 1280×720 stage: inside the layout padding, below the
+ *  title when there is one. The same numbers bake uses, so an `auto` column
+ *  choice made here is the one bake and export make. */
+export function galleryBox(hasTitle: boolean): { w: number; h: number } {
+  const w = BASE.stage.w - BASE.pad.x * 2
+  const h = BASE.stage.h - BASE.pad.y * 2 - (hasTitle ? GALLERY_TITLE_H + GALLERY_TITLE_GAP : 0)
+  return { w, h }
+}
+
+/**
+ * The column count that shows the pictures largest. For each count, every
+ * picture is fitted whole into its cell; a count scores by its SMALLEST fitted
+ * picture, because one postage stamp in a gallery is the failure worth
+ * avoiding. A near-tie (within 1%) goes to fewer rows; with the rows equal,
+ * to fewer columns — 2×2 rather than 3 + 1 when the pictures come out the
+ * same size, since that leaves no empty cells. `aspects` are width/height.
+ */
+export function bestColumns(aspects: number[], box: { w: number; h: number }, gap: number, labelH: number): number {
+  const n = aspects.length
+  if (n <= 1) return 1
+  let best = 1
+  let bestScore = -1
+  let bestRows = Infinity
+  for (let c = 1; c <= n; c++) {
+    const rows = Math.ceil(n / c)
+    const cw = (box.w - gap * (c - 1)) / c
+    const ch = (box.h - gap * (rows - 1)) / rows - labelH
+    if (cw <= 0 || ch <= 0) continue
+    const score = Math.min(...aspects.map((a) => {
+      const w = Math.min(cw, ch * a)
+      return w * (w / a)
+    }))
+    const clearlyBetter = score > bestScore * 1.01
+    const tieWithFewerRows = score >= bestScore * 0.99 && rows < bestRows
+    if (clearlyBetter || tieWithFewerRows) {
+      best = c
+      bestRows = rows
+      bestScore = Math.max(bestScore, score)
+    }
+  }
+  return best
+}
+
+/**
+ * The gallery's column count: an explicit `columns`, else `auto`. With every
+ * picture's shape known, `auto` picks by `bestColumns`; until then it falls
+ * back to up to three, and re-lays out once the shapes arrive.
+ */
+export function galleryColumns(
+  columns: Slide['columns'],
+  n: number,
+  fit?: { aspects: Array<number | undefined>; box: { w: number; h: number }; labelRow: boolean },
+): number {
   if (typeof columns === 'number' && columns > 0) return Math.floor(columns)
+  if (fit && n > 0 && fit.aspects.length === n && fit.aspects.every((a) => a != null && a > 0)) {
+    return bestColumns(fit.aspects as number[], fit.box, GALLERY_GAP, fit.labelRow ? GALLERY_LABEL_H + GALLERY_LABEL_GAP : 0)
+  }
   return Math.min(Math.max(1, n), 3)
 }
 

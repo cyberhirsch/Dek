@@ -5,7 +5,7 @@ import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
 import { safeLink } from '../render/qr'
-import { effectiveFit, galleryColumns } from '../core/gallery'
+import { effectiveFit, galleryBox, galleryColumns } from '../core/gallery'
 import { naturalSize } from '../render/naturalSize'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
@@ -63,7 +63,20 @@ const galleryItems = computed<GalleryItem[]>(() =>
     return []
   }),
 )
-const galleryCols = computed(() => galleryColumns(props.slide.columns, galleryItems.value.length))
+// `auto` picks the count that shows the pictures largest, judged on the
+// PRESENTING geometry (title only if set, labels only if any) — the editor
+// always shows those boxes, and judging by them would arrange the gallery
+// differently while editing than while presenting.
+const galleryCols = computed(() =>
+  galleryColumns(props.slide.columns, galleryItems.value.length, {
+    aspects: galleryItems.value.map((it) => {
+      const s = naturalSize(it.image)
+      return s ? s.w / s.h : undefined
+    }),
+    box: galleryBox(!!props.slide.title),
+    labelRow: props.slide.labelPos !== 'overlay' && galleryItems.value.some((it) => it.label),
+  }),
+)
 // Explicit rows, sharing the height: without them the rows were implicit `auto`
 // tracks that grew to each picture's natural height and ran off the stage.
 const galleryRows = computed(() => Math.max(1, Math.ceil(galleryItems.value.length / galleryCols.value)))

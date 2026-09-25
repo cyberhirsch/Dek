@@ -17,7 +17,7 @@ import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, Can
 import { BASE } from '../tokens'
 import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
 import { emptyTable } from './table'
-import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, containRect, effectiveFit, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
+import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, containRect, effectiveFit, galleryBox, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
 
 /** A gallery label badge (`labelPos: overlay`) — mirrors `.gallery-badge`:
  *  a 40px pill 12px in from the picture's top-left, heading italic 26px in the
@@ -294,7 +294,12 @@ export function bakeToElements(slide: Slide, opts: BakeOptions = {}): SlideEleme
       }
       const overlay = slide.labelPos === 'overlay'
       const labelRow = !overlay && items.some((it) => it.label)
-      const g = galleryCells(items.length, galleryColumns(slide.columns, items.length), { w: INNER_W, h: STAGE_H - PAD_Y - y }, labelRow)
+      const aspects = items.map((it) => {
+        const s = it.image ? opts.naturalSize?.(it.image) : undefined
+        return s ? s.w / s.h : undefined
+      })
+      const cols = galleryColumns(slide.columns, items.length, { aspects, box: galleryBox(!!title), labelRow })
+      const g = galleryCells(items.length, cols, { w: INNER_W, h: STAGE_H - PAD_Y - y }, labelRow)
       items.forEach((it, i) => {
         const cx = PAD_X + (i % g.cols) * (g.cellW + GALLERY_GAP)
         const cy = y + Math.floor(i / g.cols) * (g.cellH + GALLERY_GAP)
