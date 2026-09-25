@@ -207,6 +207,9 @@ export function parsePipeTable(text: string): TableData | null {
     for (let j = i + 2; j < lines.length && lines[j].includes('|'); j++) body.push(pipeCells(lines[j]))
     const cols = Math.max(...body.map((r) => r.length))
     return {
+      // A pipe table's first line is its header by definition — the line
+      // above the |---| separator — so the converted table says so.
+      header: true,
       rows: body.map((r) => Array.from({ length: cols }, (_, c) => fromGridCell({ text: r[c] ?? '' }))),
     }
   }

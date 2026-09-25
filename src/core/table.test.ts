@@ -191,6 +191,10 @@ describe('parsePipeTable', () => {
     ])
   })
 
+  it('marks the first line as the header, as Markdown defines it', () => {
+    expect(parsePipeTable('| a | b |\n|---|---|\n| 1 | 2 |')?.header).toBe(true)
+  })
+
   it('is null without a separator line — a stray pipe is not a table', () => {
     expect(parsePipeTable('this | that\nplain')).toBeNull()
   })
