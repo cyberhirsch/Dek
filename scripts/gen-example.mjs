@@ -83,7 +83,7 @@ shot(
     '**Sidebar** — drag to reorder; drop one slide onto another to **group** them',
     '**Stage** — click any text to edit it in place',
     '**Notes** — speaker notes, shown later in Presenter view',
-    'The dot by *saved* tracks every autosaved change',
+    'The **disk icon** is the save state — a slash means autosave is off',
   ],
   'Editing & Presenting',
 )
@@ -188,7 +188,63 @@ S(`layout: video-embed
 group: Media
 video: https://www.youtube.com/watch?v=qyZy-6VuSy4
 poster: ""
-caption: "Click to play — YouTube, Vimeo, or a direct .mp4 file"`)
+caption: "Click to play — YouTube, Vimeo, or an .mp4 · framed or fullscreen from the top bar"`)
+
+// ── Tables & Charts ──────────────────────────────────────────────────────────
+// The pie and cloud below chart THIS deck — slides per section, layouts by use —
+// counted from the finished tour at the end of this script, so the numbers are
+// true by construction and can't go stale when the tour is edited.
+
+S(`layout: section
+title: Tables & Charts
+group: Tables & Charts`)
+
+S(`# A table is rows — one line each, readable right here in the file.
+layout: table
+title: Which Layout When
+group: Tables & Charts
+table:
+  header: true
+  colWidths: [0.3, 0.7]
+  rows:
+    - [Layout, Reach for it when]
+    - [Cover, the talk begins]
+    - [Statement, one idea deserves the whole slide]
+    - [Text + Image, a point needs its evidence beside it]
+    - [Gallery, visuals are being compared]
+    - [Table, the content has rows and columns — or numbers to chart]
+    - [Freeform, nothing else fits]`)
+
+S(`layout: text
+title: One Table, Three Views
+group: Tables & Charts
+content: |
+  - The rows are the source — **table · pie · cloud** is only how they're shown
+  - A pie reads labels from the first column, values from the first numeric one
+  - In a chart, **Edit data** flips to the rows in place, and back
+  - Paste a Markdown table into a Text slide, then switch its layout to **Table**`)
+
+S(`# The same kind of table, shown as a pie (view: pie).
+layout: table
+title: This Tour, by Section
+group: Tables & Charts
+table:
+  view: pie
+  header: true
+  rows:
+    - [Section, Slides]
+@@SECTION_ROWS@@`)
+
+S(`# Words and weights, shown as a cloud (view: cloud).
+layout: table
+title: Layouts Used in This Tour
+group: Tables & Charts
+table:
+  view: cloud
+  header: true
+  rows:
+    - [Layout, Slides]
+@@LAYOUT_ROWS@@`)
 
 // 15 — section
 S(`layout: section
@@ -213,10 +269,10 @@ shot(
   'Open & Save Real Files',
   'deck-menu.png',
   [
-    '**Open file** or **Open folder** (deck + an Assets folder)',
-    '**Save As** writes the .md plus every image beside it',
-    'Switch between decks from the same menu',
-    '**Export** to PDF or a standalone HTML file',
+    'Grant a **decks folder** once — **Open** and **Save As** are Dek\'s own panels',
+    'Each deck is a **.dek** bundle: the .md plus an Assets folder',
+    'Browse into **subfolders** to keep decks by course or topic',
+    '**Export** to PDF, PowerPoint, or a standalone HTML file',
   ],
   'Present & Share',
 )
@@ -238,6 +294,27 @@ text: >
   That's the tour. Delete these slides, or hand the file to an LLM and say
   what you want — then present.
 cite: "now make it yours"`)
+
+// ── fill the self-describing charts from the finished tour ──────────────────
+const LAYOUT_NAMES = {
+  cover: 'Cover', section: 'Section', statement: 'Statement', speaker: 'Speaker', text: 'Text',
+  'text-image': 'Text + Image', 'image-full': 'Image – Full', 'image-caption': 'Image + Caption',
+  'video-embed': 'Video', gallery: 'Gallery', diagram: 'Diagram', table: 'Table', freeform: 'Freeform',
+}
+const count = (keyOf) => {
+  const m = new Map()
+  for (const block of slides.slice(1)) {
+    const k = keyOf(block)
+    if (k) m.set(k, (m.get(k) ?? 0) + 1)
+  }
+  return [...m.entries()]
+}
+const rows = (pairs) => pairs.map(([label, n]) => `    - [${JSON.stringify(label)}, ${n}]`).join('\n')
+const sections = count((b) => /^group:\s*"?(.+?)"?\s*$/m.exec(b)?.[1])
+const layouts = count((b) => LAYOUT_NAMES[/^layout:\s*(\S+)/m.exec(b)?.[1]])
+for (let i = 0; i < slides.length; i++) {
+  slides[i] = slides[i].replace('@@SECTION_ROWS@@', rows(sections)).replace('@@LAYOUT_ROWS@@', rows(layouts))
+}
 
 writeFileSync(OUT, slides.join('\n---\n') + '\n', 'utf8')
 console.log(`wrote ${OUT} (${slides.length} blocks)`)

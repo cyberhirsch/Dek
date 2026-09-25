@@ -38,7 +38,7 @@ group: "Editing & Presenting"
 elements:
   - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "The Editor at a Glance", font: "heading", italic: true, weight: 300, size: 44 }
   - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/editor.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
-  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- **Top bar** — layout, canvas tools, and live style controls for the selection\n- **Sidebar** — drag to reorder; drop one slide onto another to **group** them\n- **Stage** — click any text to edit it in place\n- **Notes** — speaker notes, shown later in Presenter view\n- The dot by *saved* tracks every autosaved change", font: "body", size: 21 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- **Top bar** — layout, canvas tools, and live style controls for the selection\n- **Sidebar** — drag to reorder; drop one slide onto another to **group** them\n- **Stage** — click any text to edit it in place\n- **Notes** — speaker notes, shown later in Presenter view\n- The **disk icon** is the save state — a slash means autosave is off", font: "body", size: 21 }
 ---
 layout: text
 title: Edit and Present
@@ -110,7 +110,69 @@ layout: video-embed
 group: Media
 video: https://www.youtube.com/watch?v=qyZy-6VuSy4
 poster: ""
-caption: "Click to play — YouTube, Vimeo, or a direct .mp4 file"
+caption: "Click to play — YouTube, Vimeo, or an .mp4 · framed or fullscreen from the top bar"
+---
+layout: section
+title: Tables & Charts
+group: Tables & Charts
+---
+# A table is rows — one line each, readable right here in the file.
+layout: table
+title: Which Layout When
+group: Tables & Charts
+table:
+  header: true
+  colWidths: [0.3, 0.7]
+  rows:
+    - [Layout, Reach for it when]
+    - [Cover, the talk begins]
+    - [Statement, one idea deserves the whole slide]
+    - [Text + Image, a point needs its evidence beside it]
+    - [Gallery, visuals are being compared]
+    - [Table, the content has rows and columns — or numbers to chart]
+    - [Freeform, nothing else fits]
+---
+layout: text
+title: One Table, Three Views
+group: Tables & Charts
+content: |
+  - The rows are the source — **table · pie · cloud** is only how they're shown
+  - A pie reads labels from the first column, values from the first numeric one
+  - In a chart, **Edit data** flips to the rows in place, and back
+  - Paste a Markdown table into a Text slide, then switch its layout to **Table**
+---
+# The same kind of table, shown as a pie (view: pie).
+layout: table
+title: This Tour, by Section
+group: Tables & Charts
+table:
+  view: pie
+  header: true
+  rows:
+    - [Section, Slides]
+    - ["Editing & Presenting", 4]
+    - ["The Canvas", 4]
+    - ["Media", 4]
+    - ["Tables & Charts", 5]
+    - ["Present & Share", 5]
+---
+# Words and weights, shown as a cloud (view: cloud).
+layout: table
+title: Layouts Used in This Tour
+group: Tables & Charts
+table:
+  view: cloud
+  header: true
+  rows:
+    - [Layout, Slides]
+    - ["Cover", 1]
+    - ["Statement", 2]
+    - ["Section", 5]
+    - ["Freeform", 7]
+    - ["Text", 4]
+    - ["Diagram", 1]
+    - ["Video", 1]
+    - ["Table", 3]
 ---
 layout: section
 title: Present & Share
@@ -128,7 +190,7 @@ group: "Present & Share"
 elements:
   - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Open & Save Real Files", font: "heading", italic: true, weight: 300, size: 44 }
   - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/deck-menu.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
-  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- **Open file** or **Open folder** (deck + an Assets folder)\n- **Save As** writes the .md plus every image beside it\n- Switch between decks from the same menu\n- **Export** to PDF or a standalone HTML file", font: "body", size: 21 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Grant a **decks folder** once — **Open** and **Save As** are Dek's own panels\n- Each deck is a **.dek** bundle: the .md plus an Assets folder\n- Browse into **subfolders** to keep decks by course or topic\n- **Export** to PDF, PowerPoint, or a standalone HTML file", font: "body", size: 21 }
 ---
 layout: text
 title: Made for LLMs, Too
