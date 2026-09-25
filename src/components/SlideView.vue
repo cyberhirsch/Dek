@@ -5,6 +5,7 @@ import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
 import { safeLink } from '../render/qr'
+import { galleryColumns } from '../core/gallery'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
 import FittedText from './FittedText.vue'
@@ -61,11 +62,13 @@ const galleryItems = computed<GalleryItem[]>(() =>
     return []
   }),
 )
-const galleryCols = computed(() => {
-  const c = props.slide.columns
-  if (typeof c === 'number') return c
-  return Math.min(galleryItems.value.length || 1, 3)
-})
+const galleryCols = computed(() => galleryColumns(props.slide.columns, galleryItems.value.length))
+// Explicit rows, sharing the height: without them the rows were implicit `auto`
+// tracks that grew to each picture's natural height and ran off the stage.
+const galleryRows = computed(() => Math.max(1, Math.ceil(galleryItems.value.length / galleryCols.value)))
+/** A label row under every picture when any has a label (or while editing, to
+ *  type one) — all or none, so the frames in a row line up, as bake draws it. */
+const galleryLabelRow = computed(() => !!props.editable || galleryItems.value.some((it) => it.label))
 const listBaseSize = computed(() =>
   props.slide.layout === 'text-image' && (props.slide.imageRatio ?? '16:9') === '16:9' ? 21 : 26,
 )
@@ -336,14 +339,14 @@ watch(
     <div v-else-if="slide.layout === 'gallery'" class="dek-pad l-gallery">
       <FittedText v-if="editable || slide.title" class="fit-gallery-title" content-class="gallery-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <div class="gallery-wrap">
-        <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
+        <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${galleryRows}, minmax(0, 1fr))` }">
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
             <div class="frame" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
               <FramedImage :src="it.image" :focus="it.focus" :editable="editable" pannable @update:focus="setGalleryFocus(i, $event)" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
               <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
             </div>
-            <FittedText v-if="editable || it.label" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />
+            <FittedText v-if="galleryLabelRow" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />
           </div>
         </div>
         <button v-if="editable" class="gallery-add" title="Add image" @click="addGalleryItem">＋</button>

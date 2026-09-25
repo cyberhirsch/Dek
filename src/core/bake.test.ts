@@ -121,6 +121,29 @@ describe('bakeToElements geometry contract', () => {
     expect(img.desaturate).toBe(true)
   })
 
+  it('never places a gallery cell outside the stage — any count, columns, title, labels', () => {
+    for (let n = 1; n <= 9; n++) {
+      for (const columns of [1, 2, 3, 4, 5, 'auto'] as const) {
+        for (const title of ['', 'A Title']) {
+          for (const label of [undefined, 'Label']) {
+            const items = Array.from({ length: n }, (_, i) => ({ image: `p${i}.png`, label }))
+            for (const b of boxes(bakeToElements({ layout: 'gallery', title, columns, items }))) {
+              expect(b.x).toBeGreaterThanOrEqual(0)
+              expect(b.y).toBeGreaterThanOrEqual(0)
+              expect(b.x + b.w, `${n} × cols ${columns}`).toBeLessThanOrEqual(1280)
+              expect(b.y + b.h, `${n} × cols ${columns}, title "${title}", label ${label}`).toBeLessThanOrEqual(720)
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('bakes a gallery written as bare strings — those used to vanish from export', () => {
+    const els = bakeToElements({ layout: 'gallery', items: ['a.png', 'b.png'] as never })
+    expect(boxes(els).filter((b) => b.src).map((b) => b.src)).toEqual(['a.png', 'b.png'])
+  })
+
   it("carries each gallery cell's pan/zoom onto its baked box", () => {
     const focus = { x: 12, y: -8, scale: 1.6 }
     const els = bakeToElements({ layout: 'gallery', items: [{ image: 'g.png', focus }, { image: 'h.png' }] })

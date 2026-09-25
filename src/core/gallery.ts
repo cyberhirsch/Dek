@@ -5,6 +5,56 @@
 
 import type { GalleryItem, Slide } from './types'
 
+// ── geometry — ONE source for the live slide, bake, and PPTX export ──────────
+// The live grid and bake used to size galleries differently: live rows grew to
+// each picture's natural height and ran off the stage, while bake shared the
+// height out. They also disagreed on the title (78 vs 67px) and label (62+10 vs
+// 43.6px) boxes. Every number below is used by both, so they can't drift.
+
+/** Gap between cells, in stage px. */
+export const GALLERY_GAP = 24
+/** The label box beneath a picture. The label is shrink-to-fit text, so this
+ *  only needs one comfortable line of the 28px label. */
+export const GALLERY_LABEL_H = 44
+/** Space between a picture and its label. */
+export const GALLERY_LABEL_GAP = 10
+/** The title box and the space beneath it. */
+export const GALLERY_TITLE_H = 78
+export const GALLERY_TITLE_GAP = 28
+
+export interface GalleryCells {
+  rows: number
+  cols: number
+  cellW: number
+  /** Whole cell, label included. */
+  cellH: number
+  /** The picture's frame: the cell minus any label row beneath it. */
+  frameH: number
+}
+
+/**
+ * Share a w×h box out between `n` cells in `cols` columns. Rows split the height
+ * equally, so the grid can never be taller than its box — whatever the
+ * pictures' shapes, however many rows. `labelRow` reserves a label beneath
+ * every picture (all or none, so frames in a row line up).
+ */
+export function galleryCells(n: number, cols: number, box: { w: number; h: number }, labelRow: boolean): GalleryCells {
+  // An explicit column count is kept even beyond `n` — an author may set
+  // `columns: 4` on a two-picture slide to match cell sizes across slides.
+  const c = Math.max(1, Math.floor(cols) || 1)
+  const rows = Math.max(1, Math.ceil(n / c))
+  const cellW = Math.max(0, (box.w - GALLERY_GAP * (c - 1)) / c)
+  const cellH = Math.max(0, (box.h - GALLERY_GAP * (rows - 1)) / rows)
+  const frameH = Math.max(0, cellH - (labelRow ? GALLERY_LABEL_H + GALLERY_LABEL_GAP : 0))
+  return { rows, cols: c, cellW, cellH, frameH }
+}
+
+/** The gallery's column count: an explicit `columns`, else `auto`. */
+export function galleryColumns(columns: Slide['columns'], n: number): number {
+  if (typeof columns === 'number' && columns > 0) return Math.floor(columns)
+  return Math.min(Math.max(1, n), 3)
+}
+
 /** A slide's gallery items as objects: bare strings become `{ image }`, and
  *  anything malformed is dropped. */
 export function galleryItemsOf(items: Slide['items']): GalleryItem[] {

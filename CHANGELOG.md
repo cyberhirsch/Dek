@@ -6,6 +6,11 @@
 
 ### Layouts
 
+**Fixed: galleries ran off the bottom of the slide** (#52)
+A gallery with more than one row of landscape pictures — and some single rows — continued below the stage, with nothing clipped and no warning. Real case: four 16:9 pictures in two columns needed about 750px where the stage has 474. The grid set its columns but not its rows, so every row grew to its tallest picture's natural height at column width. Rows are now explicit, equal shares of the height, and a cell may shrink to its row. However many pictures and whatever their shapes, the grid can't be taller than its box.
+
+The live slide and the export had disagreed. Bake (used for Freeform and PowerPoint) already shared the height out, so a deck overflowed on screen but fitted in the `.pptx`, and the two used different title and label heights. Both now take their numbers from `core/gallery.ts`. The label row is 44px, since the label shrinks to fit anyway, which gives every labelled row back 18px. When any picture has a label, every picture gets a label row, so the frames in a row line up. Bake also read only object items, so a gallery written as bare strings (`items: [a.png, b.png]`) vanished from Freeform and PowerPoint entirely; those are pictures now too. A test sweeps 1–9 pictures × every column setting × with and without title and labels, and requires every cell to stay on the stage. `+6` tests.
+
 **Fixed: switching layout deleted canvas elements laid over the slide** (#51)
 Any layout may carry canvas elements on top — a QR code on a Text slide, an arrow pointing into an image. Switching layout ignored them entirely. Between two regular layouts they weren't carried or parked in `stash`, just dropped; switching to Freeform baked the layout's fields and dropped them there too. Only undo brought them back. They now stay on the slide, in place, through any switch, and a switch to Freeform puts them on top of the baked layout — the way the slide drew them, and the way PowerPoint export already combined the two. A Freeform slide's own elements are unaffected: they're its content, and switching away still maps them into the new layout's fields. `+4` tests.
 

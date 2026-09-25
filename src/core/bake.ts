@@ -13,10 +13,11 @@
 //  - boxes carry `lineHeight` / `lineGap` so baked text keeps the CSS rhythm
 //    (1.05 headings / 1.45 body / 18px list gaps) instead of the canvas default.
 
-import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool, TableData, GalleryItem } from './types'
+import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool, TableData } from './types'
 import { BASE } from '../tokens'
 import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
 import { emptyTable } from './table'
+import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
 
 /** A deep copy of a table — JSON, not structuredClone, because the slide is
  *  usually a Vue reactive proxy, which structuredClone rejects. Keeps the baked
@@ -246,28 +247,23 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       break
     }
     case 'gallery': {
-      // .l-gallery: h1 +28, grid gap 24, cover-fit frames, 28px serif labels
-      const items = (slide.items ?? []).filter(
-        (it): it is GalleryItem => !!it && typeof it === 'object' && 'image' in it,
-      )
+      // .l-gallery — geometry from core/gallery.ts, the numbers the live grid
+      // uses too, so live, freeform and .pptx place every cell alike. Bare
+      // string items are pictures as well; they used to be dropped here, so a
+      // gallery written as `items: [a.png, b.png]` vanished from export.
+      const items = galleryItemsOf(slide.items)
       let y = PAD_Y
       if (title) {
-        els.push(text(title, PAD_X, y, INNER_W, H1_H, { ...HEAD }))
-        y += H1_H + 28
+        els.push(text(title, PAD_X, y, INNER_W, GALLERY_TITLE_H, { ...HEAD }))
+        y += GALLERY_TITLE_H + GALLERY_TITLE_GAP
       }
-      const cols = typeof slide.columns === 'number' ? slide.columns : Math.min(items.length || 1, 3)
-      const GAP = 24
-      const rows = Math.max(1, Math.ceil(items.length / cols))
-      const gridH = STAGE_H - PAD_Y - y
-      const cellW = (INNER_W - GAP * (cols - 1)) / cols
-      const cellH = (gridH - GAP * (rows - 1)) / rows
-      const hasLabels = items.some((it) => it.label)
-      const labelH = hasLabels ? 28 * 1.2 + 10 : 0
+      const labelRow = items.some((it) => it.label)
+      const g = galleryCells(items.length, galleryColumns(slide.columns, items.length), { w: INNER_W, h: STAGE_H - PAD_Y - y }, labelRow)
       items.forEach((it, i) => {
-        const cx = PAD_X + (i % cols) * (cellW + GAP)
-        const cy = y + Math.floor(i / cols) * (cellH + GAP)
-        if (it.image) els.push(image(it.image, cx, cy, cellW, cellH - labelH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus }))
-        if (it.label) els.push(text(it.label, cx, cy + cellH - labelH + 10, cellW, 28 * 1.2, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
+        const cx = PAD_X + (i % g.cols) * (g.cellW + GALLERY_GAP)
+        const cy = y + Math.floor(i / g.cols) * (g.cellH + GALLERY_GAP)
+        if (it.image) els.push(image(it.image, cx, cy, g.cellW, g.frameH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus }))
+        if (it.label) els.push(text(it.label, cx, cy + g.frameH + GALLERY_LABEL_GAP, g.cellW, GALLERY_LABEL_H, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
       })
       break
     }
