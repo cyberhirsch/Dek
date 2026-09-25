@@ -49,7 +49,7 @@ import DeckMenu from './components/DeckMenu.vue'
 import DeckBrowser from './components/DeckBrowser.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import SourcePane from './components/SourcePane.vue'
-import ContextMenu, { type CtxEntry } from './components/ContextMenu.vue'
+import ContextMenu, { isDivider, type CtxEntry, type IdleText } from './components/ContextMenu.vue'
 import type { ElementPatch, BoxElement, TableData } from './core/types'
 import { setTableCell, tableShape, type GridCell } from './core/table'
 import { parseContent, rowsToContent } from './render/inline'
@@ -1215,7 +1215,7 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; idle?: IdleText }) {
   if (!editMode.value) return
   if (p.kind === 'image') {
     const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex, el: p.imageEl })
@@ -1227,7 +1227,7 @@ function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; 
     return
   }
   if (p.kind === 'text') {
-    ctxMenu.value = { x: p.x, y: p.y, items: textItems() }
+    ctxMenu.value = { x: p.x, y: p.y, items: p.idle ? idleTextItems(p.idle) : textItems() }
     return
   }
   if (p.index < 0) {
@@ -1283,6 +1283,18 @@ function onPresentContextMenu(e: MouseEvent) {
       { label: 'Exit Presentation', hint: 'Esc', action: enterEdit },
     ],
   }
+}
+
+/** Text not being edited (#46): Edit Text first, then the usual formatting —
+ *  applied to the whole text, since there's no selection to apply it to. */
+function idleTextItems(idle: IdleText): CtxEntry[] {
+  return [
+    { label: 'Edit Text', action: idle.edit },
+    { divider: true },
+    ...textItems().map((it): CtxEntry =>
+      isDivider(it) ? it : { ...it, action: () => { idle.selectAll(); it.action?.() } },
+    ),
+  ]
 }
 
 function textItems(): CtxEntry[] {

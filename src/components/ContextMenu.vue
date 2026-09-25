@@ -14,6 +14,13 @@ export interface CtxDivider {
 }
 export type CtxEntry = CtxItem | CtxDivider
 
+/** Right-clicked text that isn't being edited: how to start editing it, and
+ *  how to select all of it so a formatting command covers the whole text. */
+export interface IdleText {
+  edit: () => void
+  selectAll: () => void
+}
+
 export const isDivider = (e: CtxEntry): e is CtxDivider => 'divider' in e
 </script>
 

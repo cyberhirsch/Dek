@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../core/types'
 import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
+import type { IdleText } from './ContextMenu.vue'
 import { parseVideo, autoplaySrc } from '../render/video'
 import { safeLink } from '../render/qr'
 import { effectiveFit, galleryBox, galleryColumns } from '../core/gallery'
@@ -44,7 +45,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; idle?: IdleText }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -132,6 +133,34 @@ function patchConfig(p: Partial<DeckConfig>) {
 // title/caption/etc. AND EditableTextList's `.dek-list.editable-list` bullets),
 // so it can't fire for image frames or the freeform canvas, which have no
 // contenteditable ancestor and handle their own menus.
+/** Focus an editable text and put the caret at a screen point inside it, or
+ *  at its end if the point doesn't land in it. */
+function caretAt(host: HTMLElement, x: number, y: number) {
+  host.focus()
+  const sel = window.getSelection()
+  if (!sel) return
+  const doc = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
+  let r = doc.caretRangeFromPoint?.(x, y) ?? null
+  if (!r || !host.contains(r.startContainer)) {
+    r = document.createRange()
+    r.selectNodeContents(host)
+    r.collapse(false)
+  }
+  sel.removeAllRanges()
+  sel.addRange(r)
+}
+/** Focus an editable text with all of it selected — so a formatting command
+ *  from the menu applies to the whole heading or list. */
+function selectAllIn(host: HTMLElement) {
+  host.focus()
+  const sel = window.getSelection()
+  if (!sel) return
+  const r = document.createRange()
+  r.selectNodeContents(host)
+  sel.removeAllRanges()
+  sel.addRange(r)
+}
+
 function onTextCtx(e: MouseEvent) {
   if (!props.editable) return
   const target = e.target as HTMLElement | null
@@ -143,7 +172,19 @@ function onTextCtx(e: MouseEvent) {
   const host = target?.closest('[contenteditable="true"]') as HTMLElement | null
   if (!host) return
   const sel = window.getSelection()
-  if (!sel || !sel.rangeCount || !sel.anchorNode || !host.contains(sel.anchorNode)) return
+  if (!sel || !sel.rangeCount || !sel.anchorNode || !host.contains(sel.anchorNode)) {
+    // Text that isn't being edited: offer to start editing it (caret where
+    // the click was), and let formatting apply to the whole text. This used to
+    // fall through to the browser's menu, which has nothing to offer here.
+    e.preventDefault()
+    const x = e.clientX
+    const y = e.clientY
+    emit('ctxmenu', {
+      x, y, sx: 0, sy: 0, index: -1, kind: 'text',
+      idle: { edit: () => caretAt(host, x, y), selectAll: () => selectAllIn(host) },
+    })
+    return
+  }
   const anchor = sel.anchorNode
   const anchorEl = (anchor.nodeType === 1 ? (anchor as HTMLElement) : anchor.parentElement) ?? null
   const link = anchorEl?.closest('a')

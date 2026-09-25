@@ -158,6 +158,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Right-click a heading or list to edit or format it** (#46)
+Right-clicking a title or bullet list you weren't already typing in fell through to the browser's menu, which has nothing useful for slide text. It now offers **Edit Text** — which starts editing with the caret where you clicked — followed by Bold, Italic, Underline, Strikethrough and Add Link. With nothing selected, those apply to the **whole** text. While you're actively typing, a plain caret still gets the browser's menu, so spell-check suggestions keep working; a selection or a link inside text you're editing gets Dek's menus, as before.
+
 **Dek's own right-click menu while presenting** (#43)
 Right-clicking a running presentation showed Chrome's menu — Back, Forward, Print, Cast — none of which means anything mid-talk, and one of which navigates away from the deck. Presenting now has its own menu: Next / Previous Slide, Overview, Presenter View, Fullscreen (ticked when on) and Exit Presentation, each with its key. Right-clicking a **link** still gets the browser's menu, so opening it in a new tab works as before.
 

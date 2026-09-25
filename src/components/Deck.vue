@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, Slide, SlideElement } from '../core/types'
 import type { SlideSplitTarget } from '../core/split'
+import type { IdleText } from './ContextMenu.vue'
 import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
 import SlideView from './SlideView.vue'
@@ -30,7 +31,7 @@ const emit = defineEmits<{
   split: [e: { index: number; target: SlideSplitTarget }]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; idle?: IdleText }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)
