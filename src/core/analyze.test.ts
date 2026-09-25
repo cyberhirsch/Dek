@@ -248,16 +248,20 @@ describe('analyzeDeck', () => {
         {
           layout: 'table',
           title: 'Grid',
-          tableRows: 2,
-          tableCols: 2,
-          tableCells: [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }],
+          table: { rows: [['A', 'B'], ['C', 42]], colWidths: [0.3, 0.7], rowHeights: [0.5, 0.5], font: 'heading', size: 30 },
         },
       ],
     }
 
-    const a = analyzeDeck(deck)
+    expect(analyzeDeck(deck).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
 
-    expect(a.issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  it('warns about a table slide with no grid', () => {
+    const deck: Deck = { config: {}, slides: [{ layout: 'table', title: 'Empty' }] }
+
+    expect(analyzeDeck(deck).issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'schema', field: 'table' })]),
+    )
   })
 
   // Highest-priority case: this is the exact regression class that once let the
@@ -265,31 +269,23 @@ describe('analyzeDeck', () => {
   it('does not orphan a table cell image', () => {
     const deck: Deck = {
       config: {},
-      slides: [
-        {
-          layout: 'table',
-          tableRows: 1,
-          tableCols: 2,
-          tableCells: [{ image: '/Deck Assets/cell.jpg' }, { text: '' }],
-        },
-      ],
+      slides: [{ layout: 'table', table: { rows: [[{ image: '/Deck Assets/cell.jpg' }, '']] } }],
     }
 
     const a = analyzeDeck(deck, ['cell.jpg'])
 
     expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
-    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'tableCells[0].image'))).toBe(true)
+    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'table.rows[0][0].image'))).toBe(true)
   })
 
   it('reports a table cell image as orphaned once the cell is removed', () => {
-    // The inverse of the above: proves the shrink confirm-dialog's premise —
-    // dropping a cell for real does surface as an orphan on the next scan. A
-    // second slide keeps a live local reference so this isn't mistaken for the
-    // "deck references no local files" empty-folder guard above.
+    // The inverse: proves the shrink confirm-dialog's premise. A second slide
+    // keeps a live local reference so this isn't mistaken for the "deck
+    // references no local files" empty-folder guard.
     const deck: Deck = {
       config: {},
       slides: [
-        { layout: 'table', tableRows: 1, tableCols: 1, tableCells: [{ text: '' }] },
+        { layout: 'table', table: { rows: [['']] } },
         { layout: 'image-full', image: '/Deck Assets/kept.jpg' },
       ],
     }
@@ -299,22 +295,15 @@ describe('analyzeDeck', () => {
     expect(a.assets.filter((x) => x.kind === 'orphan').map((x) => x.filename)).toEqual(['cell.jpg'])
   })
 
-  // Same regression class as the layout case above, one nesting level deeper:
-  // once a table is baked to freeform its pictures live in elements[].cells[].
-  it('does not orphan an image inside a baked (canvas) table element', () => {
+  // Same regression class, one nesting level deeper: once a table is baked to
+  // freeform its pictures live in elements[].table.
+  it('does not orphan an image inside a canvas table element', () => {
     const deck: Deck = {
       config: {},
       slides: [
         {
           layout: 'freeform',
-          elements: [
-            {
-              type: 'table',
-              x: 0, y: 0, w: 100, h: 100, rotation: 0,
-              rows: 1, cols: 2,
-              cells: [{ image: '/Deck Assets/baked.jpg' }, { text: '' }],
-            },
-          ],
+          elements: [{ type: 'table', x: 0, y: 0, w: 100, h: 100, rotation: 0, table: { rows: [[{ image: '/Deck Assets/baked.jpg' }, '']] } }],
         },
       ],
     }
@@ -322,7 +311,7 @@ describe('analyzeDeck', () => {
     const a = analyzeDeck(deck, ['baked.jpg'])
 
     expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
-    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'elements[0].cells[0].image'))).toBe(true)
+    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'elements[0].table.rows[0][0].image'))).toBe(true)
   })
 
   it('accepts both video flavors without a "field isn\'t rendered" warning', () => {
@@ -337,43 +326,51 @@ describe('analyzeDeck', () => {
     expect(analyzeDeck(deck).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
   })
 
-  it('accepts a table slide with dragged track sizes and custom typography', () => {
-    // tableColWidths/RowHeights/Font/Size must all be in KNOWN_FIELDS — otherwise
-    // every table with a dragged divider raises a bogus "isn't rendered" warning.
-    const deck: Deck = {
-      config: {},
-      slides: [
-        {
-          layout: 'table',
-          tableRows: 1,
-          tableCols: 2,
-          tableCells: [{ text: 'a' }, { text: 'b' }],
-          tableColWidths: [0.3, 0.7],
-          tableRowHeights: [1],
-          tableFont: 'heading',
-          tableSize: 30,
-        },
-      ],
-    }
-
-    expect(analyzeDeck(deck).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
-  })
-
   it('skips covered (merge-placeholder) cells when collecting table assets', () => {
     const deck: Deck = {
       config: {},
+      slides: [{ layout: 'table', table: { rows: [[{ image: '/Deck Assets/a.jpg', colspan: 2 }, null]] } }],
+    }
+
+    expect(analyzeDeck(deck, ['a.jpg']).assets.filter((x) => x.kind !== 'orphan')).toHaveLength(1)
+  })
+
+  // ── stash ──
+  // A layout switch parks what the target can't show in `stash`, and switching
+  // back restores it. Those parked images ARE in use; the scan used to skip
+  // stash entirely, so the Review panel offered to delete them.
+
+  it('does not orphan an image parked in stash by a layout switch', () => {
+    const deck: Deck = {
+      config: {},
+      slides: [{ layout: 'text', title: 'Was an image slide', content: '- a', stash: { image: '/Deck Assets/parked.jpg' } }],
+    }
+
+    const a = analyzeDeck(deck, ['parked.jpg'])
+
+    expect(a.assets.some((x) => x.kind === 'orphan')).toBe(false)
+    expect(a.assets.some((x) => x.uses.some((u) => u.field === 'stash.image'))).toBe(true)
+  })
+
+  it('does not orphan table, gallery, or canvas images parked in stash', () => {
+    const deck: Deck = {
+      config: {},
       slides: [
         {
-          layout: 'table',
-          tableRows: 1,
-          tableCols: 2,
-          tableCells: [{ image: '/Deck Assets/a.jpg', colspan: 2 }, { covered: true, image: '/Deck Assets/a.jpg' }],
+          layout: 'text',
+          title: 'T',
+          content: '- a',
+          stash: {
+            table: { rows: [[{ image: '/Deck Assets/cell.jpg' }]] },
+            items: ['/Deck Assets/g.jpg'],
+            elements: [{ type: 'box', x: 0, y: 0, w: 10, h: 10, rotation: 0, src: '/Deck Assets/box.jpg' }],
+          },
         },
       ],
     }
 
-    const a = analyzeDeck(deck, ['a.jpg'])
+    const a = analyzeDeck(deck, ['cell.jpg', 'g.jpg', 'box.jpg'])
 
-    expect(a.assets.filter((x) => x.kind !== 'orphan')).toHaveLength(1)
+    expect(a.assets.filter((x) => x.kind === 'orphan')).toEqual([])
   })
 })

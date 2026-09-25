@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, TableElement, CanvasTool } from '../core/types'
+import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, TableElement, TableData, CanvasTool } from '../core/types'
 import { inlineMd, htmlToInline } from '../render/inline'
 import { newElementRect, newArrow, defaultSize } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
@@ -51,10 +51,17 @@ const emit = defineEmits<{
       sx: number
       sy: number
       index: number
-      kind?: 'text' | 'link'
+      kind?: 'text' | 'link' | 'image'
       url?: string
+      /** A canvas table cell: which cell, of which table element. */
+      imageField?: 'table'
+      imageIndex?: number
+      imageEl?: number
     },
   ]
+  /** A file dropped or picked onto a canvas table's image cell. Same channel
+   *  and shape as the table layout's own cell uploads, plus the element index. */
+  upload: [e: { field: 'table'; file: File; index: number; el: number }]
 }>()
 
 const root = ref<HTMLElement | null>(null)
@@ -620,14 +627,13 @@ function isFileVideo(el: VideoElement) {
   return parseVideo(el.video)?.provider === 'file'
 }
 
-/** Edit one cell of a canvas table, re-emitting the whole element array the same
+/** Store an edited canvas table, re-emitting the whole element array the same
  *  way `commitEdit` does for box text — so it lands on the identical undo /
  *  autosave path as every other canvas edit. */
-function setTableCellText(elIndex: number, cellIndex: number, text: string) {
-  const el = props.elements[elIndex]
-  if (el?.type !== 'table') return
+function setTable(elIndex: number, table: TableData) {
+  if (props.elements[elIndex]?.type !== 'table') return
   const next = props.elements.map((e) => ({ ...e }))
-  ;(next[elIndex] as TableElement).cells = el.cells.map((c, j) => (j === cellIndex ? { ...c, text } : c))
+  ;(next[elIndex] as TableElement).table = table
   emit('update:elements', next)
 }
 
@@ -766,16 +772,12 @@ defineExpose({ commitEdit })
       <TableGrid
         v-else-if="el.type === 'table'"
         :class="{ editing: editing === i }"
-        :cells="asTable(el).cells"
-        :rows="asTable(el).rows"
-        :cols="asTable(el).cols"
-        :col-widths="asTable(el).colWidths"
-        :row-heights="asTable(el).rowHeights"
-        :font="asTable(el).font"
-        :size="asTable(el).size"
+        :table="asTable(el).table"
         :editable="editable && editing === i"
         :safe-link="safeLink"
-        @cell-text="(ci, t) => setTableCellText(i, ci, t)"
+        @update:table="setTable(i, $event)"
+        @cell-file="(ci, f) => emit('upload', { field: 'table', file: f, index: ci, el: i })"
+        @cell-ctx="(e, ci) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: i, kind: 'image', imageField: 'table', imageIndex: ci, imageEl: i })"
       />
 
       <!-- selection chrome (transform handles only for a single selection) -->

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseDeck, serializeDeck, blankSlide, defaultConfig } from './deck'
 import { slug, uniqueSlug } from './names'
-import { LAYOUT_IDS } from './types'
+import { LAYOUT_IDS, type Deck } from './types'
 
 /** parse → serialize → parse must be idempotent on the data model. */
 function roundTrip(raw: string) {
@@ -193,34 +193,173 @@ describe('blankSlide', () => {
   })
 
   it('blanks a table as a uniform 3x3 grid of empty cells', () => {
-    const s = blankSlide('table')
-    expect(s.tableRows).toBe(3)
-    expect(s.tableCols).toBe(3)
-    expect(s.tableCells).toHaveLength(9)
+    expect(blankSlide('table').table?.rows).toEqual([
+      ['', '', ''],
+      ['', '', ''],
+      ['', '', ''],
+    ])
   })
+})
 
-  it('round-trips a table with custom column widths and mixed text/image/merged cells', () => {
-    const deck = {
+describe('table storage', () => {
+  it('round-trips a table with track sizes, typography and mixed text/number/image/merged cells', () => {
+    const deck: Deck = {
       config: defaultConfig(),
       slides: [
         {
-          layout: 'table' as const,
+          layout: 'table',
           title: 'Specs',
-          tableRows: 2,
-          tableCols: 2,
-          tableColWidths: [0.3, 0.7],
-          tableRowHeights: [0.5, 0.5],
-          tableCells: [
-            { text: 'Merged', colspan: 2 },
-            { covered: true },
-            { image: 'a.jpg', link: 'https://x.io' },
-            { text: 'plain' },
-          ],
+          table: {
+            rows: [
+              [{ text: 'Merged', colspan: 2 }, null],
+              [{ image: 'a.jpg', link: 'https://x.io' }, 'plain'],
+              ['Maya', 42],
+            ],
+            colWidths: [0.3, 0.7],
+            rowHeights: [0.3, 0.3, 0.4],
+            font: 'heading',
+            size: 30,
+          },
         },
       ],
     }
-    const back = parseDeck(serializeDeck(deck))
-    expect(back.slides[0]).toEqual(deck.slides[0])
+    expect(parseDeck(serializeDeck(deck)).slides[0]).toEqual(deck.slides[0])
+  })
+
+  it('writes each row on one line, so deck.md reads as a table', () => {
+    const deck: Deck = {
+      config: defaultConfig(),
+      slides: [{ layout: 'table', title: 'Tools', table: { rows: [['Tool', 'Share'], ['Maya', 42], ['Blender', 35]] } }],
+    }
+    const md = serializeDeck(deck)
+    expect(md).toContain('  rows:\n    - [Tool, Share]\n    - [Maya, 42]\n    - [Blender, 35]')
+  })
+
+  it('writes a canvas table element the same way — one shape, both hosts', () => {
+    const deck: Deck = {
+      config: defaultConfig(),
+      slides: [{ layout: 'freeform', elements: [{ type: 'table', x: 0, y: 0, w: 10, h: 10, rotation: 0, table: { rows: [['a', 1]] } }] }],
+    }
+    expect(serializeDeck(deck)).toContain('- [a, 1]')
+  })
+
+  it('keeps other lists in block style — only table rows go flow', () => {
+    const deck: Deck = { config: defaultConfig(), slides: [{ layout: 'speaker', name: 'Ada', portraits: ['a.jpg', 'b.jpg'] }] }
+    expect(serializeDeck(deck)).toContain('portraits:\n  - a.jpg\n  - b.jpg')
+  })
+
+  it('parses a hand-written table exactly as typed', () => {
+    const raw = `---
+deck: X
+---
+layout: table
+title: Tools
+table:
+  rows:
+    - [Tool, Share]
+    - [Maya, 42]
+    - [{ image: logo.png }, ~]
+`
+    expect(parseDeck(raw).slides[0].table?.rows).toEqual([
+      ['Tool', 'Share'],
+      ['Maya', 42],
+      [{ image: 'logo.png' }, null],
+    ])
+  })
+})
+
+describe('legacy table migration', () => {
+  it('folds the old flat table* layout fields into `table`', () => {
+    const raw = `---
+deck: X
+---
+layout: table
+title: Old
+tableRows: 2
+tableCols: 2
+tableColWidths: [0.3, 0.7]
+tableFont: heading
+tableCells:
+  - text: Tool
+  - text: Share
+  - image: a.png
+  - text: "42"
+`
+    const s = parseDeck(raw).slides[0]
+    expect(s.table).toEqual({ rows: [['Tool', 'Share'], [{ image: 'a.png' }, 42]], colWidths: [0.3, 0.7], font: 'heading' })
+    for (const k of ['tableRows', 'tableCols', 'tableCells', 'tableColWidths', 'tableFont']) expect(k in s).toBe(false)
+  })
+
+  it('migrates a merge: covered placeholders become null', () => {
+    const raw = `---
+deck: X
+---
+layout: table
+tableRows: 1
+tableCols: 2
+tableCells:
+  - { text: Wide, colspan: 2 }
+  - { covered: true }
+`
+    expect(parseDeck(raw).slides[0].table?.rows).toEqual([[{ text: 'Wide', colspan: 2 }, null]])
+  })
+
+  it('migrates old fields parked in stash, so switching back does not resurrect them', () => {
+    const raw = `---
+deck: X
+---
+layout: text
+title: T
+content: "- a"
+stash:
+  tableRows: 1
+  tableCols: 1
+  tableCells:
+    - text: kept
+`
+    const s = parseDeck(raw).slides[0]
+    expect((s.stash as { table?: unknown }).table).toEqual({ rows: [['kept']] })
+    expect('tableCells' in (s.stash as object)).toBe(false)
+  })
+
+  it('migrates an old canvas table element (counts + flat cells) to the shared object', () => {
+    const raw = `---
+deck: X
+---
+layout: freeform
+elements:
+  - type: table
+    x: 110
+    y: 70
+    w: 1060
+    h: 580
+    rotation: 0
+    rows: 1
+    cols: 2
+    font: heading
+    cells:
+      - text: a
+      - image: b.png
+`
+    const el = parseDeck(raw).slides[0].elements![0]
+    expect(el).toEqual({ type: 'table', x: 110, y: 70, w: 1060, h: 580, rotation: 0, table: { rows: [['a', { image: 'b.png' }]], font: 'heading' } })
+  })
+
+  it('migrated decks write the new format and then round-trip unchanged', () => {
+    const raw = `---
+deck: X
+---
+layout: table
+tableRows: 1
+tableCols: 2
+tableCells:
+  - text: a
+  - text: b
+`
+    const once = serializeDeck(parseDeck(raw))
+    expect(once).toContain('- [a, b]')
+    expect(once).not.toContain('tableCells')
+    expect(serializeDeck(parseDeck(once))).toBe(once)
   })
 })
 

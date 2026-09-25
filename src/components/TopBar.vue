@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, CanvasTool, ElementPatch } from '../core/types'
+import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, TableData, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
-import { TABLE_CELL_SIZE, reflowTableCells, resizeWouldDropContent } from '../core/table'
+import { TABLE_CELL_SIZE, emptyTable, resizeTable, resizeWouldDropContent, tableShape } from '../core/table'
 import { DEFAULT_THEME, type ThemeId } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
 import ColorPicker from './ColorPicker.vue'
@@ -75,25 +75,6 @@ const saveTitle = computed(() => {
 const IMAGE_FIT_LAYOUTS: LayoutId[] = ['text-image', 'image-full', 'image-caption']
 const showImageFit = computed(() => !!slide.value && IMAGE_FIT_LAYOUTS.includes(slide.value.layout))
 const imageFit = computed(() => slide.value?.imageFit ?? (slide.value?.layout === 'image-caption' ? 'contain' : 'cover'))
-
-// ── table rows/cols stepper ──
-const tableCols = computed(() => slide.value?.tableCols ?? 1)
-const tableRows = computed(() => slide.value?.tableRows ?? Math.ceil((slide.value?.tableCells?.length ?? 0) / tableCols.value))
-function resizeTable(rows: number, cols: number) {
-  rows = Math.max(1, Math.min(20, Math.round(rows)))
-  cols = Math.max(1, Math.min(20, Math.round(cols)))
-  if (rows === tableRows.value && cols === tableCols.value) return
-  const cells = slide.value?.tableCells ?? []
-  const oldCols = tableCols.value
-  if (resizeWouldDropContent(cells, oldCols, rows, cols) && !window.confirm('Shrinking the table will remove content from some cells. Continue?')) return
-  emit('patch', {
-    tableRows: rows,
-    tableCols: cols,
-    tableCells: reflowTableCells(cells, oldCols, rows, cols),
-    tableColWidths: undefined,
-    tableRowHeights: undefined,
-  })
-}
 
 const LAYOUT_LABELS: Record<LayoutId, string> = {
   cover: 'Cover',
@@ -185,6 +166,35 @@ const FONTS = computed(() => [
 const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selectedElement as BoxElement) : null))
 const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
 const tableEl = computed(() => (props.selectedElement?.type === 'table' ? (props.selectedElement as TableElement) : null))
+
+// ── table controls: ONE set, for the Table layout or a selected canvas table ──
+/** The table the controls act on — a selected canvas table wins, else the
+ *  slide's own. Both are the same `TableData`, so the canvas gets the full
+ *  control set (it used to get font and size only). */
+const activeTable = computed<TableData | null>(() => {
+  if (tableEl.value) return tableEl.value.table
+  return slide.value?.layout === 'table' ? (slide.value.table ?? emptyTable(1, 1)) : null
+})
+const tableDims = computed(() => {
+  const { rows, cols } = tableShape(activeTable.value)
+  return { rows, cols }
+})
+function setTable(t: TableData) {
+  if (tableEl.value) upd({ table: t })
+  else emit('patch', { table: t })
+}
+function patchTable(p: Partial<TableData>) {
+  if (activeTable.value) setTable({ ...activeTable.value, ...p })
+}
+function resizeActiveTable(rows: number, cols: number) {
+  const t = activeTable.value
+  if (!t) return
+  rows = Math.max(1, Math.min(20, Math.round(rows)))
+  cols = Math.max(1, Math.min(20, Math.round(cols)))
+  if (rows === tableDims.value.rows && cols === tableDims.value.cols) return
+  if (resizeWouldDropContent(t, rows, cols) && !window.confirm('Shrinking the table will remove content from some cells. Continue?')) return
+  setTable(resizeTable(t, rows, cols))
+}
 function upd(p: ElementPatch) {
   emit('update-element', p)
 }
@@ -207,10 +217,7 @@ function stepScale(cur: number, dir: 1 | -1): number {
     : ([...TYPE_SCALE].reverse().find((s) => s < cur) ?? cur)
 }
 function stepTableSize(dir: 1 | -1) {
-  emit('patch', { tableSize: stepScale(slide.value?.tableSize ?? TABLE_CELL_SIZE, dir) })
-}
-function updTableSize(dir: 1 | -1) {
-  upd({ size: stepScale(tableEl.value?.size ?? TABLE_CELL_SIZE, dir) })
+  patchTable({ size: stepScale(activeTable.value?.size ?? TABLE_CELL_SIZE, dir) })
 }
 // Swatches offered in the color picker: the deck theme's own colors first, then
 // a couple of neutral anchors. De-duped, falling back to the built-in defaults.
@@ -439,22 +446,6 @@ const themeSwatches = computed(() => {
         </div>
       </template>
 
-      <!-- selected canvas table: same typography controls as the table layout,
-           since it's the same grid once it's been baked to freeform -->
-      <template v-if="tableEl">
-        <span class="div" />
-        <div class="seg style-seg">
-          <select class="sel font" title="Cell font" :value="tableEl.font ?? 'body'" @change="upd({ font: ($event.target as HTMLSelectElement).value })">
-            <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
-          </select>
-          <div class="num-step" title="Cell text size (shrinks to fit)">
-            <button class="step-btn" title="Smaller" @mousedown.prevent="updTableSize(-1)">−</button>
-            <input class="step-val" type="number" min="8" max="120" :value="tableEl.size ?? TABLE_CELL_SIZE" @input="upd({ size: +($event.target as HTMLInputElement).value })" />
-            <button class="step-btn" title="Larger" @mousedown.prevent="updTableSize(1)">+</button>
-          </div>
-        </div>
-      </template>
-
       <!-- any selected element: z-order -->
       <template v-if="selectedElement">
         <span class="div" />
@@ -521,29 +512,30 @@ const themeSwatches = computed(() => {
         </div>
       </template>
 
-      <template v-if="slide?.layout === 'table'">
+      <!-- table: the Table layout or a selected canvas table — same controls -->
+      <template v-if="activeTable">
         <span class="div" />
         <label class="lbl">Rows</label>
         <div class="num-spin" title="Rows">
-          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows - 1, tableCols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
-          <input class="spin-val" type="number" min="1" max="20" :value="tableRows" @change="resizeTable(+($event.target as HTMLInputElement).value, tableCols)" />
-          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows + 1, tableCols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows - 1, tableDims.cols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <input class="spin-val" type="number" min="1" max="20" :value="tableDims.rows" @change="resizeActiveTable(+($event.target as HTMLInputElement).value, tableDims.cols)" />
+          <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows + 1, tableDims.cols)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
         </div>
         <label class="lbl">Cols</label>
         <div class="num-spin" title="Columns">
-          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols - 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
-          <input class="spin-val" type="number" min="1" max="20" :value="tableCols" @change="resizeTable(tableRows, +($event.target as HTMLInputElement).value)" />
-          <button class="spin-btn" @mousedown.prevent="resizeTable(tableRows, tableCols + 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows, tableDims.cols - 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
+          <input class="spin-val" type="number" min="1" max="20" :value="tableDims.cols" @change="resizeActiveTable(tableDims.rows, +($event.target as HTMLInputElement).value)" />
+          <button class="spin-btn" @mousedown.prevent="resizeActiveTable(tableDims.rows, tableDims.cols + 1)"><svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></button>
         </div>
         <span class="div" />
         <div class="seg style-seg">
-          <select class="sel font" title="Cell font" :value="slide.tableFont ?? 'body'" @change="emit('patch', { tableFont: ($event.target as HTMLSelectElement).value })">
+          <select class="sel font" title="Cell font" :value="activeTable.font ?? 'body'" @change="patchTable({ font: ($event.target as HTMLSelectElement).value })">
             <option v-for="f in FONTS" :key="f.v" :value="f.v">{{ f.label }}</option>
           </select>
           <!-- Base size: cell text shrinks below it to fit, never above -->
           <div class="num-step" title="Cell text size (shrinks to fit)">
             <button class="step-btn" title="Smaller" @mousedown.prevent="stepTableSize(-1)">−</button>
-            <input class="step-val" type="number" min="8" max="120" :value="slide.tableSize ?? TABLE_CELL_SIZE" @input="emit('patch', { tableSize: +($event.target as HTMLInputElement).value })" />
+            <input class="step-val" type="number" min="8" max="120" :value="activeTable.size ?? TABLE_CELL_SIZE" @input="patchTable({ size: +($event.target as HTMLInputElement).value })" />
             <button class="step-btn" title="Larger" @mousedown.prevent="stepTableSize(1)">+</button>
           </div>
         </div>

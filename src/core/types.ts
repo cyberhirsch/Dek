@@ -57,23 +57,41 @@ export interface TextItem {
   bullet?: boolean
 }
 
-/** One cell of a `table` layout. Holds either `text` or `image` (image wins if
- *  both are set, matching how image-caption/gallery already treat "image
- *  present → show image") — no `kind` discriminator, so it stays a plain,
- *  hand-editable YAML object like `GalleryItem`. */
+/** A table cell that needs more than plain text — an image, a link, a merge.
+ *  Image wins if both `text` and `image` are set, matching how image-caption
+ *  and gallery already treat "image present → show image". */
 export interface TableCell {
   text?: string
   image?: string
   /** Makes the cell clickable in present/export (http(s)/mailto only). */
   link?: string
-  /** How many grid columns/rows this cell spans, from its own position.
-   *  Default 1. Only meaningful on the cell that "owns" a merge (top-left). */
+  /** How many columns/rows this cell spans from its own position. Default 1.
+   *  The positions it covers are stored as `null`. */
   colspan?: number
   rowspan?: number
-  /** True for a grid position covered by another cell's span — has no content
-   *  of its own and isn't rendered; kept as a placeholder so the flat
-   *  `tableCells` array stays aligned to `tableRows * tableCols`. */
-  covered?: boolean
+}
+
+/** One stored cell. The common case — plain text or a number — stays a bare
+ *  scalar so `deck.md` reads as a table (`- [Maya, 42]`); an object carries
+ *  anything more; `null` marks a position covered by another cell's merge. */
+export type TableCellValue = string | number | TableCell | null
+
+/**
+ * A table's data — the ONE shape shared by the `table` layout (`slide.table`)
+ * and the `table` canvas element (`element.table`). Keeping a single object
+ * means bake/unbake is a copy, and every table feature is built once.
+ */
+export interface TableData {
+  /** Row-major grid. Rows may differ in length; the widest row sets the
+   *  column count and shorter rows read as blank-padded. */
+  rows: TableCellValue[][]
+  /** Fractions of the grid's width/height, summing to 1; omitted ⇒ uniform. */
+  colWidths?: number[]
+  rowHeights?: number[]
+  /** Cell typography: a 'heading'/'body' theme token (or a literal family),
+   *  and the *base* size cell text shrinks below to fit, never above. */
+  font?: string
+  size?: number
 }
 
 // ── Free-positioned canvas elements ──────────────────────────────────────────
@@ -186,16 +204,7 @@ export interface DiagramElement extends ElementBase {
  */
 export interface TableElement extends ElementBase {
   type: 'table'
-  rows: number
-  cols: number
-  cells: TableCell[]
-  /** Fractions of the element's width/height, summing to 1; omitted ⇒ uniform. */
-  colWidths?: number[]
-  rowHeights?: number[]
-  /** Cell typography. `font` takes the 'heading'/'body' theme tokens like a box;
-   *  `size` is the *base* size — cell text shrinks below it to fit, never above. */
-  font?: string
-  size?: number
+  table: TableData
 }
 
 export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement | TableElement
@@ -262,20 +271,8 @@ export interface Slide {
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
   focus?: Focus
-  // table: a flat, row-major grid of cells (index = row*tableCols+col).
-  // tableColWidths/tableRowHeights are fractions of the grid summing to 1;
-  // omitted means uniform. Distinct from gallery's `columns` (which is an
-  // item-count-driven hint, not an authoritative dimension the cell array
-  // must match).
-  tableRows?: number
-  tableCols?: number
-  tableCells?: TableCell[]
-  tableColWidths?: number[]
-  tableRowHeights?: number[]
-  /** Cell typography for the whole table: a 'heading'/'body' theme token (or a
-   *  literal family), and the *base* size cell text shrinks down from to fit. */
-  tableFont?: string
-  tableSize?: number
+  /** table: the grid itself — the same object a `table` canvas element carries. */
+  table?: TableData
   // diagram: Mermaid source
   code?: string
   // freeform

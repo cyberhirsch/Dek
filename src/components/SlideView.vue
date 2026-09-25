@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Slide, DeckConfig, GalleryItem, TableCell, Focus, SlideElement } from '../core/types'
+import type { Slide, DeckConfig, GalleryItem, Focus, SlideElement } from '../core/types'
 import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
@@ -32,7 +32,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
-  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number }]
+  /** `el` is set for a cell of a canvas table element (else the layout's own). */
+  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number; el?: number }]
   'update:elements': [els: SlideElement[]]
   'update:selectedEl': [sel: number[]]
   'create-element': [el: SlideElement]
@@ -41,7 +42,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -70,9 +71,6 @@ const listBaseSize = computed(() =>
 )
 
 // table
-const tableCells = computed<TableCell[]>(() => props.slide.tableCells ?? [])
-const tableCols = computed(() => Math.max(1, props.slide.tableCols ?? 1))
-const tableRows = computed(() => Math.max(1, props.slide.tableRows ?? Math.ceil(tableCells.value.length / tableCols.value)))
 
 function patch(p: Partial<Slide>) {
   emit('patch', p)
@@ -80,17 +78,15 @@ function patch(p: Partial<Slide>) {
 // Right-clicking a layout image opens Dek's own image menu (Copy/Paste/Fit/…)
 // instead of the browser's native one — the same actions the freeform canvas
 // offers, wired to the slide's image field. Only in edit mode, and only when an
-// image is present. `target` names the multi-image slots (portraits / gallery /
-// table); omit it for the single `image` field.
-function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery' | 'table'; index: number }) {
+// image is present. `target` names the multi-image slots (portraits / gallery);
+// omit it for the single `image` field. Table cells route through TableGrid.
+function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; index: number }) {
   if (!props.editable) return
   const src = !target
     ? props.slide.image
     : target.field === 'portraits'
       ? props.slide.portraits?.[target.index]
-      : target.field === 'table'
-        ? tableCells.value[target.index]?.image
-        : galleryItems.value[target.index]?.image
+      : galleryItems.value[target.index]?.image
   if (!src) return
   e.preventDefault()
   emit('ctxmenu', {
@@ -153,26 +149,6 @@ function setFocus(f: Focus) {
   patch({ focus: f })
 }
 
-// table ops
-function setTableCellText(i: number, text: string) {
-  const cells = tableCells.value.map((c, j) => (j === i ? { ...c, text } : c))
-  patch({ tableCells: cells })
-}
-// A cell with an image gets the normal image menu (reused via onImageCtx); an
-// empty one only offers "Add Image" — but not while the user has text
-// selected there, since that selection should bubble up to onTextCtx's own
-// Bold/Italic/Add Link menu instead.
-function onTableCellCtx(e: MouseEvent, index: number) {
-  if (!props.editable) return
-  if (tableCells.value[index]?.image) {
-    onImageCtx(e, { field: 'table', index })
-    return
-  }
-  const sel = window.getSelection()
-  if (sel && sel.rangeCount && !sel.isCollapsed) return
-  e.preventDefault()
-  emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image', imageField: 'table', imageIndex: index })
-}
 
 // video-embed
 const videoFit = computed(() => props.slide.videoFit ?? 'framed')
@@ -395,18 +371,12 @@ watch(
     <div v-else-if="slide.layout === 'table'" class="dek-pad l-table">
       <FittedText v-if="editable || slide.title" class="fit-table-title" content-class="table-title" tag="h1" :model-value="slide.title" :editable="editable" placeholder="Title (optional)" :base-size="64" :min-size="26" splittable @update:model-value="patch({ title: $event })" @split="emit('split', { kind: 'field', field: 'title' })" />
       <TableGrid
-        :cells="tableCells"
-        :rows="tableRows"
-        :cols="tableCols"
-        :col-widths="slide.tableColWidths"
-        :row-heights="slide.tableRowHeights"
-        :font="slide.tableFont"
-        :size="slide.tableSize"
+        :table="slide.table"
         :editable="editable"
         :safe-link="safeLink"
-        @cell-text="setTableCellText"
+        @update:table="patch({ table: $event })"
         @cell-file="(i, f) => emit('upload', { field: 'table', file: f, index: i })"
-        @cell-ctx="onTableCellCtx"
+        @cell-ctx="(e, i) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image', imageField: 'table', imageIndex: i })"
       />
     </div>
 
@@ -432,6 +402,7 @@ watch(
       @drop-image="(f, t) => emit('drop-image', f, t)"
       @drop-link="(u, t) => emit('drop-link', u, t)"
       @ctxmenu="emit('ctxmenu', $event)"
+      @upload="emit('upload', $event)"
     />
   </div>
 </template>

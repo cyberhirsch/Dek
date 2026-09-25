@@ -13,9 +13,15 @@
 //  - boxes carry `lineHeight` / `lineGap` so baked text keeps the CSS rhythm
 //    (1.05 headings / 1.45 body / 18px list gaps) instead of the canvas default.
 
-import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool } from './types'
+import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool, TableData } from './types'
 import { BASE } from '../tokens'
 import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
+import { emptyTable } from './table'
+
+/** A deep copy of a table — JSON, not structuredClone, because the slide is
+ *  usually a Vue reactive proxy, which structuredClone rejects. Keeps the baked
+ *  element from sharing nested arrays with the slide it came from. */
+const cloneTable = (t: TableData): TableData => JSON.parse(JSON.stringify(t))
 
 const STAGE_W = BASE.stage.w
 const STAGE_H = BASE.stage.h
@@ -270,9 +276,8 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       // the grid stays a grid on the canvas (same TableGrid renderer, same
       // look), and `convert.ts` can un-bake it back into a `table` layout
       // losslessly. Decomposing into boxes here would be a one-way trip.
-      const cells = slide.tableCells ?? []
-      const cols = Math.max(1, slide.tableCols ?? 1)
-      const rows = Math.max(1, slide.tableRows ?? Math.ceil(cells.length / cols))
+      // The layout and the element carry the identical `table` object, so
+      // this is a copy — no field-by-field translation to drift.
       let y = PAD_Y
       if (title) {
         els.push(text(title, PAD_X, y, INNER_W, H1_H, { ...HEAD }))
@@ -285,13 +290,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
         w: INNER_W,
         h: STAGE_H - PAD_Y - y,
         rotation: 0,
-        rows,
-        cols,
-        cells,
-        ...(slide.tableColWidths ? { colWidths: slide.tableColWidths } : {}),
-        ...(slide.tableRowHeights ? { rowHeights: slide.tableRowHeights } : {}),
-        ...(slide.tableFont ? { font: slide.tableFont } : {}),
-        ...(slide.tableSize != null ? { size: slide.tableSize } : {}),
+        table: cloneTable(slide.table ?? emptyTable(1, 1)),
       })
       break
     }

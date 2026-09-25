@@ -1,60 +1,78 @@
 <script setup lang="ts">
 // The one table renderer, used by BOTH the `table` layout (SlideView) and the
-// `table` canvas element (CanvasElements). Keeping a single component is what
-// lets a table bake to freeform and back without changing appearance — two
-// renderers over the same data would drift on the first CSS tweak.
+// `table` canvas element (CanvasElements). Both hand it the same `TableData`
+// object and receive the same events back — a table looks and behaves
+// identically wherever it lives, and bakes to freeform and back unchanged.
 import { computed } from 'vue'
-import type { TableCell } from '../core/types'
-import { TABLE_CELL_MIN_SIZE, TABLE_CELL_SIZE, tableTracks } from '../core/table'
+import type { TableData } from '../core/types'
+import { TABLE_CELL_MIN_SIZE, TABLE_CELL_SIZE, setTableCell, tableShape, tableTracks } from '../core/table'
 import { resolveFont } from '../render/theme'
 import FittedText from './FittedText.vue'
 import FramedImage from './FramedImage.vue'
 
 const props = defineProps<{
-  cells: TableCell[]
-  rows: number
-  cols: number
-  colWidths?: number[]
-  rowHeights?: number[]
-  font?: string
-  size?: number
+  table: TableData | undefined
   editable?: boolean
-  /** Rendered scale, so cell text on a shrunk canvas element still autofits
-   *  against the size it will actually occupy. */
   safeLink?: (u?: string) => string | undefined
 }>()
 
 const emit = defineEmits<{
-  'cell-text': [index: number, text: string]
+  /** A cell's text changed — the whole updated table, ready to store. */
+  'update:table': [table: TableData]
+  /** A file was dropped/picked onto an image cell — the host routes the upload. */
   'cell-file': [index: number, file: File]
   'cell-ctx': [e: MouseEvent, index: number]
 }>()
 
-const cols = computed(() => Math.max(1, props.cols))
-const rows = computed(() => Math.max(1, props.rows))
-const baseSize = computed(() => props.size ?? TABLE_CELL_SIZE)
+const shape = computed(() => tableShape(props.table))
+const baseSize = computed(() => props.table?.size ?? TABLE_CELL_SIZE)
 
 // Percentages (not fr) so the tracks stay proportional at any rendered size —
 // the same fractions bake.ts and the PPTX exporter multiply by their own pixel
 // extents, which is what keeps screen and export geometry identical.
 const gridStyle = computed(() => ({
-  gridTemplateColumns: tableTracks(props.colWidths, cols.value).map((w) => w * 100 + '%').join(' '),
-  gridTemplateRows: tableTracks(props.rowHeights, rows.value).map((h) => h * 100 + '%').join(' '),
-  fontFamily: resolveFont(props.font),
+  gridTemplateColumns: tableTracks(props.table?.colWidths, shape.value.cols).map((w) => w * 100 + '%').join(' '),
+  gridTemplateRows: tableTracks(props.table?.rowHeights, shape.value.rows).map((h) => h * 100 + '%').join(' '),
+  fontFamily: resolveFont(props.table?.font),
 }))
+
+function onText(i: number, text: string) {
+  emit('update:table', setTableCell(props.table, i, { text }))
+}
+
+// One right-click policy for both hosts. An image cell gets the image menu; an
+// empty text cell gets "Add Image". But a text selection or a caret inside a
+// link belongs to the slide's own text menu (Bold/Italic/Link), so those are
+// left to bubble. When this does open a menu it stops propagation — on the
+// canvas the element's own menu would otherwise fire next and replace it.
+function onCtx(e: MouseEvent, i: number) {
+  if (!props.editable) return
+  if (!shape.value.cells[i]?.image) {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      if (!sel.isCollapsed) return
+      const n = sel.anchorNode
+      const host = n?.nodeType === 1 ? (n as HTMLElement) : n?.parentElement
+      if (host?.closest('a') && (e.currentTarget as HTMLElement).contains(host)) return
+    }
+  }
+  e.preventDefault()
+  e.stopPropagation()
+  emit('cell-ctx', e, i)
+}
 </script>
 
 <template>
   <div class="table-grid" :style="gridStyle">
-    <template v-for="(cell, i) in cells" :key="i">
+    <template v-for="(cell, i) in shape.cells" :key="i">
       <div
-        v-if="!cell?.covered"
+        v-if="!cell.covered"
         class="table-cell"
-        :class="{ 'has-image': !!cell?.image }"
-        :style="{ gridColumn: 'span ' + (cell?.colspan ?? 1), gridRow: 'span ' + (cell?.rowspan ?? 1) }"
-        @contextmenu="emit('cell-ctx', $event, i)"
+        :class="{ 'has-image': !!cell.image }"
+        :style="{ gridColumn: 'span ' + (cell.colspan ?? 1), gridRow: 'span ' + (cell.rowspan ?? 1) }"
+        @contextmenu="onCtx($event, i)"
       >
-        <template v-if="cell?.image">
+        <template v-if="cell.image">
           <FramedImage :src="cell.image" :editable="editable" @file="emit('cell-file', i, $event)" />
           <a
             v-if="!editable && safeLink?.(cell.link)"
@@ -70,13 +88,13 @@ const gridStyle = computed(() => ({
           v-else
           class="table-cell-fit"
           content-class="table-cell-text"
-          :model-value="cell?.text"
+          :model-value="cell.text"
           :editable="editable"
           multiline
           placeholder=""
           :base-size="baseSize"
           :min-size="TABLE_CELL_MIN_SIZE"
-          @update:model-value="emit('cell-text', i, $event)"
+          @update:model-value="onText(i, $event)"
         />
       </div>
     </template>

@@ -1,64 +1,217 @@
 import { describe, expect, it } from 'vitest'
-import { cellHasContent, reflowTableCells, resizeWouldDropContent, tableToBoxes, tableTracks, trackEdges } from './table'
-import type { TableCell, TableElement } from './types'
+import {
+  cellHasContent,
+  contentToTable,
+  fromGridCell,
+  parsePipeTable,
+  reflowTableCells,
+  resizeTable,
+  resizeWouldDropContent,
+  setTableCell,
+  tableFromLegacy,
+  tableImages,
+  tableShape,
+  tableToBoxes,
+  tableTracks,
+  toGridCell,
+  trackEdges,
+  type GridCell,
+} from './table'
+import type { TableData, TableElement } from './types'
 
-const grid = (cols: number, ...cells: TableCell[]): { cols: number; cells: TableCell[] } => ({ cols, cells })
+const t = (...rows: TableData['rows']): TableData => ({ rows })
 
-describe('cellHasContent', () => {
-  it('is false for blank, missing, or covered cells', () => {
-    expect(cellHasContent(undefined)).toBe(false)
-    expect(cellHasContent({ text: '' })).toBe(false)
-    expect(cellHasContent({ text: '  ' })).toBe(false)
-    expect(cellHasContent({ text: 'hi', covered: true })).toBe(false)
+describe('storage ⇄ grid cells', () => {
+  it('keeps plain cells as bare scalars, so deck.md reads as a table', () => {
+    expect(fromGridCell({ text: 'Maya' })).toBe('Maya')
+    expect(fromGridCell({ text: '' })).toBe('')
   })
 
-  it('is true for a cell with text or an image', () => {
-    expect(cellHasContent({ text: 'hi' })).toBe(true)
-    expect(cellHasContent({ image: 'a.png' })).toBe(true)
+  it('stores canonical numbers as numbers — and nothing that would change meaning', () => {
+    expect(fromGridCell({ text: '42' })).toBe(42)
+    expect(fromGridCell({ text: '3.5' })).toBe(3.5)
+    // each of these would read differently as a number, so they stay text
+    for (const s of ['007', '1e3', '3,5', ' 4', '+4', '42.0']) expect(fromGridCell({ text: s })).toBe(s)
+  })
+
+  it('uses an object only when a cell needs more than text', () => {
+    expect(fromGridCell({ image: 'a.png' })).toEqual({ image: 'a.png' })
+    expect(fromGridCell({ text: 'Q1', colspan: 2 })).toEqual({ text: 'Q1', colspan: 2 })
+    expect(fromGridCell({ covered: true })).toBeNull()
+  })
+
+  it('reads every stored form back into a grid cell', () => {
+    expect(toGridCell('a')).toEqual({ text: 'a' })
+    expect(toGridCell(42)).toEqual({ text: '42' })
+    expect(toGridCell(null)).toEqual({ covered: true })
+    expect(toGridCell(undefined)).toEqual({ text: '' })
+    expect(toGridCell({ image: 'p.png' })).toEqual({ image: 'p.png' })
   })
 })
 
-describe('reflowTableCells', () => {
-  it('preserves each cell at its row/column position when growing', () => {
-    const { cols, cells } = grid(2, { text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' })
-    const out = reflowTableCells(cells, cols, 3, 3)
-    // original 2x2 sits in the top-left of the new 3x3
-    expect(out.map((c) => c.text)).toEqual(['A', 'B', '', 'C', 'D', '', '', '', ''])
+describe('tableShape', () => {
+  it('flattens rows row-major and pads short rows to the widest', () => {
+    const s = tableShape(t(['a', 'b', 'c'], ['d']))
+    expect(s.rows).toBe(2)
+    expect(s.cols).toBe(3)
+    expect(s.cells.map((c) => c.text)).toEqual(['a', 'b', 'c', 'd', '', ''])
   })
 
-  it('drops cells outside the new bounds when shrinking', () => {
-    const { cols, cells } = grid(3, { text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }, { text: 'E' }, { text: 'F' })
-    const out = reflowTableCells(cells, cols, 1, 2)
-    expect(out.map((c) => c.text)).toEqual(['A', 'B'])
+  it('reads a hand-written scalar row as a one-cell row, not an error', () => {
+    const s = tableShape({ rows: ['solo' as never, ['a', 'b']] })
+    expect(s.cells.map((c) => c.text)).toEqual(['solo', '', 'a', 'b'])
   })
 
-  it('always returns exactly newRows*newCols cells', () => {
-    const { cols, cells } = grid(2, { text: 'A' }, { text: 'B' })
-    expect(reflowTableCells(cells, cols, 4, 4)).toHaveLength(16)
+  it('is at least 1×1 even for a missing or empty table', () => {
+    expect(tableShape(undefined)).toEqual({ rows: 1, cols: 1, cells: [{ text: '' }] })
+    expect(tableShape(t())).toEqual({ rows: 1, cols: 1, cells: [{ text: '' }] })
+  })
+})
+
+describe('setTableCell', () => {
+  it('patches one cell and keeps the other table fields', () => {
+    const before: TableData = { rows: [['a', 'b']], font: 'heading', colWidths: [0.3, 0.7] }
+    const after = setTableCell(before, 1, { text: '42' })
+    expect(after.rows).toEqual([['a', 42]])
+    expect(after.font).toBe('heading')
+    expect(after.colWidths).toEqual([0.3, 0.7])
+  })
+})
+
+describe('resizeTable', () => {
+  it('keeps each surviving cell at its row/column position when growing', () => {
+    expect(resizeTable(t(['A', 'B'], ['C', 'D']), 3, 3).rows).toEqual([
+      ['A', 'B', ''],
+      ['C', 'D', ''],
+      ['', '', ''],
+    ])
+  })
+
+  it('drops what falls outside when shrinking', () => {
+    expect(resizeTable(t(['A', 'B', 'C'], ['D', 'E', 'F']), 1, 2).rows).toEqual([['A', 'B']])
+  })
+
+  it('clears custom track sizes, which no longer fit the new grid', () => {
+    const r = resizeTable({ rows: [['a', 'b']], colWidths: [0.3, 0.7], rowHeights: [1] }, 1, 3)
+    expect(r.colWidths).toBeUndefined()
+    expect(r.rowHeights).toBeUndefined()
   })
 })
 
 describe('resizeWouldDropContent', () => {
   it('is false when every dropped cell is blank', () => {
-    const { cols, cells } = grid(2, { text: 'A' }, { text: '' }, { text: '' }, { text: '' })
-    expect(resizeWouldDropContent(cells, cols, 1, 1)).toBe(false)
+    expect(resizeWouldDropContent(t(['A', ''], ['', '']), 1, 1)).toBe(false)
   })
 
   it('is true when a dropped cell has text or an image', () => {
-    const { cols, cells } = grid(2, { text: 'A' }, { text: 'B' }, { text: '' }, { text: '' })
-    expect(resizeWouldDropContent(cells, cols, 1, 1)).toBe(true)
+    expect(resizeWouldDropContent(t(['A', 'B'], ['', '']), 1, 1)).toBe(true)
+    expect(resizeWouldDropContent(t(['A', { image: 'p.png' }]), 1, 1)).toBe(true)
   })
 
-  it('ignores covered (merge-placeholder) cells being dropped', () => {
-    const { cols, cells } = grid(2, { text: 'A', colspan: 2 }, { covered: true }, { text: '' }, { text: '' })
-    expect(resizeWouldDropContent(cells, cols, 1, 1)).toBe(false)
+  it('ignores covered (merge-placeholder) cells', () => {
+    expect(resizeWouldDropContent(t([{ text: 'A', colspan: 2 }, null], ['', '']), 1, 1)).toBe(false)
+  })
+})
+
+describe('reflowTableCells', () => {
+  it('always returns exactly newRows×newCols cells', () => {
+    const cells: GridCell[] = [{ text: 'A' }, { text: 'B' }]
+    expect(reflowTableCells(cells, 2, 4, 4)).toHaveLength(16)
+  })
+
+  it('treats covered placeholders as having no content', () => {
+    expect(cellHasContent({ covered: true, text: 'x' })).toBe(false)
+  })
+})
+
+describe('tableImages', () => {
+  it('lists every image with its row/column path, skipping covered cells', () => {
+    expect(tableImages(t(['a', { image: 'x.png' }], [null, { image: 'y.png', link: 'https://z.io' }]))).toEqual([
+      { src: 'x.png', path: 'rows[0][1].image' },
+      { src: 'y.png', path: 'rows[1][1].image' },
+    ])
+  })
+
+  it('is empty for a missing table', () => {
+    expect(tableImages(undefined)).toEqual([])
+  })
+})
+
+describe('tableFromLegacy', () => {
+  it('rebuilds rows from the old flat cells + dimensions, covered → null', () => {
+    const legacy = tableFromLegacy({
+      rows: 2,
+      cols: 2,
+      cells: [{ text: 'Merged', colspan: 2 }, { covered: true }, { image: 'a.jpg' }, { text: '42' }],
+      colWidths: [0.3, 0.7],
+      font: 'heading',
+      size: 30,
+    })
+    expect(legacy).toEqual({
+      rows: [
+        [{ text: 'Merged', colspan: 2 }, null],
+        [{ image: 'a.jpg' }, 42],
+      ],
+      colWidths: [0.3, 0.7],
+      font: 'heading',
+      size: 30,
+    })
+  })
+
+  it('fills a short cell list out to the full grid', () => {
+    expect(tableFromLegacy({ rows: 2, cols: 2, cells: [{ text: 'a' }] }).rows).toEqual([
+      ['a', ''],
+      ['', ''],
+    ])
+  })
+})
+
+describe('parsePipeTable', () => {
+  it('turns a Markdown pipe table into rows, numbers kept as numbers', () => {
+    const md = '| Tool | Share |\n|------|------:|\n| Maya | 42 |\n| Blender | 35 |'
+    expect(parsePipeTable(md)?.rows).toEqual([
+      ['Tool', 'Share'],
+      ['Maya', 42],
+      ['Blender', 35],
+    ])
+  })
+
+  it('finds a table after leading prose and stops at the first line without a pipe', () => {
+    const md = 'Intro line\n| a | b |\n|---|---|\n| 1 | 2 |\nAfter'
+    expect(parsePipeTable(md)?.rows).toEqual([
+      ['a', 'b'],
+      [1, 2],
+    ])
+  })
+
+  it('accepts tables without outer pipes, and escaped pipes inside cells', () => {
+    expect(parsePipeTable('a | b\n--|--\nx \\| y | z')?.rows).toEqual([
+      ['a', 'b'],
+      ['x | y', 'z'],
+    ])
+  })
+
+  it('is null without a separator line — a stray pipe is not a table', () => {
+    expect(parsePipeTable('this | that\nplain')).toBeNull()
+  })
+})
+
+describe('contentToTable', () => {
+  it('prefers a pipe table when there is one', () => {
+    expect(contentToTable('| a | b |\n|---|---|\n| c | d |').rows).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ])
+  })
+
+  it('otherwise gives one row per line, bullet markers dropped', () => {
+    expect(contentToTable('- one\n- two').rows).toEqual([['one'], ['two']])
   })
 })
 
 describe('tableTracks', () => {
   it('falls back to uniform when the stored array is absent or the wrong length', () => {
     expect(tableTracks(undefined, 4)).toEqual([0.25, 0.25, 0.25, 0.25])
-    // a stale array left over from a resize must not desync the grid
     expect(tableTracks([0.5, 0.5], 3)).toEqual([1 / 3, 1 / 3, 1 / 3])
   })
 
@@ -74,66 +227,44 @@ describe('tableTracks', () => {
 
 describe('trackEdges', () => {
   it('returns n+1 cumulative offsets spanning exactly the given size', () => {
-    const edges = trackEdges(undefined, 4, 400, 100)
-    expect(edges).toEqual([100, 200, 300, 400, 500])
+    expect(trackEdges(undefined, 4, 400, 100)).toEqual([100, 200, 300, 400, 500])
   })
 })
 
-const tableEl = (over: Partial<TableElement> = {}): TableElement => ({
-  type: 'table',
-  x: 0,
-  y: 0,
-  w: 400,
-  h: 200,
-  rotation: 0,
-  rows: 2,
-  cols: 2,
-  cells: [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }],
-  ...over,
-})
+const el = (table: TableData): TableElement => ({ type: 'table', x: 0, y: 0, w: 400, h: 200, rotation: 0, table })
 
 describe('tableToBoxes', () => {
   it('divides a uniform table into evenly-tiled cell boxes', () => {
-    const out = tableToBoxes(tableEl())
-    expect(out).toHaveLength(4)
-    const [a, b, c] = out
-    expect(b.x).toBeCloseTo(a.x + a.w, 5) // columns tile with no gap
-    expect(c.y).toBeCloseTo(a.y + a.h, 5) // rows tile with no gap
+    const [a, b, c] = tableToBoxes(el(t(['A', 'B'], ['C', 'D'])))
+    expect(b.x).toBeCloseTo(a.x + a.w, 5)
+    expect(c.y).toBeCloseTo(a.y + a.h, 5)
     expect(a.w).toBeCloseTo(200, 5)
     expect(a.h).toBeCloseTo(100, 5)
   })
 
   it('places cells at their cumulative-fraction offsets for non-uniform tracks', () => {
-    const out = tableToBoxes(tableEl({ rows: 1, cols: 2, cells: [{ text: 'A' }, { text: 'B' }], colWidths: [0.25, 0.75] }))
-    const [a, b] = out
+    const [a, b] = tableToBoxes(el({ rows: [['A', 'B']], colWidths: [0.25, 0.75] }))
     expect(a.w).toBeCloseTo(100, 5)
     expect(b.w).toBeCloseTo(300, 5)
     expect(b.x).toBeCloseTo(a.x + a.w, 5)
   })
 
   it('emits one box spanning the merged tracks, and nothing for covered cells', () => {
-    const out = tableToBoxes(
-      tableEl({ cells: [{ text: 'Merged', colspan: 2 }, { covered: true }, { text: 'C' }, { text: 'D' }] }),
-    )
+    const out = tableToBoxes(el(t([{ text: 'Merged', colspan: 2 }, null], ['C', 'D'])))
     expect(out).toHaveLength(3)
-    const merged = out.find((b) => b.content === 'Merged')!
-    expect(merged.w).toBeCloseTo(400, 5) // the full width of both columns
+    expect(out.find((b) => b.content === 'Merged')!.w).toBeCloseTo(400, 5)
   })
 
   it('clamps a colspan that overruns the grid instead of running off the edge', () => {
-    const out = tableToBoxes(tableEl({ rows: 1, cols: 2, cells: [{ text: 'A' }, { text: 'B', colspan: 5 }] }))
-    const b = out.find((x) => x.content === 'B')!
+    const b = tableToBoxes(el(t(['A', { text: 'B', colspan: 5 }]))).find((x) => x.content === 'B')!
     expect(b.x + b.w).toBeCloseTo(400, 5)
   })
 
-  it('carries the table\'s font/size onto text cells and the image onto picture cells', () => {
-    const out = tableToBoxes(
-      tableEl({ rows: 1, cols: 2, cells: [{ text: 'A' }, { image: 'p.png', link: 'https://x.io' }], font: 'heading', size: 30 }),
-    )
+  it("carries the table's font/size onto text cells and the image onto picture cells", () => {
+    const out = tableToBoxes(el({ rows: [['A', { image: 'p.png', link: 'https://x.io' }]], font: 'heading', size: 30 }))
     const text = out.find((b) => b.content === 'A')!
     expect(text.font).toBe('heading')
     expect(text.size).toBe(30)
-    const pic = out.find((b) => b.src === 'p.png')!
-    expect(pic.link).toBe('https://x.io')
+    expect(out.find((b) => b.src === 'p.png')!.link).toBe('https://x.io')
   })
 })

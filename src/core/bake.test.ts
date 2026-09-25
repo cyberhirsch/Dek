@@ -149,46 +149,27 @@ describe('bakeToElements geometry contract', () => {
     expect(withContent(els, 'Fig 2.')).toBeUndefined()
   })
 
-  it('bakes a table to ONE table element, not a scatter of boxes', () => {
+  it('bakes a table to ONE table element carrying the same table object', () => {
     // The grid has to survive as a grid: decomposing into per-cell boxes here
-    // would make table -> freeform a one-way trip (see the convert.ts round-trip
-    // test), and would lose merges, track sizes, and cell typography.
-    const cells = [{ text: 'A' }, { text: 'B' }, { text: 'C' }, { text: 'D' }]
-    const els = bakeToElements({ layout: 'table', title: 'Grid', tableRows: 2, tableCols: 2, tableCells: cells })
+    // would make table -> freeform a one-way trip (see the convert.ts
+    // round-trip test), and would lose merges, track sizes, and typography.
+    const table = { rows: [['A', 'B'], ['C', 42]], colWidths: [0.25, 0.75], font: 'heading', size: 30 }
+    const els = bakeToElements({ layout: 'table', title: 'Grid', table })
     const tables = els.filter((e): e is TableElement => e.type === 'table')
     expect(tables).toHaveLength(1)
-    expect(tables[0].rows).toBe(2)
-    expect(tables[0].cols).toBe(2)
-    expect(tables[0].cells).toEqual(cells)
+    expect(tables[0].table).toEqual(table)
+    // a copy, not the slide's own object — edits to one can't leak into the other
+    expect(tables[0].table).not.toBe(table)
     // the title still bakes as its own heading box above the grid
     const head = withContent(els, 'Grid')!
     expect(head.font).toBe('heading')
     expect(tables[0].y).toBeGreaterThan(head.y)
   })
 
-  it('carries track sizes and cell typography onto the baked table element', () => {
-    const els = bakeToElements({
-      layout: 'table',
-      tableRows: 1,
-      tableCols: 2,
-      tableCells: [{ text: 'A' }, { text: 'B' }],
-      tableColWidths: [0.25, 0.75],
-      tableFont: 'heading',
-      tableSize: 30,
-    })
-    const t = els.find((e): e is TableElement => e.type === 'table')!
-    expect(t.colWidths).toEqual([0.25, 0.75])
-    expect(t.font).toBe('heading')
-    expect(t.size).toBe(30)
-  })
-
-  it('omits track/typography fields entirely when the table uses defaults', () => {
-    const els = bakeToElements({ layout: 'table', tableRows: 1, tableCols: 1, tableCells: [{ text: 'A' }] })
-    const t = els.find((e): e is TableElement => e.type === 'table')!
-    // absent, not `undefined` keys — keeps the serialized .md clean
-    expect('colWidths' in t).toBe(false)
-    expect('font' in t).toBe(false)
-    expect('size' in t).toBe(false)
+  it('bakes a table with no title flush to the top padding', () => {
+    const els = bakeToElements({ layout: 'table', table: { rows: [['A']] } })
+    expect(els).toHaveLength(1)
+    expect(els[0].y).toBe(70)
   })
 
   it('produces finite geometry for every layout, even with empty fields', () => {

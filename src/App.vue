@@ -47,7 +47,8 @@ import DeckBrowser from './components/DeckBrowser.vue'
 import ReviewPanel from './components/ReviewPanel.vue'
 import SourcePane from './components/SourcePane.vue'
 import ContextMenu, { type CtxEntry } from './components/ContextMenu.vue'
-import type { ElementPatch, BoxElement } from './core/types'
+import type { ElementPatch, BoxElement, TableData } from './core/types'
+import { setTableCell, tableShape, type GridCell } from './core/table'
 import { parseContent, rowsToContent } from './render/inline'
 
 const deck = ref<Deck | null>(null)
@@ -912,7 +913,30 @@ function closeCtx() {
 // its own input down in CanvasElements; the menu can't reach that one). The
 // target is either a freeform box element or one of the slide's image fields
 // (the single `image`, or a `portraits` / `gallery` slot by index).
-type ImageField = { field: 'image' | 'portraits' | 'gallery' | 'table'; index?: number }
+type ImageField = { field: 'image' | 'portraits' | 'gallery' | 'table'; index?: number; el?: number }
+
+// ── table cells: one accessor pair for both hosts ──
+// A table lives either on the slide (`slide.table`, the Table layout) or on a
+// canvas element (`elements[el].table`). Every cell action below goes through
+// these two, so a canvas table gets images, links and the cell menu exactly
+// as the layout does — they used to be layout-only.
+function tableAt(s: Slide, el: number | undefined): TableData | undefined {
+  if (el == null) return s.table
+  const e = s.elements?.[el]
+  return e?.type === 'table' ? e.table : undefined
+}
+function setTableAt(el: number | undefined, table: TableData) {
+  if (el == null) patchSlide({ table })
+  else patchElementAt(el, { table })
+}
+function tableCellAt(s: Slide, t: ImageField) {
+  return tableShape(tableAt(s, t.el)).cells[t.index ?? -1]
+}
+function patchTableCell(t: ImageField, patch: Partial<GridCell>) {
+  const s = deck.value?.slides[current.value]
+  if (!s) return
+  setTableAt(t.el, setTableCell(tableAt(s, t.el), t.index ?? -1, patch))
+}
 const ctxImgInput = ref<HTMLInputElement | null>(null)
 const ctxImgTarget = ref<{ kind: 'element'; index: number } | ({ kind: 'field' } & ImageField) | null>(null)
 function replaceImageAt(index: number) {
@@ -931,7 +955,7 @@ function onCtxImgPick(e: Event) {
   ctxImgTarget.value = null
   if (!f || !f.type.startsWith('image/') || !target) return
   if (target.kind === 'element') onElementImage(target.index, f)
-  else void onUpload({ field: target.field, file: f, index: target.index })
+  else void onUpload({ field: target.field, file: f, index: target.index, el: target.el })
 }
 
 function canvasItems(sx: number, sy: number): CtxEntry[] {
@@ -991,7 +1015,7 @@ function multiItems(): CtxEntry[] {
 function fieldImageSrc(s: Slide, t: ImageField): string | undefined {
   if (t.field === 'image') return s.image
   if (t.field === 'portraits') return s.portraits?.[t.index ?? -1]
-  if (t.field === 'table') return s.tableCells?.[t.index ?? -1]?.image
+  if (t.field === 'table') return tableCellAt(s, t)?.image
   const it = s.items?.[t.index ?? -1]
   if (typeof it === 'string') return it
   if (it && typeof it === 'object' && 'image' in it) return (it as { image?: string }).image
@@ -1048,7 +1072,7 @@ function fieldImageLink(s: Slide, t: ImageField): string | undefined {
     const it = s.items?.[t.index ?? -1]
     return it && typeof it === 'object' && 'link' in it ? (it as { link?: string }).link : undefined
   }
-  if (t.field === 'table') return s.tableCells?.[t.index ?? -1]?.link
+  if (t.field === 'table') return tableCellAt(s, t)?.link
   return undefined
 }
 async function addFieldLink(t: ImageField) {
@@ -1074,13 +1098,12 @@ function setFieldLink(t: ImageField, link: string | undefined) {
     })
     patchSlide({ items })
   } else if (t.field === 'table') {
-    const cells = (s.tableCells ?? []).map((c, i) => (i === t.index ? { ...c, link } : c))
-    patchSlide({ tableCells: cells })
+    patchTableCell(t, { link })
   }
 }
 async function pasteFieldImage(t: ImageField) {
   const file = await readClipboardImage()
-  if (file) await onUpload({ field: t.field, file, index: t.index })
+  if (file) await onUpload({ field: t.field, file, index: t.index, el: t.el })
 }
 /** Clear an image field / slot. The single image resets its focus/fit too; a
  *  portrait or gallery slot is removed from its array (matching the in-frame ✕). */
@@ -1096,8 +1119,7 @@ function removeFieldImage(t: ImageField) {
   } else if (t.field === 'table') {
     // Cells are positional in a fixed grid — clear in place rather than
     // splicing, which would shift every later cell into the wrong slot.
-    const cells = (s.tableCells ?? []).map((c, i) => (i === t.index ? { ...c, image: undefined, link: undefined } : c))
-    patchSlide({ tableCells: cells })
+    patchTableCell(t, { image: undefined, link: undefined })
   } else {
     const items = [...(s.items ?? [])]
     items.splice(t.index ?? -1, 1)
@@ -1133,10 +1155,10 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }) {
   if (!editMode.value) return
   if (p.kind === 'image') {
-    const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex })
+    const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex, el: p.imageEl })
     if (items.length) ctxMenu.value = { x: p.x, y: p.y, items }
     return
   }
@@ -1485,7 +1507,7 @@ function renameGroup(e: { indices: number[]; name: string }) {
 }
 
 // ── image upload ──
-async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number }) {
+async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number; el?: number }) {
   if (!deck.value) return
   const dataUrl = await fileToOptimizedDataUrl(e.file)
   const url = await uploadImage(e.file.name, dataUrl)
@@ -1511,8 +1533,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     if (e.index != null && items[e.index]) items[e.index].image = url
     patchSlide({ items })
   } else if (e.field === 'table') {
-    const cells = (slide.tableCells ?? []).map((c, i) => (i === e.index ? { ...c, image: url, text: undefined } : c))
-    patchSlide({ tableCells: cells })
+    patchTableCell({ field: 'table', index: e.index, el: e.el }, { image: url, text: undefined })
   }
 }
 </script>

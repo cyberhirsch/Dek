@@ -10,6 +10,7 @@
 import YAML from 'yaml'
 import type { Deck, DeckConfig, Slide, LayoutId, TextItem, SlideElement } from './types'
 import { LAYOUT_IDS, LAYOUT_ALIASES } from './types'
+import { emptyTable, tableFromLegacy } from './table'
 
 const SEP = /^---[ \t]*$/m
 
@@ -66,7 +67,9 @@ export function parseDeck(raw: string): Deck {
       obj.content = itemsToContent(obj.items as Array<string | TextItem>)
       delete obj.items
     }
-    // Migrate legacy element types (text/rect → box).
+    // Migrate the flat pre-`table` fields into the one shared `table` object.
+    migrateLegacyTable(obj)
+    // Migrate legacy element types (text/rect → box, flat table → `table`).
     if (Array.isArray(obj.elements)) obj.elements = obj.elements.map(normalizeElement)
     return obj
   })
@@ -83,7 +86,51 @@ function normalizeElement(el: SlideElement): SlideElement {
   if (t === 'image') {
     return { fill: 'transparent', stroke: 'transparent', ...el, type: 'box' } as SlideElement
   }
+  // A canvas table saved before the shared `table` object: `rows`/`cols` were
+  // counts and `cells` a flat list. Only migrate when `table` is absent, so an
+  // already-migrated element is never touched twice.
+  if (t === 'table' && !('table' in el)) {
+    const { rows, cols, cells, colWidths, rowHeights, font, size, ...rest } = el as unknown as Record<string, unknown>
+    return {
+      ...rest,
+      table: tableFromLegacy({
+        rows: rows as number | undefined,
+        cols: cols as number | undefined,
+        cells,
+        colWidths: colWidths as number[] | undefined,
+        rowHeights: rowHeights as number[] | undefined,
+        font: font as string | undefined,
+        size: size as number | undefined,
+      }),
+    } as SlideElement
+  }
   return el
+}
+
+const LEGACY_TABLE_FIELDS = ['tableRows', 'tableCols', 'tableCells', 'tableColWidths', 'tableRowHeights', 'tableFont', 'tableSize']
+
+/** Fold the old flat `table*` layout fields into `slide.table`. They may also
+ *  sit in `stash` (a table slide switched to another layout under the old
+ *  format), so that is migrated too — otherwise switching back would
+ *  resurrect the old fields. */
+function migrateLegacyTable(obj: Record<string, unknown>) {
+  const fold = (o: Record<string, unknown>) => {
+    if (!LEGACY_TABLE_FIELDS.some((k) => k in o)) return
+    if (!o.table) {
+      o.table = tableFromLegacy({
+        rows: o.tableRows as number | undefined,
+        cols: o.tableCols as number | undefined,
+        cells: o.tableCells,
+        colWidths: o.tableColWidths as number[] | undefined,
+        rowHeights: o.tableRowHeights as number[] | undefined,
+        font: o.tableFont as string | undefined,
+        size: o.tableSize as number | undefined,
+      })
+    }
+    for (const k of LEGACY_TABLE_FIELDS) delete o[k]
+  }
+  fold(obj)
+  if (obj.stash && typeof obj.stash === 'object') fold(obj.stash as Record<string, unknown>)
 }
 
 /** True when an `items` array is a text list (not a gallery of {image}). */
@@ -102,13 +149,30 @@ export function itemsToContent(items: Array<string | TextItem>): string {
     .join('\n')
 }
 
-const yamlOpts = { lineWidth: 0, indent: 2 } as const
+const yamlOpts = { lineWidth: 0, indent: 2, flowCollectionPadding: false } as const
+
+/** Stringify one block, writing each table row on a single line
+ *  (`- [Maya, 42]`) so a table reads as a table in deck.md. Everything else
+ *  keeps block style. A row is recognised structurally — an item of the `rows`
+ *  sequence inside a `table` map — wherever that sits (slide, stash, element). */
+function stringifyBlock(value: unknown): string {
+  const doc = new YAML.Document(value)
+  YAML.visit(doc, {
+    Pair(_key, pair, path) {
+      if (!YAML.isScalar(pair.key) || pair.key.value !== 'rows' || !YAML.isSeq(pair.value)) return
+      const owner = path[path.length - 2]
+      if (!YAML.isPair(owner) || !YAML.isScalar(owner.key) || owner.key.value !== 'table') return
+      for (const row of pair.value.items) if (YAML.isSeq(row)) row.flow = true
+    },
+  })
+  return doc.toString(yamlOpts).trimEnd()
+}
 
 export function serializeDeck(deck: Deck): string {
   const parts: string[] = []
-  parts.push('---\n' + YAML.stringify(deck.config, yamlOpts).trimEnd())
+  parts.push('---\n' + stringifyBlock(deck.config))
   for (const slide of deck.slides) {
-    parts.push('---\n' + YAML.stringify(slide, yamlOpts).trimEnd())
+    parts.push('---\n' + stringifyBlock(slide))
   }
   return parts.join('\n') + '\n'
 }
@@ -163,7 +227,7 @@ export function blankSlide(layout: LayoutId = 'text'): Slide {
     case 'diagram':
       return { layout, title: '', code: 'flowchart LR\n  A[Start] --> B[Step]\n  B --> C[End]' }
     case 'table':
-      return { layout, title: '', tableRows: 3, tableCols: 3, tableCells: Array.from({ length: 9 }, () => ({ text: '' })) }
+      return { layout, title: '', table: emptyTable(3, 3) }
     case 'freeform':
       return { layout, elements: [] }
   }

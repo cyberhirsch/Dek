@@ -1,5 +1,6 @@
-import type { Deck, GalleryItem, LayoutId, Slide, TableCell } from './types'
+import type { Deck, GalleryItem, LayoutId, Slide } from './types'
 import { LAYOUT_IDS } from './types'
+import { tableImages } from './table'
 
 export type IssueKind = 'schema' | 'asset' | 'review'
 export type IssueSeverity = 'error' | 'warning' | 'info'
@@ -58,9 +59,7 @@ type Field =
   | 'code'
   | 'body'
   | 'group'
-  | 'tableRows'
-  | 'tableCols'
-  | 'tableCells'
+  | 'table'
 
 interface LayoutRule {
   required?: Field[]
@@ -80,7 +79,7 @@ const RULES: Record<LayoutId, LayoutRule> = {
   'video-embed': { required: ['video'], image: ['poster'] },
   gallery: { required: ['items'], image: ['items'], list: 'gallery' },
   diagram: { required: ['code'] },
-  table: { required: ['tableCells'], list: 'table' },
+  table: { required: ['table'], list: 'table' },
   freeform: {},
 }
 
@@ -100,7 +99,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   'video-embed': ['video', 'poster', 'image', 'caption', 'videoFit'],
   gallery: ['title', 'items', 'columns'],
   diagram: ['title', 'code'],
-  table: ['title', 'tableRows', 'tableCols', 'tableCells', 'tableColWidths', 'tableRowHeights', 'tableFont', 'tableSize'],
+  table: ['title', 'table'],
   freeform: ['body', 'elements'],
 }
 
@@ -142,9 +141,6 @@ function isGalleryItem(v: unknown): v is GalleryItem {
   return !!v && typeof v === 'object' && typeof (v as GalleryItem).image === 'string'
 }
 
-function isTableCell(v: unknown): v is TableCell {
-  return !!v && typeof v === 'object'
-}
 
 function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   const n = index + 1
@@ -189,16 +185,13 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
   }
 
   if (rule.list === 'table') {
-    const rows = slide.tableRows
-    const cols = slide.tableCols
-    if (!Array.isArray(slide.tableCells)) {
-      issue(issues, n, 'warning', 'schema', 'Expected table cells.', 'tableCells')
-    } else {
-      if (typeof rows === 'number' && typeof cols === 'number' && slide.tableCells.length !== rows * cols) {
-        issue(issues, n, 'warning', 'schema', `Table has ${slide.tableCells.length} cells but tableRows×tableCols is ${rows}×${cols}.`, 'tableCells')
-      }
-      const bad = slide.tableCells.filter((c) => !isTableCell(c)).length
-      if (bad) issue(issues, n, 'warning', 'schema', 'Table contains malformed cells.', 'tableCells')
+    // Rows are read leniently (a scalar row is a one-cell row, short rows pad
+    // out), so the only real error is having no grid at all.
+    const t = slide.table
+    if (!t || typeof t !== 'object' || !Array.isArray(t.rows)) {
+      issue(issues, n, 'warning', 'schema', 'Expected a table with `rows`.', 'table')
+    } else if (!t.rows.length) {
+      issue(issues, n, 'warning', 'schema', 'Table has no rows.', 'table')
     }
   }
 
@@ -251,42 +244,49 @@ function addAsset(map: Map<string, AssetRef>, ref: unknown, slide: number, field
   rec.uses.push({ slide, field })
 }
 
-function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef>) {
+/**
+ * Every asset a slide references — including what's parked in `stash`. A
+ * layout switch hides fields it can't show there (an Image-Full → Text switch
+ * stashes the image; Table → Text stashes the whole table), and switching back
+ * restores them. They ARE references: missing them made the Review panel offer
+ * to delete images that come back one click later. `prefix` locates stashed
+ * uses in the report (`stash.image`).
+ */
+function collectAssets(slide: Slide, index: number, assets: Map<string, AssetRef>, prefix = '') {
   const n = index + 1
-  addAsset(assets, slide.image, n, 'image')
-  addAsset(assets, slide.poster, n, 'poster')
-  for (const [i, p] of (slide.portraits ?? []).entries()) addAsset(assets, p, n, `portraits[${i}]`)
+  addAsset(assets, slide.image, n, `${prefix}image`)
+  addAsset(assets, slide.poster, n, `${prefix}poster`)
+  for (const [i, p] of (slide.portraits ?? []).entries()) addAsset(assets, p, n, `${prefix}portraits[${i}]`)
   for (const [i, item] of (slide.items ?? []).entries()) {
     if (typeof item === 'string') {
-      if (slide.layout === 'gallery') addAsset(assets, item, n, `items[${i}]`)
+      // A bare-string item is a picture only in a gallery. In `stash`, `items`
+      // can only have come from a gallery (text items migrate to `content` at
+      // parse time), so there a string is always an image.
+      if (slide.layout === 'gallery' || prefix) addAsset(assets, item, n, `${prefix}items[${i}]`)
     } else if (isGalleryItem(item)) {
-      addAsset(assets, item.image, n, `items[${i}].image`)
+      addAsset(assets, item.image, n, `${prefix}items[${i}].image`)
     }
   }
-  // Table cell images. Skipping `covered` placeholders isn't optional here —
-  // this exact function has a documented history of missing a new per-element
-  // image location (see the `elements[]` note just below) and the Review
-  // panel offering to delete images that were still genuinely in use.
-  for (const [i, cell] of (slide.tableCells ?? []).entries()) {
-    if (cell && !cell.covered && cell.image) addAsset(assets, cell.image, n, `tableCells[${i}].image`)
-  }
+  // Table cell images — the same walker for the layout and the canvas element,
+  // so the two hosts can never disagree about which images a table uses.
+  for (const img of tableImages(slide.table)) addAsset(assets, img.src, n, `${prefix}table.${img.path}`)
   // Freeform canvas images live on `elements[]`, not the semantic image fields.
   // Missing them here made every canvas/baked image look unreferenced — i.e. an
   // "orphan" the Review panel would offer to delete. They ARE references.
   for (const [i, el] of (slide.elements ?? []).entries()) {
-    const e = el as { type: string; src?: string; video?: string; poster?: string; cells?: TableCell[] }
-    if (e.type === 'box' || e.type === 'image') addAsset(assets, e.src, n, `elements[${i}].src`)
+    const e = el as { type: string; src?: string; video?: string; poster?: string; table?: Slide['table'] }
+    const at = `${prefix}elements[${i}]`
+    if (e.type === 'box' || e.type === 'image') addAsset(assets, e.src, n, `${at}.src`)
     else if (e.type === 'video') {
-      addAsset(assets, e.video, n, `elements[${i}].video`)
-      addAsset(assets, e.poster, n, `elements[${i}].poster`)
+      addAsset(assets, e.video, n, `${at}.video`)
+      addAsset(assets, e.poster, n, `${at}.poster`)
     } else if (e.type === 'table') {
-      // A baked table keeps its pictures inside the element's own cells — one
-      // more nesting level than `elements[].src`, and exactly the shape of the
-      // bug described above. Walk it.
-      for (const [c, cell] of (e.cells ?? []).entries()) {
-        if (cell && !cell.covered && cell.image) addAsset(assets, cell.image, n, `elements[${i}].cells[${c}].image`)
-      }
+      for (const img of tableImages(e.table)) addAsset(assets, img.src, n, `${at}.table.${img.path}`)
     }
+  }
+  // One level of stash only — stash is never itself stashed.
+  if (!prefix && slide.stash && typeof slide.stash === 'object') {
+    collectAssets({ ...(slide.stash as Slide), layout: slide.layout }, index, assets, 'stash.')
   }
 }
 

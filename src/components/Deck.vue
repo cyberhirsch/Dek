@@ -21,7 +21,7 @@ const emit = defineEmits<{
   'update:modelValue': [n: number]
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
-  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number }]
+  upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number; el?: number }]
   'update:elements': [els: SlideElement[]]
   'update:selectedEl': [sel: number[]]
   'create-element': [el: SlideElement]
@@ -30,7 +30,7 @@ const emit = defineEmits<{
   split: [e: { index: number; target: SlideSplitTarget }]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number }]
 }>()
 
 const stage = ref<HTMLElement | null>(null)

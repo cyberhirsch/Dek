@@ -6,6 +6,29 @@
 
 ### Layouts
 
+**One table object for the layout and the canvas — stored as rows you can read** (#48)
+A table used to be described twice: the Table layout carried seven flat fields on the slide (`tableRows`, `tableCols`, `tableCells`, `tableColWidths`, …) and the canvas table element carried the same seven under different names. Every feature had to be built on both sides, and they had already drifted — a canvas table had no Rows/Cols stepper, and its cells could take neither an image nor a right-click menu. Both now carry the **same `table` object**, rendered, edited, sized and exported through the same code. Baking to Freeform is a copy, not a translation. The top bar shows one set of table controls for whichever table is active, and canvas table cells get images, links and the cell menu.
+
+The storage changed with it. Instead of a flat list of cells plus dimensions (twelve lines for an empty 3×3, row structure invisible), a table is **rows**, written one per line:
+
+```yaml
+table:
+  rows:
+    - [Tool, Share]
+    - [Maya, 42]
+    - [{ image: logo.png }, Blender]
+```
+
+Plain cells are bare values; numbers stay numbers (`42`, never `'42'`) — but only strings that round-trip exactly are converted, so `007`, `1e3` or `3,5` keep reading as typed. A cell that needs more is an inline object, and a position covered by a merge is `null`. The row and column counts are simply the rows, which removes the "cell count doesn't match rows×cols" warning — that state can no longer exist. **Existing decks migrate on load**: old layout fields, old canvas elements, and old fields parked in `stash` all convert losslessly, and are written in the new form on the next save.
+
+Found and fixed along the way:
+- **Table → Text → Table lost every image cell.** Text can only show a table's text cells. The conversion consumed the table, so the image cells were never parked in `stash`. A table now stays in `stash` whenever it feeds a Text or Gallery slot, and switching back restores it whole.
+- **The unused-asset scan ignored `stash` entirely.** Any image parked by a layout switch — Image-Full → Text stashes the image, Gallery → Text stashes the items — looked unreferenced, so the Review panel offered to delete it, and switching back found it gone. This predates tables; it's the same class as the canvas-image incident. The scan now walks `stash`, including stashed tables, galleries and canvas elements.
+- **PPTX tables exported with solid white rules.** The exporter passed the full text colour as the rule colour; on screen the rules are the 14% hairline. They now export at the on-screen weight.
+- **Markdown tables now convert.** A Text slide containing a pipe table (`| a | b |` with a `|---|---|` separator) switches into a real Table grid, instead of one column of cells holding raw pipes and dashes. Pasting a Markdown table into a Text slide and switching layout is now a quick way to author one.
+
+`+29` tests.
+
 **Video comes in two flavors: Framed and Fullscreen** (#43)
 The video layout now has a **framed / fullscreen** toggle in the top bar. *Framed* is the existing look — a centred 16:9 frame with a hairline border, radius and drop shadow, and a caption below it. *Fullscreen* bleeds the video to the slide edges with no border, radius or shadow, since any of those would draw a visible seam against the slide it's meant to be flush with. Both are 16:9: the stage is itself 16:9, so fullscreen is the same frame with the margin and chrome removed, not a different aspect. A caption isn't rendered in fullscreen — there's nowhere for it to sit — but the text stays on the slide and comes back when you switch to framed. PPTX/HTML export bakes each flavor to matching geometry. `videoFit: framed | full`, defaulting to `framed`, so existing video slides are untouched. `+3` tests.
 
