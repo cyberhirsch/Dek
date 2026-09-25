@@ -22,6 +22,9 @@ Dek gains a real, structured **Table** layout — rows/columns set from a top-ba
 
 ### Opening & saving
 
+**Layout and Insert menus now match — and Insert is no longer in a serif** (#43)
+The layout picker was a native `<select>`, so its popup took the operating system's styling — square, with the OS blue highlight — right beside Dek's own dark, rounded Insert menu. Worse, the Insert menu rendered in a **serif**: it's teleported to `<body>` so the centre bar can't clip it, which lifts it out from under the bar's JetBrains Mono, and it only said `font-family: inherit` — so it inherited the page default. Both menus are now the same component styling, with the chrome font set explicitly. The layout control shows the **current layout's name** (replacing the word "Layout"), with the active one marked in the menu the way an active tool is. It's sized to the longest label ("Image + Caption") so the tools to its right don't shift as you move between slides. Both menus now close on a click elsewhere or Escape; Insert used to close on pointer-leave, which a 13-item list made too easy to trigger by accident.
+
 **Insert is an icon button, matching the tools beside it** (#43)
 "＋ Insert ▾" is now just the ＋, at 31×29 — the exact size of the canvas tool buttons it sits next to, so the row aligns instead of having one odd-width member. The word and the caret were describing the menu that opens anyway; the tooltip names its contents (Video, Diagram, Table). While the menu is open the button takes the same accent treatment as an active canvas tool, so it reads as the source of the panel floating beside it.
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, CanvasTool, ElementPatch } from '../core/types'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
@@ -117,13 +117,59 @@ const insertBtn = ref<HTMLButtonElement | null>(null)
 // The Insert menu is teleported to <body> so it isn't clipped by .center's
 // overflow: hidden. We anchor it under the button via its bounding rect.
 const menuPos = ref({ top: 0, left: 0 })
+const insertMenu = ref<HTMLElement | null>(null)
 function toggleInsert() {
   insertOpen.value = !insertOpen.value
   if (insertOpen.value) {
+    layoutOpen.value = false
     const r = insertBtn.value?.getBoundingClientRect()
     if (r) menuPos.value = { top: r.bottom + 4, left: r.left }
   }
 }
+
+// ── layout picker (same menu as Insert, so the two read as one system) ──
+const layoutOpen = ref(false)
+const layoutBtn = ref<HTMLButtonElement | null>(null)
+const layoutMenu = ref<HTMLElement | null>(null)
+const layoutMenuPos = ref({ top: 0, left: 0 })
+/** Width of the longest label, in `ch` of the bar's monospace font — exact,
+ *  so the button never resizes when the current layout changes. */
+const LAYOUT_LABEL_CH = Math.max(...Object.values(LAYOUT_LABELS).map((s) => s.length))
+function toggleLayout() {
+  layoutOpen.value = !layoutOpen.value
+  if (layoutOpen.value) {
+    insertOpen.value = false
+    const r = layoutBtn.value?.getBoundingClientRect()
+    if (r) layoutMenuPos.value = { top: r.bottom + 4, left: r.left }
+  }
+}
+function pickLayout(id: LayoutId) {
+  layoutOpen.value = false
+  if (id !== slide.value?.layout) emit('change-layout', id)
+}
+
+// Both menus close on a click anywhere else or on Escape — the Insert menu used
+// to close on pointer-leave, which with a 13-item layout list meant a slightly
+// wide mouse path shut it mid-reach.
+function onDocPointerDown(e: PointerEvent) {
+  const t = e.target as Node
+  if (insertOpen.value && !insertMenu.value?.contains(t) && !insertBtn.value?.contains(t)) insertOpen.value = false
+  if (layoutOpen.value && !layoutMenu.value?.contains(t) && !layoutBtn.value?.contains(t)) layoutOpen.value = false
+}
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && (insertOpen.value || layoutOpen.value)) {
+    insertOpen.value = false
+    layoutOpen.value = false
+  }
+}
+onMounted(() => {
+  window.addEventListener('pointerdown', onDocPointerDown, true)
+  window.addEventListener('keydown', onDocKey)
+})
+onUnmounted(() => {
+  window.removeEventListener('pointerdown', onDocPointerDown, true)
+  window.removeEventListener('keydown', onDocKey)
+})
 function pickTool(t: CanvasTool) {
   emit('update:tool', t)
   insertOpen.value = false
@@ -216,16 +262,40 @@ const themeSwatches = computed(() => {
     </div>
 
     <div class="center">
-      <!-- The separate "Layout" label folded into the control itself. The select
-           still carries the real layout as its value — so the current one is
-           marked when the menu opens — while the closed face reads "Layout",
-           which is both shorter and fixed-width regardless of the layout name. -->
-      <div class="sel-face-wrap" :title="`Layout — ${slide ? LAYOUT_LABELS[slide.layout] : ''}`">
-        <select class="sel sel-faced" :value="slide?.layout" @change="emit('change-layout', ($event.target as HTMLSelectElement).value as LayoutId)">
-          <option v-for="id in LAYOUT_IDS" :key="id" :value="id">{{ LAYOUT_LABELS[id] }}</option>
-        </select>
-        <span class="sel-face">Layout</span>
-      </div>
+      <!-- Layout picker: Dek's own menu rather than a native <select>, whose
+           popup takes the OS highlight and never matched the Insert menu beside
+           it. Fixed at the longest label's width so the tools to its right
+           don't shift as you move between slides with different layouts. -->
+      <button
+        ref="layoutBtn"
+        class="layout-btn"
+        :class="{ on: layoutOpen }"
+        :style="{ width: `calc(${LAYOUT_LABEL_CH}ch + 30px)` }"
+        title="Slide layout"
+        @click="toggleLayout"
+      >
+        <span class="layout-name">{{ slide ? LAYOUT_LABELS[slide.layout] : '' }}</span>
+        <svg class="caret" viewBox="0 0 10 6" width="9" height="6" aria-hidden="true">
+          <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <Teleport to="body">
+        <div
+          v-if="layoutOpen"
+          ref="layoutMenu"
+          class="menu"
+          :style="{ top: layoutMenuPos.top + 'px', left: layoutMenuPos.left + 'px' }"
+        >
+          <button
+            v-for="id in LAYOUT_IDS"
+            :key="id"
+            :class="{ current: slide?.layout === id }"
+            @click="pickLayout(id)"
+          >
+            {{ LAYOUT_LABELS[id] }}
+          </button>
+        </div>
+      </Teleport>
 
       <span class="div" />
 
@@ -259,9 +329,9 @@ const themeSwatches = computed(() => {
           <Teleport to="body">
             <div
               v-if="insertOpen"
+              ref="insertMenu"
               class="menu"
               :style="{ top: menuPos.top + 'px', left: menuPos.left + 'px' }"
-              @pointerleave="insertOpen = false"
             >
               <button @click="((insertOpen = false), emit('insert', 'video'))">▶ Video</button>
               <button @click="((insertOpen = false), emit('insert', 'diagram'))">◇ Diagram</button>
@@ -670,6 +740,10 @@ const themeSwatches = computed(() => {
   color: #7fc7ff;
   background: rgba(127, 199, 255, 0.12);
 }
+/* Menus are teleported to <body> (so .center's overflow can't clip them),
+   which takes them out from under .bar — they must restate the chrome font or
+   they inherit the page default. That's how the Insert menu came out in a
+   serif. */
 .menu {
   position: fixed;
   display: flex;
@@ -681,6 +755,8 @@ const themeSwatches = computed(() => {
   border-radius: 8px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   z-index: 60;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
 }
 .menu button {
   display: flex;
@@ -697,6 +773,40 @@ const themeSwatches = computed(() => {
   font-family: inherit;
 }
 .menu button:hover { background: rgba(127, 199, 255, 0.18); color: #fff; }
+/* The active layout, marked the way an active tool is — accent text on a faint
+   accent tint — instead of the OS selection blue the native select used. */
+.menu button.current { color: #7fc7ff; background: rgba(127, 199, 255, 0.1); }
+.menu button.current:hover { background: rgba(127, 199, 255, 0.18); }
+
+/* Layout trigger: styled as a sibling of the .seg buttons, not as a form
+   field, so it belongs to the toolbar rather than to a settings form. */
+.layout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 29px;
+  padding: 0 9px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(230, 236, 242, 0.85);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.layout-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.layout-btn.on { border-color: #7fc7ff; color: #7fc7ff; background: rgba(127, 199, 255, 0.12); }
+.layout-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.layout-btn .caret {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
 .fmt b, .fmt i, .fmt u, .fmt s { font-size: 13px; font-style: normal; }
 .fmt i { font-style: italic; }
 /* Custom spinner for strokeWidth / radius / thickness — themed arrows on
@@ -779,32 +889,4 @@ const themeSwatches = computed(() => {
   display: none;
 }
 .sel.font { padding: 4px 6px; }
-
-/* Layout picker: label folded into the control. The select keeps the real
-   layout selected (so it's marked when the menu opens) but renders its own
-   text invisibly; `.sel-face` paints the fixed "Layout" over it. Options are
-   given an explicit colour — they inherit from the select, and the popup would
-   otherwise be transparent too. */
-.sel-face-wrap {
-  position: relative;
-  display: inline-flex;
-}
-.sel-faced {
-  width: 76px;
-  color: transparent;
-}
-.sel-faced option {
-  color: #e6ecf2;
-  background: #1e222b;
-}
-.sel-face {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  font-size: 11px;
-  color: #e6ecf2;
-  white-space: nowrap;
-}
 </style>
