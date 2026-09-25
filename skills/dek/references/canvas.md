@@ -22,13 +22,16 @@ Note that a semantic slide *also* accepts `elements` — you can annotate a
 
 ## The element model
 
-Five types share a common frame:
+Five types — `box`, `arrow`, `video`, `diagram`, `table` — share a common frame:
 
 ```yaml
 { type, x, y, w, h, rotation }
 ```
 
 `rotation` is clockwise degrees about the element's centre; default `0`.
+
+Older decks may contain `image`, `text`, or `rect` elements. Dek loads all three
+as `box`es (an `image` becomes a box with its `src`), so write a `box`.
 
 ### box — the one primitive
 
@@ -41,28 +44,33 @@ three at once:
 
 | Field | Type | Notes |
 |---|---|---|
-| `fill` | color | `transparent` for a pure text box. |
-| `stroke` | color | `transparent` for a pure text box. |
-| `strokeWidth` | number | 1–2 px. |
-| `radius` | number | Corner radius, px. 8–12 matches the chrome. |
+| `fill` | color | Default `transparent` — what a pure text box wants. |
+| `stroke` | color | Default `transparent`. |
+| `strokeWidth` | number | 1–2 px. Default 0. |
+| `radius` | number | Corner radius, px. 8–12 matches the chrome. Default 0. |
 | `src` | string | Image path; makes the box a picture. |
-| `fit` | `cover` \| `contain` | How the image fills the box. |
+| `fit` | `cover` \| `contain` | How the image fills the box. Default `cover`. |
 | `focus` | `{x, y, scale}` | Pan/zoom of the image inside the box. |
+| `invert` | bool | Inverts the image's colors. |
+| `desaturate` | bool | Shows the image in grayscale. Combines with `invert`. |
 | `qr` | string (URL) | Draws the URL as a QR code filling the box. The *link* is stored, never a generated image — editing the URL redraws the code. Ignored if the box also has a `src`. |
 | `link` | string (URL) | Makes the box clickable while presenting (`http(s)`/`mailto` only). Combine with `src` to make a photo clickable, or with `qr` so a code is both scannable and clickable. |
 | `content` | string | Inline Markdown. `- ` lines become bullets. |
-| `font` | `heading` \| `body` \| family | **Use the tokens**, not a literal family. |
-| `size` | number | Font size in stage px. |
-| `color` | color | Text color. |
-| `align` | `left` \| `center` \| `right` | |
-| `valign` | `top` \| `middle` \| `bottom` | |
-| `weight` | number | 300 for the light heading look. |
+| `font` | `heading` \| `body` \| family | **Use the tokens**, not a literal family. Default `body`. |
+| `size` | number | Font size in stage px. Default 28. |
+| `color` | color | Text color. Default: the theme's text color. |
+| `align` | `left` \| `center` \| `right` | Default `left`. |
+| `valign` | `top` \| `middle` \| `bottom` | Default `top`. |
+| `weight` | number | 300 for the light heading look. Default 400; `bold: true` forces 700. |
 | `bold` `italic` `underline` `strike` | bool | |
-| `lineHeight` | number | Multiplier. 1.05 headings, 1.45 body. |
-| `lineGap` | number | Gap between lines, in em. |
+| `lineHeight` | number | Multiplier. 1.05 headings, 1.45 body. Default 1.25. |
+| `lineGap` | number | Gap between lines, in em. Default 0.4. |
 
 Text auto-shrinks to fit its box: the `size` you set is a **maximum**, not a
 guarantee.
+
+`invert` and `desaturate` are display filters — the image file is untouched —
+and neither survives `.pptx` export.
 
 A QR box needs no image asset and takes almost no room in the file:
 
@@ -82,17 +90,56 @@ the photo becomes clickable without being destroyed.
 
 Drawn from the box's left-middle to its right-middle, then rotated about the
 centre. So a diagonal arrow is a zero-height box of length = distance, with
-`rotation` set to the angle. Keep them thin (2–3 px).
+`rotation` set to the angle. Keep them thin (2–3 px). Defaults: `strokeWidth: 3`
+and `stroke: "#e6ecf2"` — off-white even on a light theme, so set `stroke`
+there.
 
-### image, video, diagram
+### video, diagram
 
 ```yaml
-{ type: image,   x, y, w, h, src, fit, focus }
 { type: video,   x, y, w, h, video, poster }
 { type: diagram, x, y, w, h, code }          # Mermaid source
 ```
 
-`image` is legacy — a `box` with a `src` is the current form and does more.
+A `video` element plays like the [video-embed](layouts.md#video-embed) layout:
+click-to-play, the YouTube thumbnail when there's no `poster`, the same accepted
+URLs, and the same time window in the URL (`&start=130&end=220`).
+
+### table
+
+The [table](layouts.md#table) layout's grid as one object. It's what a table
+slide becomes when converted to freeform, and what converts back.
+
+```yaml
+{ type: table, x, y, w, h, table: { rows, header, view, colWidths, rowHeights, font, size } }
+```
+
+`table` is **the identical object** a table slide carries — the same `rows`
+(one line each, `null` for a merge-covered position), `header`, `view`
+(`table` · `pie` · `cloud`), track sizes, `font` and `size`, with the same
+defaults and the same shrink-to-fit cell text. Everything in
+[the table layout's reference](layouts.md#table) applies unchanged; only the box
+around it is the element's own. Written out in block form:
+
+```yaml
+elements:
+  - type: table
+    x: 110
+    y: 190
+    w: 1060
+    h: 460
+    rotation: 0
+    table:
+      view: pie
+      header: true
+      rows:
+        - [Part, Minutes]
+        - [Lecture, 40]
+        - [Studio, 35]
+```
+
+Older decks may hold the previous element shape — `rows`/`cols` as counts beside
+a flat `cells` list. Dek converts it on load; don't write it.
 
 ## Headings on the canvas must be italic and light
 

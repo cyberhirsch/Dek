@@ -2,7 +2,7 @@
 name: dek
 description: >
   Author and edit Dek presentation decks — a whole deck is one Markdown file
-  (`deck.md`, or `<name>.dek/deck.md`) built from `---`-delimited YAML blocks:
+  (`deck.md`, or `<name>.dek/deck.md`) built from YAML blocks separated by triple-dash lines:
   a config block, then one block per slide with a `layout:` and that layout's
   named fields. Use this whenever you are asked to write, restructure, translate,
   proofread, expand, split, or restyle slides for a deck or lecture whose source
@@ -89,9 +89,10 @@ mkdir -p "Gaussian Splatting.dek/Assets"
 # then write the slides to "Gaussian Splatting.dek/deck.md"
 ```
 
-Writing a bare `my-deck.md` and stopping is the most common mistake. The user
-opens a *folder* in Dek ("Open deck…"), and a loose `.md` with images beside it
-can't be opened that way at all.
+Writing a bare `my-deck.md` and stopping is the most common mistake. Dek's
+**Open deck…** panel lists only the `.dek` folders inside the user's decks
+folder (subfolders included); a loose `.md` with images beside it never shows up
+there, so it can't be opened that way at all.
 
 ### Two other layouts you will meet
 
@@ -129,8 +130,10 @@ reads only known fields, a misspelled field name doesn't error: it just silently
 never appears.
 
 If the editor is open on the file while you write it, Dek notices the change and
-reloads the deck live. So your edit lands in front of the user immediately. Save
-whole, valid files — never a half-written intermediate state.
+reloads the deck live. So your edit lands in front of the user immediately —
+unless they have unsaved edits of their own in that tab, in which case Dek asks
+them which version to keep. Say that you changed the file. Save whole, valid
+files — never a half-written intermediate state.
 
 ### Traps that break a deck
 
@@ -191,7 +194,7 @@ them in the first place.)
 
 You can't see the rendered slide, so verify what you can:
 
-- Every block has a `layout:`, and it's one of the twelve.
+- Every block has a `layout:`, and it's one of the thirteen.
 - Every field you wrote appears in that layout's table in
   [references/layouts.md](references/layouts.md).
 - No bare `---` inside any block scalar.
@@ -207,7 +210,7 @@ You can't see the rendered slide, so verify what you can:
   Inside the Dek repo itself, `npx vitest run` covers the parser and the schema
   validator, and `analyzeDeck()` reports exactly the warnings a user would see.
 
-## The twelve layouts
+## The thirteen layouts
 
 Pick the layout that matches the *idea*, not the one that's easiest to fill.
 Full field lists, defaults, and examples: **[references/layouts.md](references/layouts.md)**.
@@ -222,9 +225,10 @@ Full field lists, defaults, and examples: **[references/layouts.md](references/l
 | `text-image` | Body beside a picture | `title`, `content`, `image`, `side` |
 | `image-full` | Full-bleed image | `image`, `title`, `caption` |
 | `image-caption` | Framed image + credit | `image`, `caption`, `captionPos` |
-| `video-embed` | YouTube / Vimeo / file | `video`, `poster`, `caption` |
+| `video-embed` | YouTube / Vimeo / file; a segment via `&start=`/`&end=` in the URL | `video`, `poster`, `caption`, `videoFit` |
 | `gallery` | Image grid, comparisons | `title`, `items[]`, `columns` |
 | `diagram` | Mermaid chart | `title`, `code` |
+| `table` | Grid of text/number/image cells — or the same rows as a pie or word cloud | `title`, `table` (`rows`, `header`, `view`) |
 | `freeform` | Blank canvas | `elements[]` |
 
 Every slide also accepts `notes:` (speaker notes) and `group:` (a sidebar
@@ -245,6 +249,10 @@ content: |
   A paragraph between bullet groups.
 ```
 
+Only `content` (and a canvas box's `content`) is Markdown. Every other text
+field — `title`, `subtitle`, `text`, `cite`, `caption`, gallery labels, table
+cells — is plain text, so `**bold**` there shows its asterisks.
+
 Add `steps: true` to a `text` or `text-image` slide to reveal its rows one at a
 time while presenting.
 
@@ -256,6 +264,11 @@ pointing at a real file in the bundle's `Assets/` folder.
 **Never invent an image path.** A reference to a file that doesn't exist renders
 as a hole in a live presentation. If you don't have the picture, leave the field
 empty, choose a layout that doesn't need one, and tell the user what's missing.
+
+The single-image layouts (`text-image`, `image-full`, `image-caption`) also take
+`imageFit` (fill or fit the frame), `imageLink` (clickable while presenting),
+`imageInvert` and `imageDesaturate`; gallery items and image table cells carry
+their own `link`. See [Image options](references/layouts.md#image-options).
 
 ## How to work on a deck
 
@@ -287,9 +300,8 @@ The one hard rule, because it's the easiest to get wrong and the most damaging:
 The heading face is a light italic serif whose appeal is the modulation between
 thick and thin strokes. All caps flattens that into uniform rectangles, kills the
 italic's movement, and reads as shouting on an otherwise hushed layout. Write
-`The Basics`, not `THE BASICS`. (Some older decks and even `template.md` still
-contain all-caps headings — they are wrong, not precedent. Fix them when you
-touch them.)
+`The Basics`, not `THE BASICS`. (Some older decks still contain all-caps
+headings — they are wrong, not precedent. Fix them when you touch them.)
 
 Two fonts, never a third. One accent doing the work; if two colors are competing
 on a slide, you've overused the second.
@@ -298,7 +310,8 @@ on a slide, you've overused the second.
 
 Any slide may carry an `elements[]` array of free-positioned objects in
 **1280×720 stage pixels**, top-left origin. A `box` is the one primitive behind
-shapes, text boxes, and images.
+shapes, text boxes, images, and QR codes; the other element types are `arrow`,
+`video`, `diagram`, and `table`.
 
 Hand-authoring elements is fiddly and easy to get subtly wrong (heading boxes
 must be italic and light, never bold; text insets are compensated by the

@@ -20,8 +20,8 @@ theme is trying not to.
 Write `The Basics`, not `THE BASICS`. `Save to local files`, not `SAVE TO LOCAL
 FILES`.
 
-Older decks — and the repo's own `template.md` — still contain all-caps headings.
-They are a leftover, not a precedent. Fix them when you touch them.
+Older decks still contain all-caps headings. They are a leftover, not a
+precedent. Fix them when you touch them.
 
 (The rule is tied to the serif. If a deck's `fontHeading` is ever swapped for a
 geometric sans or a condensed display face built for caps, revisit it. With
