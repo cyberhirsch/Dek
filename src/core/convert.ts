@@ -134,9 +134,18 @@ export function convertLayout(slide: Slide, to: LayoutId): Slide {
   if (slide.group) base.group = slide.group
   if (slide.notes) base.notes = slide.notes
 
-  // → freeform: bake the visible fields into positioned elements; keep any stash.
+  // Canvas elements laid over a semantic layout (a QR code, an arrow, a label)
+  // are free-positioned objects, not layout content — they belong to the slide
+  // whatever its layout. They used to be ignored here, so any layout switch
+  // silently deleted them: not stashed, gone. A freeform slide's elements are
+  // different: they ARE its content, and un-bake below maps them into slots.
+  const overlay = slide.layout === 'freeform' ? [] : (slide.elements ?? [])
+
+  // → freeform: bake the visible fields into positioned elements, with the
+  // overlay on top — exactly how the slide drew them (and how PPTX export
+  // already combines the two). Keep any stash.
   if (to === 'freeform') {
-    base.elements = bakeToElements(slide)
+    base.elements = [...bakeToElements(slide), ...overlay]
     if (slide.stash && Object.keys(slide.stash).length) base.stash = { ...slide.stash }
     return base
   }
@@ -191,6 +200,9 @@ export function convertLayout(slide: Slide, to: LayoutId): Slide {
   }
   if (leftover.length) stash.elements = leftover
   if (Object.keys(stash).length) base.stash = stash
+
+  // Overlay elements stay on the slide, in place.
+  if (overlay.length) base.elements = [...overlay]
 
   return base
 }

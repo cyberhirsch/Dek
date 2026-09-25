@@ -30,6 +30,38 @@ describe('convertLayout — slot mapping', () => {
   })
 })
 
+describe('convertLayout — canvas elements laid over a layout', () => {
+  // The slide that exposed it: a Text layout carrying a QR code as a canvas
+  // element. Every layout switch used to delete the element outright.
+  const qr: BoxElement = { type: 'box', x: 140, y: 360, w: 280, h: 280, rotation: 0, qr: 'https://modelviewer.dev', link: 'https://modelviewer.dev' }
+  const slide: Slide = { layout: 'text', title: 'Scan It', content: '- Scan the code', elements: [qr] }
+
+  it('keeps them, in place, when switching to another layout', () => {
+    const ti = convertLayout(slide, 'text-image')
+    expect(ti.elements).toEqual([qr])
+    expect(ti.title).toBe('Scan It')
+  })
+
+  it('keeps them on top of the baked layout when switching to freeform', () => {
+    const ff = convertLayout(slide, 'freeform')
+    expect(ff.elements!.at(-1)).toEqual(qr)
+    // the layout's own content is baked too, underneath
+    expect(ff.elements!.some((e) => e.type === 'box' && (e as BoxElement).content === 'Scan It')).toBe(true)
+  })
+
+  it('survives a round of switches', () => {
+    const back = convertLayout(convertLayout(convertLayout(slide, 'text-image'), 'statement'), 'text')
+    expect(back.elements).toEqual([qr])
+  })
+
+  it("does not duplicate a freeform slide's own elements — those un-bake into slots", () => {
+    const ff: Slide = { layout: 'freeform', elements: [{ type: 'box', x: 0, y: 0, w: 10, h: 10, rotation: 0, content: 'Title' }] }
+    const text = convertLayout(ff, 'text')
+    expect(text.title).toBe('Title')
+    expect(text.elements).toBeUndefined()
+  })
+})
+
 describe('convertLayout — freeform bake (font fidelity, no doubling)', () => {
   it('bakes a text slide and keeps the heading light + italic (not bold/upright)', () => {
     const text: Slide = { layout: 'text', title: 'Heading', content: 'body' }

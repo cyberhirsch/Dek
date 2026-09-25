@@ -6,6 +6,9 @@
 
 ### Layouts
 
+**Fixed: switching layout deleted canvas elements laid over the slide** (#51)
+Any layout may carry canvas elements on top — a QR code on a Text slide, an arrow pointing into an image. Switching layout ignored them entirely. Between two regular layouts they weren't carried or parked in `stash`, just dropped; switching to Freeform baked the layout's fields and dropped them there too. Only undo brought them back. They now stay on the slide, in place, through any switch, and a switch to Freeform puts them on top of the baked layout — the way the slide drew them, and the way PowerPoint export already combined the two. A Freeform slide's own elements are unaffected: they're its content, and switching away still maps them into the new layout's fields. `+4` tests.
+
 **Gallery pictures can be panned and zoomed, like single images** (#50)
 Each gallery cell now takes the same pan/zoom as the single-image layouts: scroll to zoom, then drag to pan, and each picture keeps its own framing (`focus` on the gallery item). It survives a trip through Freeform, so gallery → freeform → gallery doesn't reset every cell. Replacing a picture starts the new one centred, because the old framing was for the old picture. The editing hint now has a short form for narrow frames: the full sentence is about 420px, and a gallery cell can be 250px.
 
