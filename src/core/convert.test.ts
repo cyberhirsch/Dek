@@ -69,6 +69,13 @@ describe('convertLayout — best-effort un-bake', () => {
     expect(text.stash?.elements?.[0].type).toBe('arrow')
   })
 
+  it("keeps each gallery cell's pan/zoom through gallery → freeform → gallery", () => {
+    const focus = { x: 20, y: 0, scale: 2 }
+    const gal: Slide = { layout: 'gallery', items: [{ image: 'a.png', focus }, { image: 'b.png' }] }
+    const back = convertLayout(convertLayout(gal, 'freeform'), 'gallery')
+    expect(back.items).toEqual([{ image: 'a.png', focus }, { image: 'b.png' }])
+  })
+
   it('multiple freeform image boxes un-bake into a gallery', () => {
     const ff: Slide = {
       layout: 'freeform',

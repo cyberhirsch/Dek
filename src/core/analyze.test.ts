@@ -204,6 +204,13 @@ describe('analyzeDeck', () => {
     )
   })
 
+  it('flags a malformed focus on a gallery item, and accepts a valid one', () => {
+    const bad: Deck = { config: {}, slides: [{ layout: 'gallery', items: [{ image: 'a.png', focus: 'center' as never }] }] }
+    const good: Deck = { config: {}, slides: [{ layout: 'gallery', items: [{ image: 'a.png', focus: { x: 0, y: 0, scale: 1.5 } }] }] }
+    expect(analyzeDeck(bad).issues.some((i) => i.message.includes('malformed focus'))).toBe(true)
+    expect(analyzeDeck(good).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+  })
+
   it('accepts a well-formed focus', () => {
     const deck: Deck = {
       config: {},

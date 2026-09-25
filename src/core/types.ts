@@ -49,6 +49,9 @@ export interface GalleryItem {
   label?: string
   /** Makes the cell clickable in present/export (http(s)/mailto only). */
   link?: string
+  /** Pan/zoom of the picture inside its cell — the same shape as a
+   *  single-image layout's `focus`. Omitted: centred, unzoomed. */
+  focus?: Focus
 }
 
 export interface TextItem {

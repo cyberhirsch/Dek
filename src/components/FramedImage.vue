@@ -37,6 +37,14 @@ function readFrame() {
 function boundsFor(scale: number) {
   return panBounds(natural.value, frameSize.value, props.fit ?? 'cover', scale)
 }
+/** The editing hint, shortened for narrow frames. A gallery cell can be
+ *  ~250px wide, and the full sentence (~420px) would be clipped mid-word; the
+ *  ⇄ button is visible on hover anyway, so the short form drops that part. */
+const hint = computed(() => {
+  const wide = frameSize.value.w >= 460
+  if (canPan.value) return wide ? 'drag to pan · scroll to zoom · click ⇄ or drop to replace' : 'drag to pan · scroll to zoom'
+  return wide ? 'scroll to zoom in, then drag to pan · click ⇄ or drop to replace' : 'scroll to zoom'
+})
 /** Whether there's any hidden overflow left to drag into view at all. */
 const canPan = computed(() => {
   const b = boundsFor(props.focus?.scale ?? 1)
@@ -172,9 +180,7 @@ function onPick(e: Event) {
     <div v-if="over" class="fi-drop">drop to replace</div>
     <!-- "drag to pan" only when there's hidden overflow to drag into view;
          a fully-visible picture has nothing to pan to, so zoom leads instead. -->
-    <div v-if="editable && pannable && src" class="fi-hint">
-      {{ canPan ? 'drag to pan · scroll to zoom' : 'scroll to zoom in, then drag to pan' }} · click ⇄ or drop to replace
-    </div>
+    <div v-if="editable && pannable && src" class="fi-hint">{{ hint }}</div>
   </div>
 </template>
 

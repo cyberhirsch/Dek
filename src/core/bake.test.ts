@@ -121,6 +121,13 @@ describe('bakeToElements geometry contract', () => {
     expect(img.desaturate).toBe(true)
   })
 
+  it("carries each gallery cell's pan/zoom onto its baked box", () => {
+    const focus = { x: 12, y: -8, scale: 1.6 }
+    const els = bakeToElements({ layout: 'gallery', items: [{ image: 'g.png', focus }, { image: 'h.png' }] })
+    expect(boxes(els).find((b) => b.src === 'g.png')!.focus).toEqual(focus)
+    expect(boxes(els).find((b) => b.src === 'h.png')!.focus).toBeUndefined()
+  })
+
   it('carries a gallery cell link onto its baked box', () => {
     const els = bakeToElements({
       layout: 'gallery',

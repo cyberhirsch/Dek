@@ -148,6 +148,9 @@ function removeGalleryItem(i: number) {
 function setFocus(f: Focus) {
   patch({ focus: f })
 }
+function setGalleryFocus(i: number, focus: Focus) {
+  patch({ items: galleryItems.value.map((g, j) => (j === i ? { ...g, focus } : g)) })
+}
 
 
 // video-embed
@@ -336,7 +339,7 @@ watch(
         <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, 1fr)` }">
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
             <div class="frame" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
-              <FramedImage :src="it.image" :editable="editable" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
+              <FramedImage :src="it.image" :focus="it.focus" :editable="editable" pannable @update:focus="setGalleryFocus(i, $event)" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
               <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
             </div>

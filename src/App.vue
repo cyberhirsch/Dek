@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
+import { replaceGalleryImage, setGalleryLink } from './core/gallery'
 import { blankSlide } from './core/deck'
 import { convertLayout } from './core/convert'
 import { newElementRect } from './core/bake'
@@ -1137,16 +1138,7 @@ function setFieldLink(t: ImageField, link: string | undefined) {
   if (t.field === 'image') {
     patchSlide({ imageLink: link })
   } else if (t.field === 'gallery') {
-    const items = (s.items ?? []).map((it, i) => {
-      if (i !== t.index) return it
-      const image = typeof it === 'string' ? it : (it as { image: string }).image
-      const label = typeof it === 'object' && it && 'label' in it ? (it as { label?: string }).label : undefined
-      const next: { image: string; label?: string; link?: string } = { image }
-      if (label != null) next.label = label
-      if (link) next.link = link
-      return next
-    })
-    patchSlide({ items })
+    patchSlide({ items: setGalleryLink(s.items, t.index ?? -1, link) })
   } else if (t.field === 'table') {
     patchTableCell(t, { link })
   }
@@ -1571,17 +1563,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     portraits[e.index ?? portraits.length] = url
     patchSlide({ portraits })
   } else if (e.field === 'gallery') {
-    const items = (slide.items ?? []).flatMap((it): Array<{ image: string; label?: string }> => {
-      if (typeof it === 'string') return [{ image: it }]
-      if (it && typeof it === 'object' && 'image' in it && typeof it.image === 'string') {
-        const item: { image: string; label?: string } = { image: it.image }
-        if (typeof it.label === 'string') item.label = it.label
-        return [item]
-      }
-      return []
-    })
-    if (e.index != null && items[e.index]) items[e.index].image = url
-    patchSlide({ items })
+    if (e.index != null) patchSlide({ items: replaceGalleryImage(slide.items, e.index, url) })
   } else if (e.field === 'table') {
     patchTableCell({ field: 'table', index: e.index, el: e.el }, { image: url, text: undefined })
   }

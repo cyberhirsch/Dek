@@ -13,7 +13,7 @@
 //  - boxes carry `lineHeight` / `lineGap` so baked text keeps the CSS rhythm
 //    (1.05 headings / 1.45 body / 18px list gaps) instead of the canvas default.
 
-import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool, TableData } from './types'
+import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, CanvasTool, TableData, GalleryItem } from './types'
 import { BASE } from '../tokens'
 import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
 import { emptyTable } from './table'
@@ -248,7 +248,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
     case 'gallery': {
       // .l-gallery: h1 +28, grid gap 24, cover-fit frames, 28px serif labels
       const items = (slide.items ?? []).filter(
-        (it): it is { image: string; label?: string; link?: string } => !!it && typeof it === 'object' && 'image' in it,
+        (it): it is GalleryItem => !!it && typeof it === 'object' && 'image' in it,
       )
       let y = PAD_Y
       if (title) {
@@ -266,7 +266,7 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       items.forEach((it, i) => {
         const cx = PAD_X + (i % cols) * (cellW + GAP)
         const cy = y + Math.floor(i / cols) * (cellH + GAP)
-        if (it.image) els.push(image(it.image, cx, cy, cellW, cellH - labelH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link }))
+        if (it.image) els.push(image(it.image, cx, cy, cellW, cellH - labelH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus }))
         if (it.label) els.push(text(it.label, cx, cy + cellH - labelH + 10, cellW, 28 * 1.2, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
       })
       break

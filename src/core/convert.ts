@@ -95,7 +95,9 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
     fields.image = imgs[0].src
     if (imgs[0].focus) fields.focus = imgs[0].focus
   } else if (imgs.length > 1) {
-    fields.items = imgs.map((im): GalleryItem => ({ image: im.src! }))
+    // Each picture keeps its own pan/zoom, so gallery → freeform → gallery
+    // doesn't reset every cell's framing.
+    fields.items = imgs.map((im): GalleryItem => (im.focus ? { image: im.src!, focus: im.focus } : { image: im.src! }))
   }
 
   const vid = elements.find((e): e is VideoElement => e.type === 'video')

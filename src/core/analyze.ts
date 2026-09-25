@@ -180,6 +180,8 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
     } else {
       const missing = slide.items.filter((it) => typeof it !== 'string' && !isGalleryItem(it)).length
       if (missing) issue(issues, n, 'warning', 'schema', 'Gallery contains items without an image.', 'items')
+      const badFocus = slide.items.filter((it) => isGalleryItem(it) && !isValidFocus(it.focus)).length
+      if (badFocus) issue(issues, n, 'warning', 'schema', 'Gallery item has a malformed focus — expected { x, y, scale }.', 'items')
       if (slide.items.length > 6) issue(issues, n, 'info', 'review', 'Dense gallery may need review.', 'items')
     }
   }
