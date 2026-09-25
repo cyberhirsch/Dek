@@ -678,12 +678,31 @@
   min-width: 0;
   min-height: 0;
 }
-.gallery-cell .frame {
+/* The picture's share of the cell. A size container, so a hugging frame can
+   size itself from the slot with container units as the grid resizes. */
+.gallery-cell .frame-slot {
+  position: relative;
   flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+}
+.gallery-cell .frame {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--dek-line);
-  min-height: 0;
+}
+/* contain: the frame is the largest box of the picture's shape (--ar) that
+   fits the slot, so border and radius wrap the picture itself. Mirrored by
+   containRect in core/gallery.ts for bake. */
+.gallery-cell .frame.hug {
+  width: min(100cqw, 100cqh * var(--ar));
+  height: min(100cqh, 100cqw / var(--ar));
 }
 .gallery-cell .frame > .fi {
   position: absolute;

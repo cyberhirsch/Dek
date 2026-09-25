@@ -76,6 +76,31 @@ export function replaceGalleryImage(items: Slide['items'], index: number, image:
   })
 }
 
+/** Set one cell's fit override; `undefined` returns it to the gallery's own. */
+export function setGalleryFit(items: Slide['items'], index: number, fit: 'cover' | 'contain' | undefined): GalleryItem[] {
+  return galleryItemsOf(items).map((it, i) => {
+    if (i !== index) return it
+    const { fit: _old, ...rest } = it
+    return fit ? { ...rest, fit } : rest
+  })
+}
+
+/** The fit a gallery picture actually uses: its own override, else the
+ *  gallery's `imageFit`, else `cover`. */
+export function effectiveFit(item: GalleryItem, imageFit: Slide['imageFit']): 'cover' | 'contain' {
+  return item.fit ?? imageFit ?? 'cover'
+}
+
+/** The largest rect of a picture's shape that fits inside a box, centred —
+ *  what a `contain` frame shrinks to so its border hugs the picture. */
+export function containRect(natural: { w: number; h: number }, box: { x: number; y: number; w: number; h: number }) {
+  if (!(natural.w > 0 && natural.h > 0 && box.w > 0 && box.h > 0)) return box
+  const k = Math.min(box.w / natural.w, box.h / natural.h)
+  const w = natural.w * k
+  const h = natural.h * k
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h }
+}
+
 /** Set or clear (`undefined`) one cell's link, keeping its other fields. */
 export function setGalleryLink(items: Slide['items'], index: number, link: string | undefined): GalleryItem[] {
   return galleryItemsOf(items).map((it, i) => {

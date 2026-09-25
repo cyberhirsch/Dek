@@ -11,6 +11,9 @@ Every picture went into the `.pptx` stretched to fill its box. Any picture whose
 
 ### Layouts
 
+**Galleries can fit pictures whole, with frames that hug them** (#53)
+Now that gallery rows share the slide's height (#52), filling each frame crops hard: four 16:9 renders in a 2×2 grid became 518×150 strips, cutting away exactly the detail a class is asked to judge. A gallery now takes `imageFit: contain` — *fill | fit* in the top bar, as on single-image layouts — and any picture can override it (`fit` on the item, or *Fit: Cover / Fit: Contain* in its right-click menu). Choosing the gallery's own value clears the override rather than restating it. In *fit* mode the frame **hugs the picture**: its border and radius wrap the picture itself instead of drawing letterbox bars inside a box, and it re-sizes itself as the grid changes (CSS container units, from the picture's shape). Pan and zoom still work inside a hugging frame, and label badges ride the picture's corner. Baking to Freeform hugs the same way, from a shared cache of picture sizes that also serves #54 and #55, and the PowerPoint export places them whole (#53, export fix). Converting gallery → Freeform → gallery keeps the fit. Invalid `imageFit` or item `fit` values are now flagged in Review. `+8` tests.
+
 **Short gallery labels as badges** (#56)
 A gallery's labels can now sit **on** the pictures: `labelPos: overlay` (*Labels: badge* in the top bar) draws a short label — "1", "A" — as a pill in the picture's top-left corner. The label row goes, so a quiz gallery ("which one is real?") gives that height back to its pictures: 54px per row. The badge uses the label's own face, Cormorant light italic, in the accent colour on a dark translucent pill, so it reads over any picture. PowerPoint and Freeform draw the same pill. The editor's ✕ remove button moved to the top-right beside the ⇄ replace button, so both picture controls sit together and the corner belongs to the badge. `+1` test.
 

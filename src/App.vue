@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Deck, DeckConfig, LayoutId, Slide, SlideElement } from './core/types'
-import { replaceGalleryImage, setGalleryLink } from './core/gallery'
+import { effectiveFit, galleryItemsOf, replaceGalleryImage, setGalleryFit, setGalleryLink } from './core/gallery'
+import { naturalSize } from './render/naturalSize'
 import { blankSlide } from './core/deck'
 import { convertLayout } from './core/convert'
 import { newElementRect } from './core/bake'
@@ -640,7 +641,7 @@ function changeLayout(id: LayoutId) {
   // convertLayout maps shared content across the two layouts and parks the rest
   // in `stash` (reversible), so nothing is lost and nothing renders twice.
   snap('layout')
-  deck.value.slides[current.value] = convertLayout(s, id)
+  deck.value.slides[current.value] = convertLayout(s, id, { naturalSize })
   selectedEls.value = []
   scheduleSlideSave()
 }
@@ -657,7 +658,7 @@ function appendElements(els: SlideElement[]) {
     patchSlide({ elements: next })
     selectedEls.value = els.map((_, k) => next.length - els.length + k)
   } else {
-    const fresh = convertLayout(s, 'freeform')
+    const fresh = convertLayout(s, 'freeform', { naturalSize })
     fresh.elements = [...(fresh.elements ?? []), ...els]
     snap('bake-freeform')
     deck.value.slides[current.value] = fresh
@@ -1096,6 +1097,21 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
       { label: 'Add Link (from Clipboard)', action: () => addFieldLink(t) },
     )
     if (fieldImageLink(s, t)) items.push({ label: 'Remove Link', action: () => setFieldLink(t, undefined) })
+  }
+  // A gallery picture's fit overrides the gallery's own; choosing the value the
+  // gallery already uses clears the override rather than restating it.
+  if (t.field === 'gallery') {
+    const item = galleryItemsOf(s.items)[t.index ?? -1]
+    if (item) {
+      const fit = effectiveFit(item, s.imageFit)
+      const choose = (f: 'cover' | 'contain') =>
+        patchSlide({ items: setGalleryFit(s.items, t.index ?? -1, f === (s.imageFit ?? 'cover') ? undefined : f) })
+      items.push(
+        { divider: true },
+        { label: 'Fit: Cover', check: fit === 'cover', action: () => choose('cover') },
+        { label: 'Fit: Contain', check: fit === 'contain', action: () => choose('contain') },
+      )
+    }
   }
   // Fit/Invert/Desaturate only make sense for the single framed image; portraits/gallery are grids.
   if (t.field === 'image') {

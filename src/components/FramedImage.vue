@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Focus } from '../core/types'
 import { clampPan, panBounds } from '../render/pan'
+import { rememberNaturalSize } from '../render/naturalSize'
 
 const props = defineProps<{
   src?: string
@@ -28,7 +29,11 @@ let frameObserver: ResizeObserver | null = null
 
 function readNatural() {
   const img = imgEl.value
-  if (img?.naturalWidth) natural.value = { w: img.naturalWidth, h: img.naturalHeight }
+  if (img?.naturalWidth) {
+    natural.value = { w: img.naturalWidth, h: img.naturalHeight }
+    // Share it: layouts use picture shapes too (gallery frames, columns).
+    rememberNaturalSize(props.src, img.naturalWidth, img.naturalHeight)
+  }
 }
 function readFrame() {
   const el = root.value

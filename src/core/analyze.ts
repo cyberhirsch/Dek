@@ -97,7 +97,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   'image-full': ['image', 'title', 'caption', 'focus', 'imageFit', 'imageLink', 'imageInvert', 'imageDesaturate'],
   'image-caption': ['image', 'caption', 'captionPos', 'focus', 'imageFit', 'imageLink', 'imageInvert', 'imageDesaturate'],
   'video-embed': ['video', 'poster', 'image', 'caption', 'videoFit'],
-  gallery: ['title', 'items', 'columns', 'labelPos'],
+  gallery: ['title', 'items', 'columns', 'labelPos', 'imageFit'],
   diagram: ['title', 'code'],
   table: ['title', 'table'],
   freeform: ['body', 'elements'],
@@ -161,6 +161,10 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
     issue(issues, n, 'warning', 'schema', `Field "${key}" isn't rendered by the ${slide.layout} layout.`, key)
   }
 
+  if (slide.imageFit != null && slide.imageFit !== 'cover' && slide.imageFit !== 'contain') {
+    issue(issues, n, 'warning', 'schema', 'imageFit must be cover or contain.', 'imageFit')
+  }
+
   if (!isValidFocus(slide.focus)) {
     issue(issues, n, 'warning', 'schema', 'Malformed focus — expected { x, y, scale }.', 'focus')
   }
@@ -180,6 +184,8 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
     } else {
       const missing = slide.items.filter((it) => typeof it !== 'string' && !isGalleryItem(it)).length
       if (missing) issue(issues, n, 'warning', 'schema', 'Gallery contains items without an image.', 'items')
+      const badFit = slide.items.filter((it) => isGalleryItem(it) && it.fit != null && it.fit !== 'cover' && it.fit !== 'contain').length
+      if (badFit) issue(issues, n, 'warning', 'schema', 'Gallery item fit must be cover or contain.', 'items')
       const badFocus = slide.items.filter((it) => isGalleryItem(it) && !isValidFocus(it.focus)).length
       if (badFocus) issue(issues, n, 'warning', 'schema', 'Gallery item has a malformed focus — expected { x, y, scale }.', 'items')
       if (slide.items.length > 6) issue(issues, n, 'info', 'review', 'Dense gallery may need review.', 'items')

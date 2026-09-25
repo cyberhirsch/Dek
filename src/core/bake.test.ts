@@ -155,6 +155,21 @@ describe('bakeToElements geometry contract', () => {
     expect(pill.color).toBe('var(--dek-accent)')
   })
 
+  it('bakes a contain picture to a box that hugs it, when its size is known', () => {
+    const slide = { layout: 'gallery' as const, imageFit: 'contain' as const, items: [{ image: 'wide.png', label: '1' }] }
+    const hugged = boxes(bakeToElements({ ...slide, labelPos: 'overlay' }, { naturalSize: () => ({ w: 2000, h: 1000 }) }))
+    const pic = hugged.find((b) => b.src === 'wide.png')!
+    expect(pic.w / pic.h).toBeCloseTo(2, 1)
+    expect(pic.fit).toBe('contain')
+    // the badge rides the picture's corner, not the cell's
+    const badge = hugged.find((b) => b.content === '1')!
+    expect(badge.y).toBe(pic.y + 12)
+    // unknown size: the full cell, still marked contain
+    const full = boxes(bakeToElements(slide)).find((b) => b.src === 'wide.png')!
+    expect(full.w).toBe(1060)
+    expect(full.fit).toBe('contain')
+  })
+
   it('bakes a gallery written as bare strings — those used to vanish from export', () => {
     const els = bakeToElements({ layout: 'gallery', items: ['a.png', 'b.png'] as never })
     expect(boxes(els).filter((b) => b.src).map((b) => b.src)).toEqual(['a.png', 'b.png'])

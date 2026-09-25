@@ -75,7 +75,7 @@ const saveTitle = computed(() => {
 // The image layouts that carry a single framed image and support a fill/fit
 // toggle. image-caption defaults to `contain` (show the whole photo); the others
 // default to `cover` (fill the frame), matching SlideView's per-layout defaults.
-const IMAGE_FIT_LAYOUTS: LayoutId[] = ['text-image', 'image-full', 'image-caption']
+const IMAGE_FIT_LAYOUTS: LayoutId[] = ['text-image', 'image-full', 'image-caption', 'gallery']
 const showImageFit = computed(() => !!slide.value && IMAGE_FIT_LAYOUTS.includes(slide.value.layout))
 const imageFit = computed(() => slide.value?.imageFit ?? (slide.value?.layout === 'image-caption' ? 'contain' : 'cover'))
 

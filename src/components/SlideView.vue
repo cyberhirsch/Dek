@@ -5,7 +5,8 @@ import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import { parseVideo, autoplaySrc } from '../render/video'
 import { safeLink } from '../render/qr'
-import { galleryColumns } from '../core/gallery'
+import { effectiveFit, galleryColumns } from '../core/gallery'
+import { naturalSize } from '../render/naturalSize'
 import FramedImage from './FramedImage.vue'
 import EditableText from './EditableText.vue'
 import FittedText from './FittedText.vue'
@@ -69,6 +70,14 @@ const galleryRows = computed(() => Math.max(1, Math.ceil(galleryItems.value.leng
 /** A label row under every picture when any has a label (or while editing, to
  *  type one) — all or none, so the frames in a row line up, as bake draws it. */
 const galleryOverlay = computed(() => props.slide.labelPos === 'overlay')
+/** A `contain` picture whose shape is known gets a frame that hugs it: the
+ *  aspect goes to CSS, which sizes the frame inside its slot. Undefined means
+ *  the frame fills the slot (cover, or the shape hasn't loaded yet). */
+function galleryHug(it: GalleryItem): Record<string, string> | undefined {
+  if (effectiveFit(it, props.slide.imageFit) !== 'contain') return undefined
+  const size = naturalSize(it.image)
+  return size ? { '--ar': String(size.w / size.h) } : undefined
+}
 const galleryLabelRow = computed(
   () => !galleryOverlay.value && (!!props.editable || galleryItems.value.some((it) => it.label)),
 )
@@ -344,21 +353,26 @@ watch(
       <div class="gallery-wrap">
         <div class="gallery-grid" :style="{ gridTemplateColumns: `repeat(${galleryCols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${galleryRows}, minmax(0, 1fr))` }">
           <div v-for="(it, i) in galleryItems" :key="i" class="gallery-cell">
-            <div class="frame" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
-              <FramedImage :src="it.image" :focus="it.focus" :editable="editable" pannable @update:focus="setGalleryFocus(i, $event)" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
-              <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
-              <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
-              <template v-if="galleryOverlay && (editable || it.label)">
-                <EditableText
-                  v-if="editable"
-                  class="gallery-badge"
-                  :class="{ empty: !it.label }"
-                  :model-value="it.label"
-                  placeholder="1"
-                  @update:model-value="setGalleryLabel(i, $event)"
-                />
-                <span v-else class="gallery-badge">{{ it.label }}</span>
-              </template>
+            <!-- The slot is the picture's share of the cell; the frame fills it,
+                 or for `contain` with a known shape shrinks to hug the picture
+                 so its border and radius wrap the picture, not letterbox bars. -->
+            <div class="frame-slot">
+              <div class="frame" :class="{ hug: !!galleryHug(it) }" :style="galleryHug(it)" @contextmenu="onImageCtx($event, { field: 'gallery', index: i })">
+                <FramedImage :src="it.image" :focus="it.focus" :fit="galleryHug(it) ? 'cover' : effectiveFit(it, slide.imageFit)" :editable="editable" pannable @update:focus="setGalleryFocus(i, $event)" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
+                <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
+                <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
+                <template v-if="galleryOverlay && (editable || it.label)">
+                  <EditableText
+                    v-if="editable"
+                    class="gallery-badge"
+                    :class="{ empty: !it.label }"
+                    :model-value="it.label"
+                    placeholder="1"
+                    @update:model-value="setGalleryLabel(i, $event)"
+                  />
+                  <span v-else class="gallery-badge">{{ it.label }}</span>
+                </template>
+              </div>
             </div>
             <FittedText v-if="galleryLabelRow" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />
           </div>

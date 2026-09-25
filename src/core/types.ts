@@ -52,6 +52,8 @@ export interface GalleryItem {
   /** Pan/zoom of the picture inside its cell — the same shape as a
    *  single-image layout's `focus`. Omitted: centred, unzoomed. */
   focus?: Focus
+  /** Overrides the gallery's `imageFit` for this one picture. */
+  fit?: 'cover' | 'contain'
 }
 
 export interface TextItem {
@@ -269,8 +271,9 @@ export interface Slide {
   /** text-image: aspect ratio of the image frame. */
   imageRatio?: '16:9' | '1:1' | '9:16'
   /** How the image sits in its frame: `cover` fills and crops overflow (the
-   *  default for text-image / image-full), `contain` shows the whole image
-   *  letterboxed (the default for image-caption). */
+   *  default for text-image / image-full / gallery), `contain` shows the whole
+   *  image (the default for image-caption). In a gallery, `contain` shrinks
+   *  each frame to hug its picture; items may override it with `fit`. */
   imageFit?: 'cover' | 'contain'
   /** Makes the layout image (`image` field) clickable in present/export — the
    *  layout counterpart of a freeform box's `link`. `http(s)`/`mailto` only. */

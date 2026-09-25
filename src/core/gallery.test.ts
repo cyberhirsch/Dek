@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, galleryCells, galleryColumns, galleryItemsOf, replaceGalleryImage, setGalleryLink } from './gallery'
+import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, containRect, effectiveFit, galleryCells, galleryColumns, galleryItemsOf, replaceGalleryImage, setGalleryFit, setGalleryLink } from './gallery'
 
 const focus = { x: 10, y: 0, scale: 1.5 }
 
@@ -65,5 +65,29 @@ describe('galleryColumns', () => {
     expect(galleryColumns(2, 9)).toBe(2)
     expect(galleryColumns('auto', 2)).toBe(2)
     expect(galleryColumns(undefined, 7)).toBe(3)
+  })
+})
+
+describe('gallery fit', () => {
+  it('a cell override wins over the gallery, which wins over the cover default', () => {
+    expect(effectiveFit({ image: 'a' }, undefined)).toBe('cover')
+    expect(effectiveFit({ image: 'a' }, 'contain')).toBe('contain')
+    expect(effectiveFit({ image: 'a', fit: 'cover' }, 'contain')).toBe('cover')
+  })
+
+  it("sets a cell's fit without touching its other fields, and clears it back", () => {
+    const items = [{ image: 'a.png', label: 'A', link: 'https://a.io', focus }]
+    expect(setGalleryFit(items, 0, 'contain')).toEqual([{ ...items[0], fit: 'contain' }])
+    expect(setGalleryFit([{ image: 'a.png', fit: 'contain' as const }], 0, undefined)).toEqual([{ image: 'a.png' }])
+  })
+
+  it('containRect: the largest rect of the picture shape, centred in the box', () => {
+    expect(containRect({ w: 2000, h: 1000 }, { x: 10, y: 20, w: 400, h: 400 })).toEqual({ x: 10, y: 120, w: 400, h: 200 })
+    expect(containRect({ w: 600, h: 840 }, { x: 0, y: 0, w: 500, h: 420 })).toEqual({ x: 100, y: 0, w: 300, h: 420 })
+  })
+
+  it('containRect leaves the box alone when the size is unknown', () => {
+    const box = { x: 1, y: 2, w: 3, h: 4 }
+    expect(containRect({ w: 0, h: 0 }, box)).toBe(box)
   })
 })

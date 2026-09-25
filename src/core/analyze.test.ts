@@ -211,6 +211,15 @@ describe('analyzeDeck', () => {
     expect(analyzeDeck(good).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
   })
 
+  it('accepts a gallery imageFit, and flags values that are not cover or contain', () => {
+    const ok: Deck = { config: {}, slides: [{ layout: 'gallery', imageFit: 'contain', items: [{ image: 'a.png', fit: 'cover' }] }] }
+    const bad: Deck = { config: {}, slides: [{ layout: 'gallery', imageFit: 'fill' as never, items: [{ image: 'a.png', fit: 'stretch' as never }] }] }
+    expect(analyzeDeck(ok).issues.filter((i) => i.kind === 'schema')).toHaveLength(0)
+    const msgs = analyzeDeck(bad).issues.map((i) => i.message)
+    expect(msgs).toContain('imageFit must be cover or contain.')
+    expect(msgs).toContain('Gallery item fit must be cover or contain.')
+  })
+
   it('accepts a well-formed focus', () => {
     const deck: Deck = {
       config: {},

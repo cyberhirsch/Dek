@@ -15,7 +15,7 @@
 // image/gallery, etc.), parking leftover canvas objects under `stash.elements`.
 
 import type { Slide, LayoutId, SlideElement, BoxElement, VideoElement, DiagramElement, TableElement, GalleryItem, TableData } from './types'
-import { bakeToElements } from './bake'
+import { bakeToElements, type BakeOptions } from './bake'
 import { contentToTable, tableShape } from './table'
 
 type Slot = 'heading' | 'lede' | 'prose' | 'caption' | 'image' | 'gallery' | 'video' | 'diagram' | 'portraits' | 'table'
@@ -56,7 +56,7 @@ const SLOT_CANDIDATES: Record<Slot, string[]> = {
 // Modifier fields travel with their parent media slot; parked if the target can't use them.
 const MOD_SUPPORT: Record<string, LayoutId[]> = {
   focus: ['text-image', 'image-full', 'image-caption'],
-  imageFit: ['text-image', 'image-full', 'image-caption'],
+  imageFit: ['text-image', 'image-full', 'image-caption', 'gallery'],
   imageLink: ['text-image', 'image-full', 'image-caption'],
   imageInvert: ['text-image', 'image-full', 'image-caption'],
   imageDesaturate: ['text-image', 'image-full', 'image-caption'],
@@ -96,9 +96,17 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
     fields.image = imgs[0].src
     if (imgs[0].focus) fields.focus = imgs[0].focus
   } else if (imgs.length > 1) {
-    // Each picture keeps its own pan/zoom, so gallery → freeform → gallery
-    // doesn't reset every cell's framing.
-    fields.items = imgs.map((im): GalleryItem => (im.focus ? { image: im.src!, focus: im.focus } : { image: im.src! }))
+    // Each picture keeps its own pan/zoom and fit, so gallery → freeform →
+    // gallery doesn't reset every cell. When they all agree on `contain`,
+    // that's the gallery's own imageFit, not a per-picture override.
+    const allContain = imgs.every((im) => im.fit === 'contain')
+    if (allContain) fields.imageFit = 'contain'
+    fields.items = imgs.map((im): GalleryItem => {
+      const it: GalleryItem = { image: im.src! }
+      if (im.focus) it.focus = im.focus
+      if (!allContain && im.fit === 'contain') it.fit = 'contain'
+      return it
+    })
   }
 
   const vid = elements.find((e): e is VideoElement => e.type === 'video')
@@ -128,7 +136,7 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
 
 /** Convert a slide to a different layout, mapping shared content and parking the
  *  rest in `stash` so the change is reversible. Returns a fresh slide. */
-export function convertLayout(slide: Slide, to: LayoutId): Slide {
+export function convertLayout(slide: Slide, to: LayoutId, opts?: BakeOptions): Slide {
   if (slide.layout === to) return slide
 
   const base: Slide = { layout: to }
@@ -146,7 +154,7 @@ export function convertLayout(slide: Slide, to: LayoutId): Slide {
   // overlay on top — exactly how the slide drew them (and how PPTX export
   // already combines the two). Keep any stash.
   if (to === 'freeform') {
-    base.elements = [...bakeToElements(slide), ...overlay]
+    base.elements = [...bakeToElements(slide, opts), ...overlay]
     if (slide.stash && Object.keys(slide.stash).length) base.stash = { ...slide.stash }
     return base
   }

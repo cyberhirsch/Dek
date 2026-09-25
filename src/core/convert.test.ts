@@ -108,6 +108,20 @@ describe('convertLayout — best-effort un-bake', () => {
     expect(back.items).toEqual([{ image: 'a.png', focus }, { image: 'b.png' }])
   })
 
+  it("keeps a contain gallery's fit through gallery → freeform → gallery", () => {
+    const gal: Slide = { layout: 'gallery', imageFit: 'contain', items: [{ image: 'a.png' }, { image: 'b.png' }] }
+    const back = convertLayout(convertLayout(gal, 'freeform'), 'gallery')
+    expect(back.imageFit).toBe('contain')
+    expect(back.items).toEqual([{ image: 'a.png' }, { image: 'b.png' }])
+  })
+
+  it('keeps a single-picture override as a per-item fit', () => {
+    const gal: Slide = { layout: 'gallery', items: [{ image: 'a.png', fit: 'contain' }, { image: 'b.png' }] }
+    const back = convertLayout(convertLayout(gal, 'freeform'), 'gallery')
+    expect(back.imageFit).toBeUndefined()
+    expect(back.items).toEqual([{ image: 'a.png', fit: 'contain' }, { image: 'b.png' }])
+  })
+
   it('multiple freeform image boxes un-bake into a gallery', () => {
     const ff: Slide = {
       layout: 'freeform',

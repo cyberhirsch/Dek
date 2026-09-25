@@ -17,7 +17,7 @@ import type { Slide, SlideElement, BoxElement, VideoElement, DiagramElement, Can
 import { BASE } from '../tokens'
 import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
 import { emptyTable } from './table'
-import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
+import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, containRect, effectiveFit, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
 
 /** A gallery label badge (`labelPos: overlay`) — mirrors `.gallery-badge`:
  *  a 40px pill 12px in from the picture's top-left, heading italic 26px in the
@@ -134,7 +134,14 @@ function estLines(s: string, size: number, maxW: number, ratio: number): number 
 }
 
 /** Build the element list that reproduces a slide's current content. */
-export function bakeToElements(slide: Slide): SlideElement[] {
+/** What bake may know beyond the slide itself. Natural image sizes let a
+ *  `contain` gallery picture bake to a box that hugs the picture (so its
+ *  border does too); without them it bakes to the full cell. */
+export interface BakeOptions {
+  naturalSize?: (src: string) => { w: number; h: number } | undefined
+}
+
+export function bakeToElements(slide: Slide, opts: BakeOptions = {}): SlideElement[] {
   // Already a canvas — keep whatever elements it has.
   if (slide.layout === 'freeform') return [...(slide.elements ?? [])]
 
@@ -291,8 +298,13 @@ export function bakeToElements(slide: Slide): SlideElement[] {
       items.forEach((it, i) => {
         const cx = PAD_X + (i % g.cols) * (g.cellW + GALLERY_GAP)
         const cy = y + Math.floor(i / g.cols) * (g.cellH + GALLERY_GAP)
-        if (it.image) els.push(image(it.image, cx, cy, g.cellW, g.frameH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus }))
-        if (it.label && overlay) els.push(galleryBadge(it.label, cx, cy, g.cellW))
+        // The picture's frame: the whole cell, or — for `contain` with a known
+        // size — shrunk to hug the picture, as the live frame does.
+        const fit = effectiveFit(it, slide.imageFit)
+        const size = fit === 'contain' && it.image ? opts.naturalSize?.(it.image) : undefined
+        const r = size ? containRect(size, { x: cx, y: cy, w: g.cellW, h: g.frameH }) : { x: cx, y: cy, w: g.cellW, h: g.frameH }
+        if (it.image) els.push(image(it.image, r.x, r.y, r.w, r.h, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus, ...(fit === 'contain' ? { fit } : {}) }))
+        if (it.label && overlay) els.push(galleryBadge(it.label, r.x, r.y, r.w))
         else if (it.label) els.push(text(it.label, cx, cy + g.frameH + GALLERY_LABEL_GAP, g.cellW, GALLERY_LABEL_H, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
       })
       break
