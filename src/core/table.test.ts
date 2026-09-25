@@ -264,6 +264,12 @@ describe('tableToBoxes', () => {
     expect(b.x + b.w).toBeCloseTo(400, 5)
   })
 
+  it('carries cell emphasis onto the exported boxes', () => {
+    const out = tableToBoxes(el({ rows: [[{ text: 'A', bold: true }, { text: 'B', italic: true }]] }))
+    expect(out.find((b) => b.content === 'A')!.bold).toBe(true)
+    expect(out.find((b) => b.content === 'B')!.italic).toBe(true)
+  })
+
   it("carries the table's font/size onto text cells and the image onto picture cells", () => {
     const out = tableToBoxes(el({ rows: [['A', { image: 'p.png', link: 'https://x.io' }]], font: 'heading', size: 30 }))
     const text = out.find((b) => b.content === 'A')!

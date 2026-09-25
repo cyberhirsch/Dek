@@ -11,6 +11,16 @@ Every picture went into the `.pptx` stretched to fill its box. Any picture whose
 
 ### Layouts
 
+**Tables: draggable dividers, row and column editing, cell selection and merging** (#48)
+The table's editing is now complete, the same for the Table layout and for a table on a Freeform canvas:
+
+- **Drag the dividers** between rows and columns to size them. The grid follows the pointer live but saves once, on release: one undo step, one autosave, not one per pixel. A track can't be dragged narrower than 6% of the table — the divider stops there rather than jumping.
+- **Add and remove rows and columns where you need them**: *Insert Row Above/Below*, *Insert Column Left/Right*, *Delete Row/Column* on any cell's right-click menu, plus a **+** on the table's bottom and right edges to append. Custom track sizes keep their proportions, and deleting a line that holds content asks first.
+- **Select a block of cells** by dragging across them, or Shift-click to add single cells. A plain click still goes straight into a cell's text.
+- **Bulk actions** on the selection: *Bold*, *Italic*, *Clear*, *Merge Cells*. Merging needs a rectangle of unmerged cells; as in a spreadsheet, the top-left cell keeps its content and the rest become covered, and it asks before discarding anything. *Unmerge Cells* splits a merged cell back. Bold and italic are flags on the cell (`bold: true`, `italic: true`), not `**`/`*` in the text — cell text is plain, so Markdown markers would just show. Both carry into PowerPoint.
+
+Every structural edit is merge-aware. A row inserted through a merge grows it; deleting the row a merge is owned from moves the merge down rather than losing it; a drag that clips a merged block selects all of it. The logic is pure and tested in `core/tableEdit.ts`. `+23` tests.
+
 **Review warns about gallery pictures that are too small or cropped away** (#55)
 Since #52 a gallery can't overflow, but it can still fail quietly. Review now judges every gallery picture as the slide actually lays it out: the same box, `auto` columns, labels or badges, fit and zoom. A picture showing smaller than about 250 × 140 stage px (by area, so portraits aren't penalised for being narrow) is a **warning**: too small to judge from the back of a lecture hall. The message gives the smallest size and suggests fewer pictures or badge labels. A picture that loses more than about 35% to cropping — by *fill* or by zoom, which crops even in *fit* mode — gets an **info** suggesting `imageFit: contain`. Picture sizes come from the shared size cache and load on their own, so the checks fill in as pictures arrive; a picture whose size isn't known yet isn't judged rather than guessed at. The ">6 items" note stays. The lecture skill's audit script now makes the same checks instead of predicting an overflow that can no longer happen. `+5` tests.
 

@@ -74,6 +74,10 @@ export interface TableCell {
    *  The positions it covers are stored as `null`. */
   colspan?: number
   rowspan?: number
+  /** Cell-wide emphasis. Flags rather than `**`/`*` in the text: cell text is
+   *  plain, so Markdown markers would just show. */
+  bold?: boolean
+  italic?: boolean
 }
 
 /** One stored cell. The common case — plain text or a number — stays a bare

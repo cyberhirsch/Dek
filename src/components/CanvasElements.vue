@@ -55,12 +55,14 @@ const emit = defineEmits<{
       sx: number
       sy: number
       index: number
-      kind?: 'text' | 'link' | 'image'
+      kind?: 'text' | 'link' | 'image' | 'cells'
       url?: string
-      /** A canvas table cell: which cell, of which table element. */
+      /** A canvas table cell: which cell, of which table element, and the
+       *  cells the menu acts on (the selected block, or just that cell). */
       imageField?: 'table'
       imageIndex?: number
       imageEl?: number
+      cells?: number[]
     },
   ]
   /** A file dropped or picked onto a canvas table's image cell. Same channel
@@ -787,7 +789,7 @@ defineExpose({ commitEdit })
         :safe-link="safeLink"
         @update:table="setTable(i, $event)"
         @cell-file="(ci, f) => emit('upload', { field: 'table', file: f, index: ci, el: i })"
-        @cell-ctx="(e, ci) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: i, kind: 'image', imageField: 'table', imageIndex: ci, imageEl: i })"
+        @cell-ctx="(e, ci, cells) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: i, kind: 'cells', imageField: 'table', imageIndex: ci, imageEl: i, cells })"
       />
 
       <!-- selection chrome (transform handles only for a single selection) -->

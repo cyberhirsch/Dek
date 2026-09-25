@@ -51,13 +51,15 @@ function compactText(text: string): string | number {
 export function fromGridCell(c: GridCell): TableCellValue {
   if (c.covered) return null
   const span = (c.colspan ?? 1) > 1 || (c.rowspan ?? 1) > 1
-  if (!c.image && !c.link && !span) return compactText(c.text ?? '')
+  if (!c.image && !c.link && !span && !c.bold && !c.italic) return compactText(c.text ?? '')
   const out: TableCell = {}
   if (c.text) out.text = c.text
   if (c.image) out.image = c.image
   if (c.link) out.link = c.link
   if ((c.colspan ?? 1) > 1) out.colspan = c.colspan
   if ((c.rowspan ?? 1) > 1) out.rowspan = c.rowspan
+  if (c.bold) out.bold = true
+  if (c.italic) out.italic = true
   return out
 }
 
@@ -332,6 +334,8 @@ export function tableToBoxes(el: TableElement, lineColor = 'rgba(230,236,242,0.1
             valign: 'middle' as const,
             // header row: the accent colour, as on screen
             ...(t?.header && i < cols ? { color: 'var(--dek-accent)' } : {}),
+            ...(cell.bold ? { bold: true } : {}),
+            ...(cell.italic ? { italic: true } : {}),
           }),
     })
   })

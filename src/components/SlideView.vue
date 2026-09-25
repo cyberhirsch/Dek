@@ -45,7 +45,7 @@ const emit = defineEmits<{
   split: [target: SlideSplitTarget]
   'drop-image': [file: File, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
   'drop-link': [url: string, target: { kind: 'box'; index: number } | { kind: 'new'; x: number; y: number }]
-  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; idle?: IdleText }]
+  ctxmenu: [p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image' | 'cells'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; cells?: number[]; idle?: IdleText }]
 }>()
 
 const glow = computed(() => props.config.theme?.glow !== false)
@@ -489,7 +489,7 @@ watch(
         :safe-link="safeLink"
         @update:table="patch({ table: $event })"
         @cell-file="(i, f) => emit('upload', { field: 'table', file: f, index: i })"
-        @cell-ctx="(e, i) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'image', imageField: 'table', imageIndex: i })"
+        @cell-ctx="(e, i, cells) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'cells', imageField: 'table', imageIndex: i, cells })"
       />
     </div>
 

@@ -52,6 +52,22 @@ import SourcePane from './components/SourcePane.vue'
 import ContextMenu, { isDivider, type CtxEntry, type IdleText } from './components/ContextMenu.vue'
 import type { ElementPatch, BoxElement, TableData } from './core/types'
 import { setTableCell, tableShape, type GridCell } from './core/table'
+import {
+  canMerge,
+  cellsHaveContent,
+  cellsHaveStyle,
+  clearCells,
+  insertColumn,
+  insertRow,
+  isMerged,
+  lineHasContent,
+  mergeCells,
+  mergeWouldDropContent,
+  removeColumn,
+  removeRow,
+  toggleCellStyle,
+  unmergeCell,
+} from './core/tableEdit'
 import { parseContent, rowsToContent } from './render/inline'
 
 const deck = ref<Deck | null>(null)
@@ -1020,6 +1036,72 @@ function canvasItems(sx: number, sy: number): CtxEntry[] {
     { label: 'Add Shape', action: () => appendElements([newElementRect('rect', sx, sy, 240, 160)]) },
   ]
 }
+/**
+ * Right-click on table cells (#48) — the layout's or a canvas table's, one menu
+ * for both. `cells` is the selected block, or just the clicked cell. Actions
+ * read the table fresh when clicked, and anything that discards content asks
+ * first, like shrinking the table does.
+ */
+function tableCellMenu(el: number | undefined, index: number, cells: number[]): CtxEntry[] {
+  const s = deck.value?.slides[current.value]
+  if (!s) return []
+  const cur = () => tableAt(deck.value!.slides[current.value], el)
+  const set = (next: TableData) => setTableAt(el, next)
+  const t = cur()
+  const { rows, cols, cells: all } = tableShape(t)
+  const cell = all[index]
+  const single = cells.length === 1
+  const r = Math.floor(index / cols)
+  const c = index % cols
+  const rs = cell?.rowspan ?? 1
+  const cs = cell?.colspan ?? 1
+  const items: CtxEntry[] = []
+  // A picture cell leads with its picture menu: copy, paste, replace, link, remove.
+  if (single && cell?.image) items.push(...layoutImageItems({ field: 'table', index, el }), { divider: true })
+  items.push(
+    { label: 'Bold', check: cellsHaveStyle(t, cells, 'bold'), action: () => set(toggleCellStyle(cur(), cells, 'bold')) },
+    { label: 'Italic', check: cellsHaveStyle(t, cells, 'italic'), action: () => set(toggleCellStyle(cur(), cells, 'italic')) },
+    { divider: true },
+    {
+      label: single ? 'Clear Cell' : `Clear ${cells.length} Cells`,
+      disabled: !cellsHaveContent(t, cells),
+      action: () => {
+        if (!single && !window.confirm(`Clear the text and pictures from ${cells.length} cells?`)) return
+        set(clearCells(cur(), cells))
+      },
+    },
+  )
+  if (!single) {
+    items.push({
+      label: 'Merge Cells',
+      disabled: !canMerge(t, cells),
+      action: () => {
+        if (mergeWouldDropContent(cur(), cells) && !window.confirm("Merging keeps only the top-left cell's content. Merge anyway?")) return
+        set(mergeCells(cur(), cells))
+      },
+    })
+  }
+  if (single && isMerged(cell)) items.push({ label: 'Unmerge Cells', action: () => set(unmergeCell(cur(), index)) })
+  if (single && !cell?.image) items.push({ label: 'Add Image…', action: () => replaceFieldImage({ field: 'table', index, el }) })
+  // Rows and columns, relative to the clicked cell (and past its merge).
+  const removeLine = (axis: 'row' | 'col') => () => {
+    const at = axis === 'row' ? r : c
+    if (lineHasContent(cur(), axis, at) && !window.confirm(`This ${axis === 'row' ? 'row' : 'column'} has content. Delete it?`)) return
+    set(axis === 'row' ? removeRow(cur(), at) : removeColumn(cur(), at))
+  }
+  items.push(
+    { divider: true },
+    { label: 'Insert Row Above', action: () => set(insertRow(cur(), r)) },
+    { label: 'Insert Row Below', action: () => set(insertRow(cur(), r + rs)) },
+    { label: 'Insert Column Left', action: () => set(insertColumn(cur(), c)) },
+    { label: 'Insert Column Right', action: () => set(insertColumn(cur(), c + cs)) },
+    { divider: true },
+    { label: 'Delete Row', disabled: rows <= 1, action: removeLine('row') },
+    { label: 'Delete Column', disabled: cols <= 1, action: removeLine('col') },
+  )
+  return items
+}
+
 /** The slide's empty background — a regular layout's (#44) or a freeform
  *  canvas's: add or paste elements at the click, then the same slide
  *  operations as the sidebar thumbnail, so there's one menu to learn. */
@@ -1221,8 +1303,13 @@ function thumbItems(index: number): CtxEntry[] {
   )
   return items
 }
-function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; idle?: IdleText }) {
+function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; index: number; kind?: 'text' | 'link' | 'image' | 'cells'; url?: string; imageField?: 'image' | 'portraits' | 'gallery' | 'table'; imageIndex?: number; imageEl?: number; cells?: number[]; idle?: IdleText }) {
   if (!editMode.value) return
+  if (p.kind === 'cells') {
+    const index = p.imageIndex ?? -1
+    ctxMenu.value = { x: p.x, y: p.y, items: tableCellMenu(p.imageEl, index, p.cells?.length ? p.cells : [index]) }
+    return
+  }
   if (p.kind === 'image') {
     const items = layoutImageItems({ field: p.imageField ?? 'image', index: p.imageIndex, el: p.imageEl })
     if (items.length) ctxMenu.value = { x: p.x, y: p.y, items }
