@@ -158,6 +158,9 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Dek's own right-click menu while presenting** (#43)
+Right-clicking a running presentation showed Chrome's menu — Back, Forward, Print, Cast — none of which means anything mid-talk, and one of which navigates away from the deck. Presenting now has its own menu: Next / Previous Slide, Overview, Presenter View, Fullscreen (ticked when on) and Exit Presentation, each with its key. Right-clicking a **link** still gets the browser's menu, so opening it in a new tab works as before.
+
 **Fixed: dragging an image could pull it off its own frame, looking cropped** (#42)
 Panning a framed image had no bounds at all — a drag applied its full delta, so the picture could be dragged clean off the frame: background showed on one side while the picture ran out the other, reading as a hard crop even though nothing had been cropped. Pan is now limited to the picture's actual hidden overflow (half of it per edge, so at the limit one picture edge sits exactly on the matching frame edge). The practical effect: a `cover` image that overflows can still be dragged to choose which part shows, but a `contain` image at scale 1 — already fully visible, with nothing hidden to reveal — no longer moves at all; zoom in first and panning opens up. Zooming back out re-clamps too, instead of leaving the picture stranded at an offset that's now off-frame. The same clamp runs at render, so decks saved with an out-of-bounds focus display correctly without rewriting stored data. The move cursor and hover hint now appear only when there's genuinely something to pan into. New `render/pan.ts` (`panBounds`, `clampPan`) — `+8` tests.
 

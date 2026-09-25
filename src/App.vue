@@ -1260,6 +1260,31 @@ function addLinkToSelection() {
   }
   document.execCommand('createLink', false, url)
 }
+// ── present mode: Dek's own right-click menu (#43) ──
+// Presenting used to show Chrome's menu — Back, Forward, Print, Cast — none of
+// which means anything in a running deck. Links keep the browser's menu, so
+// "open in new tab" still works on them.
+function onPresentContextMenu(e: MouseEvent) {
+  if (editMode.value || !deck.value) return
+  if ((e.target as HTMLElement | null)?.closest('a[href]')) return
+  e.preventDefault()
+  const last = deck.value.slides.length - 1
+  ctxMenu.value = {
+    x: e.clientX,
+    y: e.clientY,
+    items: [
+      { label: 'Next Slide', hint: '→', disabled: current.value >= last, action: () => (current.value = Math.min(last, current.value + 1)) },
+      { label: 'Previous Slide', hint: '←', disabled: current.value <= 0, action: () => (current.value = Math.max(0, current.value - 1)) },
+      { divider: true },
+      { label: 'Overview', hint: 'O', action: () => (overviewOpen.value = true) },
+      { label: 'Presenter View', hint: 'P', action: () => openPresenter() },
+      { label: 'Fullscreen', hint: 'F', check: !!document.fullscreenElement, action: toggleFullscreen },
+      { divider: true },
+      { label: 'Exit Presentation', hint: 'Esc', action: enterEdit },
+    ],
+  }
+}
+
 function textItems(): CtxEntry[] {
   return [
     { label: 'Bold', hint: 'Ctrl+B', action: () => onFormat('bold') },
@@ -1649,7 +1674,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @contextmenu-slide="onSlideContextMenu"
       />
 
-      <div v-if="deck" class="stage-wrap">
+      <div v-if="deck" class="stage-wrap" @contextmenu="onPresentContextMenu">
         <DeckView
           v-model="current"
           :deck="deck"
