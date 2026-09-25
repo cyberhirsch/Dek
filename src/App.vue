@@ -30,6 +30,7 @@ import {
   getCurrentFile,
 } from './api'
 import { deckKey, readSlidePos, writeSlidePos } from './storage/position'
+import { dropRecent, pushRecent, readRecent, writeRecent, type RecentDeck } from './storage/recent'
 import { useUndo } from './composables/useUndo'
 import { usePresenterSync } from './composables/usePresenterSync'
 import { useImport } from './composables/useImport'
@@ -243,18 +244,67 @@ const importAt = ref<number | null>(null)
 async function onBrowserOpen(e: { file: string; path: string[] }) {
   error.value = ''
   try {
-    applyDeck(await openWorkspaceFile(e.file, e.path))
+    const opened = await openWorkspaceFile(e.file, e.path)
+    applyDeck(opened)
+    rememberRecent({ file: e.file, path: e.path, name: opened.config.deck ?? e.file })
     reconnectName.value = null
     deckBrowser.value = null
   } catch (err) {
     if (!isAbort(err)) error.value = `Open failed: ${(err as Error).message}`
   }
 }
+
+// ── recent decks (the deck menu's Recent list) ──
+const recentDecks = ref<RecentDeck[]>(readRecent())
+function rememberRecent(r: RecentDeck) {
+  recentDecks.value = pushRecent(recentDecks.value, r)
+  writeRecent(recentDecks.value)
+}
+/**
+ * Before swapping the open deck for another. Opening used to replace the deck
+ * outright, so with autosave off any unsaved edits were silently lost — and a
+ * one-click Recent list makes that much easier to do by accident. With
+ * autosave on, pending edits are simply saved first; with it off, you're asked.
+ */
+async function readyToLeaveDeck(): Promise<boolean> {
+  // Read through a function: the status changes across the await.
+  const saved = () => saveStatus.value === 'saved'
+  if (saved()) return true
+  if (autosave.value) {
+    await saveWholeDeck()
+    if (saved()) return true
+  }
+  return window.confirm('This deck has unsaved changes. Open another deck and discard them?')
+}
+async function onOpenRecent(r: RecentDeck) {
+  if (!(await readyToLeaveDeck())) return
+  error.value = ''
+  try {
+    const opened = await openWorkspaceFile(r.file, r.path)
+    applyDeck(opened)
+    rememberRecent({ ...r, name: opened.config.deck ?? r.name })
+    reconnectName.value = null
+  } catch (err) {
+    if (isAbort(err)) return
+    // Moved, renamed or deleted since: drop it, so the list only offers decks
+    // that exist. Any other failure (a lapsed folder grant, say) leaves the
+    // entry alone — the deck is still there, it just can't be read right now.
+    if ((err as { name?: string })?.name === 'NotFoundError') {
+      recentDecks.value = dropRecent(recentDecks.value, r)
+      writeRecent(recentDecks.value)
+      error.value = `"${r.name}" is no longer in your decks folder — removed from Recent.`
+    } else {
+      error.value = `Open failed: ${(err as Error).message}`
+    }
+  }
+}
 async function onBrowserSave(e: { name: string; path: string[] }) {
   if (!deck.value) return
   error.value = ''
   try {
-    applyDeck(await saveWorkspaceFile(e.name, deck.value.config, deck.value.slides, e.path))
+    const saved = await saveWorkspaceFile(e.name, deck.value.config, deck.value.slides, e.path)
+    applyDeck(saved.deck)
+    rememberRecent({ file: saved.file, path: e.path, name: saved.deck.config.deck ?? saved.file })
     saveStatus.value = 'saved'
     reconnectName.value = null
     deckBrowser.value = null
@@ -1572,6 +1622,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @save-as="onSaveAs"
       @new-deck="onNewDeck"
       @open-deck="onOpenDeck"
+      :recent-decks="recentDecks"
+      @open-recent="onOpenRecent"
       @import="onImportFile"
       @theme="setTheme"
     />

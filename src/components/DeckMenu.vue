@@ -2,14 +2,16 @@
 import { ref } from 'vue'
 import { listDecks, supportsFS, supportsDir } from '../api'
 import type { DeckRef } from '../storage/types'
+import type { RecentDeck } from '../storage/recent'
 import type { ThemeId } from '../tokens'
 
-defineProps<{ currentName: string; themeId?: ThemeId }>()
+const props = defineProps<{ currentName: string; themeId?: ThemeId; recent?: RecentDeck[] }>()
 const emit = defineEmits<{
   browse: [] //   open Dek's in-app deck browser
   'save-as': []
   new: []
   open: [file: string]
+  'open-recent': [deck: RecentDeck]
   export: []
   import: [file: File]
   theme: [id: ThemeId]
@@ -57,6 +59,17 @@ function pick(file: string) {
   open.value = false
   emit('open', file)
 }
+function pickRecent(r: RecentDeck) {
+  open.value = false
+  emit('open-recent', r)
+}
+/** The open deck is the latest entry — marked, so the list also says where you
+ *  are. Matched on the first entry only: a name alone can repeat across
+ *  folders ("Week 01" in two courses), but the newest entry is the one just
+ *  opened. */
+const isCurrent = (i: number) => i === 0 && props.recent?.[0]?.name === props.currentName
+/** Where a deck lives, for telling same-named decks apart. */
+const where = (r: RecentDeck) => r.path.join(' / ')
 function exportDeck() {
   open.value = false
   emit('export')
@@ -97,7 +110,23 @@ function setTheme(id: ThemeId) {
           </button>
           <button :class="{ active: themeId === 'light' }" @click="setTheme('light')">○ Editorial Light</button>
         </div>
-        <div v-if="decks.length" class="dm-grp">
+        <div v-if="recent?.length" class="dm-grp">
+          <div class="dm-lbl">Recent</div>
+          <button
+            v-for="(r, i) in recent"
+            :key="r.path.join('/') + '/' + r.file"
+            class="dm-deck"
+            :class="{ active: isCurrent(i) }"
+            :title="[...r.path, r.file].join(' / ')"
+            @click="pickRecent(r)"
+          >
+            <span class="dm-deck-name">{{ r.name }}</span>
+            <span v-if="r.path.length" class="dm-deck-where">{{ where(r) }}</span>
+          </button>
+        </div>
+        <!-- The folder's own deck list: only worth showing when it offers a
+             choice — inside a .dek bundle it is just the deck already open. -->
+        <div v-if="decks.length > 1" class="dm-grp">
           <div class="dm-lbl">Decks</div>
           <button v-for="d in decks" :key="d.file" class="dm-deck" @click="pick(d.file)">{{ d.name }}</button>
         </div>
@@ -194,6 +223,24 @@ function setTheme(id: ThemeId) {
 }
 .dm-menu button.active {
   color: #7fc7ff;
+}
+/* A recent deck: its name, and beneath it the folder it lives in — the only
+   way to tell two "Week 01"s from different courses apart. */
+.dm-menu button.dm-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dm-deck-name,
+.dm-deck-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.dm-deck-where {
+  font-size: 10px;
+  color: rgba(230, 236, 242, 0.45);
 }
 .dm-note {
   padding: 8px;

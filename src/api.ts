@@ -433,16 +433,23 @@ export async function openWorkspaceFile(file: string, path: string[] = []): Prom
 
 /** Save the deck as a new `<name>.dek` bundle in the workspace, at an optional
  *  subfolder path. No dialog. */
-export async function saveWorkspaceFile(name: string, config: DeckConfig, slides: Slide[], path: string[] = []): Promise<Deck> {
+export async function saveWorkspaceFile(
+  name: string,
+  config: DeckConfig,
+  slides: Slide[],
+  path: string[] = [],
+): Promise<{ deck: Deck; file: string }> {
   const dir = await workspaceFolder(path)
   if (!dir) throw new Error('No decks folder chosen yet.')
-  const { backend, deck, bundle } = await createWorkspaceDeck(dir, name, { config, slides })
+  const { backend, deck, bundle, file } = await createWorkspaceDeck(dir, name, { config, slides })
   override = backend
   setCurrent(BUNDLE_MD)
   await clearActiveFile()
   await rememberActiveFolder(bundle, BUNDLE_MD)
   setServerBaseMtime(undefined)
-  return deck
+  // `file` is the bundle actually created — uniquified if the name was taken
+  // (`Week 01 2.dek`) — so a caller can find this deck again.
+  return { deck, file }
 }
 
 /** Copy every slide from another workspace deck into the *active* deck's asset

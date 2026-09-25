@@ -6,6 +6,7 @@ import { TYPE_SCALE } from '../core/defaults'
 import { TABLE_CELL_SIZE, emptyTable, resizeTable, resizeWouldDropContent, tableShape } from '../core/table'
 import { DEFAULT_THEME, type ThemeId } from '../tokens'
 import DeckMenu from './DeckMenu.vue'
+import type { RecentDeck } from '../storage/recent'
 import ColorPicker from './ColorPicker.vue'
 
 const props = defineProps<{
@@ -18,6 +19,7 @@ const props = defineProps<{
   reviewCount: number
   tool: CanvasTool
   selectedElement: SlideElement | null
+  recentDecks?: RecentDeck[]
   showSource: boolean
 }>()
 const emit = defineEmits<{
@@ -35,6 +37,7 @@ const emit = defineEmits<{
   'save-as': []
   'new-deck': []
   'open-deck': [file: string]
+  'open-recent': [deck: RecentDeck]
   import: [file: File]
   theme: [id: ThemeId]
   'update:tool': [t: CanvasTool]
@@ -246,6 +249,8 @@ const themeSwatches = computed(() => {
       <DeckMenu
         :current-name="deck.config.deck ?? 'deck'"
         :theme-id="(deck.config.theme?.preset as ThemeId | undefined) ?? 'default'"
+        :recent="recentDecks"
+        @open-recent="emit('open-recent', $event)"
         @browse="emit('browse')"
         @save-as="emit('save-as')"
         @new="emit('new-deck')"
