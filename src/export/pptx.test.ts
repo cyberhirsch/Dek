@@ -255,6 +255,42 @@ describe('deckToPptx — tables', () => {
   })
 })
 
+describe('deckToPptx — picture placement', () => {
+  // A real 2:1 PNG header: PowerPoint used to stretch it to any box shape.
+  const header = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0x07, 0xd0, 0, 0, 0x03, 0xe8, 8, 6, 0, 0, 0])
+  const widePng = Buffer.from(header).toString('base64')
+  const resolveWide = async () => ({ base64: widePng, ext: 'png' })
+
+  async function slideXml(deck: Deck) {
+    const blob = await deckToPptx(deck, resolveWide)
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()))
+    return zip.file('ppt/slides/slide1.xml')!.async('string')
+  }
+  const square = (fit?: 'cover' | 'contain') => ({
+    config: {},
+    slides: [{ layout: 'freeform' as const, elements: [{ type: 'box' as const, x: 0, y: 0, w: 400, h: 400, rotation: 0, src: 'wide.png', ...(fit ? { fit } : {}) }] }],
+  })
+
+  it('crops a cover picture to its box instead of stretching it', async () => {
+    const xml = await slideXml(square())
+    expect(xml).toContain('<a:srcRect l="25000" t="0" r="25000" b="0"/>')
+  })
+
+  it('shrinks a contain picture to its own shape, centred in the box', async () => {
+    const xml = await slideXml(square('contain'))
+    expect(xml).not.toContain('<a:srcRect')
+    // 400×200 at y = 100: 9525 EMU per px
+    expect(xml).toContain(`<a:off x="0" y="${100 * 9525}"/><a:ext cx="${400 * 9525}" cy="${200 * 9525}"/>`)
+  })
+
+  it('keeps the old placement when the size cannot be read, rather than failing', async () => {
+    const blob = await deckToPptx(square(), async () => ({ base64: 'bm90IGFuIGltYWdl', ext: 'png' }))
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()))
+    const xml = await zip.file('ppt/slides/slide1.xml')!.async('string')
+    expect(xml).toContain(`<a:ext cx="${400 * 9525}" cy="${400 * 9525}"/>`)
+  })
+})
+
 describe('inlineRuns', () => {
   it('splits bold / italic / plain into styled runs', () => {
     expect(inlineRuns('a **b** c')).toEqual([

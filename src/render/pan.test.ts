@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampPan, panBounds } from './pan'
+import { clampPan, panBounds, placePicture } from './pan'
 
 // A 16:9 picture in a square frame — the case in the editor that exposed the
 // bug: a drag could pull the picture clean off its frame, showing background on
@@ -52,5 +52,41 @@ describe('clampPan', () => {
   it('pins to 0 when there is no room to pan', () => {
     expect(clampPan(120, 0)).toBe(0)
     expect(clampPan(-120, 0)).toBe(0)
+  })
+})
+
+describe('placePicture — what the frame shows, as a rect + source crop', () => {
+  const wide = { w: 2000, h: 1000 } // 2:1
+  const square = { w: 100, h: 100 }
+
+  it('cover: fills the frame and crops the overflow evenly', () => {
+    const p = placePicture(wide, square, 'cover')!
+    expect([p.x, p.y, p.w, p.h]).toEqual([0, 0, 100, 100])
+    expect(p.crop.l).toBeCloseTo(0.25, 9)
+    expect(p.crop.r).toBeCloseTo(0.25, 9)
+    expect(p.crop.t).toBeCloseTo(0, 9)
+  })
+
+  it('contain: shrinks to the picture, centred, with nothing cropped', () => {
+    const p = placePicture(wide, square, 'contain')!
+    expect([p.x, p.y, p.w, p.h]).toEqual([0, 25, 100, 50])
+    expect(p.crop).toEqual({ l: 0, t: 0, r: 0, b: 0 })
+  })
+
+  it('zoom crops further, about the centre', () => {
+    const p = placePicture({ w: 100, h: 100 }, square, 'cover', { scale: 2 })!
+    expect([p.x, p.y, p.w, p.h]).toEqual([0, 0, 100, 100])
+    for (const side of ['l', 't', 'r', 'b'] as const) expect(p.crop[side]).toBeCloseTo(0.25, 9)
+  })
+
+  it('pan moves the crop window, clamped as on screen', () => {
+    // 2:1 in a square, cover: 50px of overflow each side; a far pan clamps to it
+    const p = placePicture(wide, square, 'cover', { x: 999, y: 0, scale: 1 })!
+    expect(p.crop.l).toBeCloseTo(0, 9)
+    expect(p.crop.r).toBeCloseTo(0.5, 9)
+  })
+
+  it('is null with no size to work from', () => {
+    expect(placePicture({ w: 0, h: 0 }, square, 'cover')).toBeNull()
   })
 })

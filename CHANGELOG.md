@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Export
+
+**Fixed: PowerPoint export stretched pictures out of shape** (#53)
+Every picture went into the `.pptx` stretched to fill its box. Any picture whose shape differed from its frame — which is the default, since frames crop to fill — came out squashed or stretched, and pan/zoom was ignored entirely. The exporter now reads each picture's real size from its file header (PNG, JPEG — including past large EXIF blocks — GIF, WebP, BMP, SVG; no browser needed) and places it the way the slide shows it. *Fill* pictures are cropped with PowerPoint's own source crop, so they stay editable and can be re-cropped there. *Fit* pictures get a box shrunk to their own shape. Pan and zoom carry across. The geometry is the same `object-fit` + zoom + clamped-pan model the editor draws with (`placePicture` in `render/pan.ts`). If a size can't be read, the old placement is the fallback — never an error. Video posters now sit whole inside their frame, as on screen. `+16` tests.
+
 ### Layouts
 
 **Short gallery labels as badges** (#56)
