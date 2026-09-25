@@ -158,6 +158,12 @@ The light theme was partly unreadable because `slide.css` hardcoded the *dark* t
 
 ### Canvas & editor
 
+**Fixed: a slide with a canvas element on top lost its clickable text** (#44)
+Any regular layout can carry canvas elements on top — a QR code on a Text slide, an arrow on an image. As soon as it did, the canvas layer covered the **whole** slide, so clicking the title or a bullet started a selection marquee instead of editing it. On such slides the layout's own text couldn't be clicked into at all. Now only the elements themselves catch the pointer; everywhere else belongs to the layout. The one thing given up is drag-selecting several canvas elements from empty space over a regular layout — click or Shift-click them instead. Freeform canvases, where the canvas *is* the slide, work as before. Clicking into the layout now also clears an element selection.
+
+**A right-click menu on the slide's empty background** (#44)
+Right-clicking empty space on a regular layout fell through to the browser's menu. It now opens Dek's stage menu: Paste, Add Text Box and Add Shape at the spot you clicked, then the slide operations — Duplicate, Insert Before/After, Cut/Copy/Paste Slide, Delete and the rest of the sidebar thumbnail's menu. A Freeform canvas's empty-space menu gains the same slide operations, so there's one background menu to learn. Right-clicking an image, a table cell or text still opens its own menu.
+
 **Right-click a heading or list to edit or format it** (#46)
 Right-clicking a title or bullet list you weren't already typing in fell through to the browser's menu, which has nothing useful for slide text. It now offers **Edit Text** — which starts editing with the caret where you clicked — followed by Bold, Italic, Underline, Strikethrough and Add Link. With nothing selected, those apply to the **whole** text. While you're actively typing, a plain caret still gets the browser's menu, so spell-check suggestions keep working; a selection or a link inside text you're editing gets Dek's menus, as before.
 

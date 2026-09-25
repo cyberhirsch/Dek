@@ -23,6 +23,10 @@ const props = defineProps<{
   selected?: number[]
   /** URL for the image tool — dragging out a rectangle places this picture. */
   pendingImage?: string
+  /** Laid over a regular layout rather than being the whole slide (freeform).
+   *  Then only the elements catch the pointer: the empty area belongs to the
+   *  layout underneath, whose title and text must stay clickable. */
+  overlay?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -160,8 +164,14 @@ function onCanvasDrop(e: DragEvent) {
 // Capture pointer events only when there's something to do here: a creation tool
 // is active, or the slide actually has elements. Otherwise stay transparent so
 // the underlying semantic layout (EditableText, image frames) stays clickable.
+// The whole layer catches the pointer while a creation tool is armed, and on a
+// freeform canvas. Over a regular layout it used to catch it as soon as the
+// slide had any element — covering the layout's own title and text, so a click
+// there drew a selection marquee instead of editing. There, only the elements
+// themselves catch it (`.overlay .el` below).
+const creating = computed(() => !!props.tool && props.tool !== 'select')
 const interactive = computed(
-  () => !!props.editable && ((props.tool && props.tool !== 'select') || props.elements.length > 0),
+  () => !!props.editable && (creating.value || (!props.overlay && props.elements.length > 0)),
 )
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
@@ -652,7 +662,7 @@ defineExpose({ commitEdit })
   <div
     ref="root"
     class="canvas-layer"
-    :class="{ editable, creating: editable && tool && tool !== 'select', 'drop-active': dropActive }"
+    :class="{ editable, overlay, creating: editable && tool && tool !== 'select', 'drop-active': dropActive }"
     :style="{ pointerEvents: interactive ? 'auto' : 'none' }"
     @pointerdown="onBackgroundDown"
     @contextmenu="onContextMenu"
@@ -889,6 +899,11 @@ defineExpose({ commitEdit })
   position: absolute;
   transform-origin: center center;
   box-sizing: border-box;
+}
+/* Over a regular layout the layer lets the pointer through; its elements opt
+   back in, so they stay selectable, movable and right-clickable. */
+.canvas-layer.editable.overlay .el {
+  pointer-events: auto;
 }
 .canvas-layer.editable .el {
   cursor: move;

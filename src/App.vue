@@ -1020,6 +1020,12 @@ function canvasItems(sx: number, sy: number): CtxEntry[] {
     { label: 'Add Shape', action: () => appendElements([newElementRect('rect', sx, sy, 240, 160)]) },
   ]
 }
+/** The slide's empty background — a regular layout's (#44) or a freeform
+ *  canvas's: add or paste elements at the click, then the same slide
+ *  operations as the sidebar thumbnail, so there's one menu to learn. */
+function stageItems(sx: number, sy: number): CtxEntry[] {
+  return [...canvasItems(sx, sy), { divider: true }, ...thumbItems(current.value)]
+}
 function elementItems(index: number): CtxEntry[] {
   const el = deck.value?.slides[current.value]?.elements?.[index]
   const items: CtxEntry[] = [
@@ -1231,7 +1237,7 @@ function onCanvasContextMenu(p: { x: number; y: number; sx: number; sy: number; 
     return
   }
   if (p.index < 0) {
-    ctxMenu.value = { x: p.x, y: p.y, items: canvasItems(p.sx, p.sy) }
+    ctxMenu.value = { x: p.x, y: p.y, items: stageItems(p.sx, p.sy) }
     return
   }
   // Right-clicking an element outside the current selection selects just it.

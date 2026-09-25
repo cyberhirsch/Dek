@@ -133,6 +133,22 @@ function patchConfig(p: Partial<DeckConfig>) {
 // title/caption/etc. AND EditableTextList's `.dek-list.editable-list` bullets),
 // so it can't fire for image frames or the freeform canvas, which have no
 // contenteditable ancestor and handle their own menus.
+const slideRoot = ref<HTMLElement | null>(null)
+/** A screen point in 1280×720 stage px — where a text box or shape added from
+ *  the menu should land. The stage is CSS-scaled to fit the window. */
+function toStagePoint(e: MouseEvent): { x: number; y: number } {
+  const r = slideRoot.value?.getBoundingClientRect()
+  if (!r || !r.width) return { x: 0, y: 0 }
+  return { x: Math.round(((e.clientX - r.left) / r.width) * 1280), y: Math.round(((e.clientY - r.top) / r.height) * 720) }
+}
+/** Clicking into the layout (its text, its background) ends an element
+ *  selection, as clicking empty canvas does on a freeform slide. */
+function onLayoutPointerDown(e: PointerEvent) {
+  if (!props.editable || !props.selectedEl?.length) return
+  if ((e.target as HTMLElement | null)?.closest('.canvas-layer')) return
+  emit('update:selectedEl', [])
+}
+
 /** Focus an editable text and put the caret at a screen point inside it, or
  *  at its end if the point doesn't land in it. */
 function caretAt(host: HTMLElement, x: number, y: number) {
@@ -163,6 +179,8 @@ function selectAllIn(host: HTMLElement) {
 
 function onTextCtx(e: MouseEvent) {
   if (!props.editable) return
+  // Something inside already opened its own menu (an image, a table cell).
+  if (e.defaultPrevented) return
   const target = e.target as HTMLElement | null
   // The canvas-elements overlay (freeform boxes, or freeform elements layered
   // on any layout) wires its own contenteditable text boxes and context menu
@@ -170,7 +188,14 @@ function onTextCtx(e: MouseEvent) {
   // twice, once by it and once (with the wrong index) by this generic handler.
   if (target?.closest('.canvas-layer')) return
   const host = target?.closest('[contenteditable="true"]') as HTMLElement | null
-  if (!host) return
+  if (!host) {
+    // The layout's empty background (#44): Dek's stage menu — add a text box or
+    // shape here, paste, and the slide operations — in place of the browser's.
+    e.preventDefault()
+    const p = toStagePoint(e)
+    emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: p.x, sy: p.y, index: -1 })
+    return
+  }
   const sel = window.getSelection()
   if (!sel || !sel.rangeCount || !sel.anchorNode || !host.contains(sel.anchorNode)) {
     // Text that isn't being edited: offer to start editing it (caret where
@@ -242,7 +267,7 @@ watch(
 </script>
 
 <template>
-  <div class="dek-slide" :class="['l-' + slide.layout, { glow }]" @contextmenu="onTextCtx">
+  <div ref="slideRoot" class="dek-slide" :class="['l-' + slide.layout, { glow }]" @contextmenu="onTextCtx" @pointerdown="onLayoutPointerDown">
     <EditableText
       v-if="editable && slide.layout !== 'cover'"
       class="dek-header"
@@ -481,6 +506,7 @@ watch(
       :tool="tool"
       :selected="selectedEl"
       :pending-image="pendingImage"
+      :overlay="slide.layout !== 'freeform'"
       @update:elements="emit('update:elements', $event)"
       @update:selected="emit('update:selectedEl', $event)"
       @create="emit('create-element', $event)"
