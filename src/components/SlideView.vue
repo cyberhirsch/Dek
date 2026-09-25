@@ -68,7 +68,10 @@ const galleryCols = computed(() => galleryColumns(props.slide.columns, galleryIt
 const galleryRows = computed(() => Math.max(1, Math.ceil(galleryItems.value.length / galleryCols.value)))
 /** A label row under every picture when any has a label (or while editing, to
  *  type one) — all or none, so the frames in a row line up, as bake draws it. */
-const galleryLabelRow = computed(() => !!props.editable || galleryItems.value.some((it) => it.label))
+const galleryOverlay = computed(() => props.slide.labelPos === 'overlay')
+const galleryLabelRow = computed(
+  () => !galleryOverlay.value && (!!props.editable || galleryItems.value.some((it) => it.label)),
+)
 const listBaseSize = computed(() =>
   props.slide.layout === 'text-image' && (props.slide.imageRatio ?? '16:9') === '16:9' ? 21 : 26,
 )
@@ -345,6 +348,17 @@ watch(
               <FramedImage :src="it.image" :focus="it.focus" :editable="editable" pannable @update:focus="setGalleryFocus(i, $event)" @file="emit('upload', { field: 'gallery', file: $event, index: i })" />
               <a v-if="!editable && safeLink(it.link)" class="img-link" :href="safeLink(it.link)" target="_blank" rel="noopener noreferrer" />
               <button v-if="editable" class="cell-x" title="Remove" @click="removeGalleryItem(i)">✕</button>
+              <template v-if="galleryOverlay && (editable || it.label)">
+                <EditableText
+                  v-if="editable"
+                  class="gallery-badge"
+                  :class="{ empty: !it.label }"
+                  :model-value="it.label"
+                  placeholder="1"
+                  @update:model-value="setGalleryLabel(i, $event)"
+                />
+                <span v-else class="gallery-badge">{{ it.label }}</span>
+              </template>
             </div>
             <FittedText v-if="galleryLabelRow" class="fit-gallery-label" content-class="label" :model-value="it.label" :editable="editable" placeholder="label" :base-size="28" :min-size="11" splittable @update:model-value="setGalleryLabel(i, $event)" @split="emit('split', { kind: 'gallery-label', index: i })" />
           </div>

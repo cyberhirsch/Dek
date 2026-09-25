@@ -19,6 +19,34 @@ import { BOX_DEFAULTS, TEXT_DEFAULTS, ARROW_DEFAULTS } from './defaults'
 import { emptyTable } from './table'
 import { GALLERY_GAP, GALLERY_LABEL_GAP, GALLERY_LABEL_H, GALLERY_TITLE_GAP, GALLERY_TITLE_H, galleryCells, galleryColumns, galleryItemsOf } from './gallery'
 
+/** A gallery label badge (`labelPos: overlay`) — mirrors `.gallery-badge`:
+ *  a 40px pill 12px in from the picture's top-left, heading italic 26px in the
+ *  accent on a dark translucent fill. Width follows the label, capped at the
+ *  cell. Built as a plain box (not `text()`): its size IS the pill, no inset. */
+function galleryBadge(label: string, cellX: number, cellY: number, cellW: number): BoxElement {
+  const w = Math.min(cellW - 24, Math.max(40, label.length * 26 * 0.5 + 28))
+  return {
+    type: 'box',
+    x: Math.round(cellX + 12),
+    y: Math.round(cellY + 12),
+    w: Math.round(w),
+    h: 40,
+    rotation: 0,
+    fill: 'rgba(7,8,9,0.72)',
+    stroke: 'transparent',
+    radius: 20,
+    content: label,
+    font: 'heading',
+    italic: true,
+    weight: 300,
+    size: 26,
+    lineHeight: 1,
+    align: 'center',
+    valign: 'middle',
+    color: 'var(--dek-accent)',
+  }
+}
+
 /** A deep copy of a table — JSON, not structuredClone, because the slide is
  *  usually a Vue reactive proxy, which structuredClone rejects. Keeps the baked
  *  element from sharing nested arrays with the slide it came from. */
@@ -257,13 +285,15 @@ export function bakeToElements(slide: Slide): SlideElement[] {
         els.push(text(title, PAD_X, y, INNER_W, GALLERY_TITLE_H, { ...HEAD }))
         y += GALLERY_TITLE_H + GALLERY_TITLE_GAP
       }
-      const labelRow = items.some((it) => it.label)
+      const overlay = slide.labelPos === 'overlay'
+      const labelRow = !overlay && items.some((it) => it.label)
       const g = galleryCells(items.length, galleryColumns(slide.columns, items.length), { w: INNER_W, h: STAGE_H - PAD_Y - y }, labelRow)
       items.forEach((it, i) => {
         const cx = PAD_X + (i % g.cols) * (g.cellW + GALLERY_GAP)
         const cy = y + Math.floor(i / g.cols) * (g.cellH + GALLERY_GAP)
         if (it.image) els.push(image(it.image, cx, cy, g.cellW, g.frameH, { radius: 10, stroke: 'rgba(230,236,242,0.1)', strokeWidth: 1, link: it.link, focus: it.focus }))
-        if (it.label) els.push(text(it.label, cx, cy + g.frameH + GALLERY_LABEL_GAP, g.cellW, GALLERY_LABEL_H, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
+        if (it.label && overlay) els.push(galleryBadge(it.label, cx, cy, g.cellW))
+        else if (it.label) els.push(text(it.label, cx, cy + g.frameH + GALLERY_LABEL_GAP, g.cellW, GALLERY_LABEL_H, { font: 'heading', italic: true, size: 28, align: 'center', color: 'var(--dek-accent)', lineHeight: 1.2 }))
       })
       break
     }

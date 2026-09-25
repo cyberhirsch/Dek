@@ -281,6 +281,10 @@ export interface Slide {
   imageDesaturate?: boolean
   captionPos?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
   columns?: number | 'auto'
+  /** gallery: where labels go. `below` (default) gives each picture a label
+   *  row; `overlay` sets a short label ("1", "A") as a badge on the picture's
+   *  corner, so a quiz gallery gets that height back for its pictures. */
+  labelPos?: 'below' | 'overlay'
   focus?: Focus
   /** table: the grid itself — the same object a `table` canvas element carries. */
   table?: TableData

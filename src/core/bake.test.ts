@@ -139,6 +139,22 @@ describe('bakeToElements geometry contract', () => {
     }
   })
 
+  it('draws overlay labels as badges on the picture, giving the label row back', () => {
+    const items = [{ image: 'a.png', label: '1' }, { image: 'b.png', label: '2' }]
+    const below = bakeToElements({ layout: 'gallery', items })
+    const badge = bakeToElements({ layout: 'gallery', items, labelPos: 'overlay' })
+    const picBelow = boxes(below).find((b) => b.src === 'a.png')!
+    const picBadge = boxes(badge).find((b) => b.src === 'a.png')!
+    // the picture is taller by exactly the label row it no longer needs
+    expect(picBadge.h - picBelow.h).toBe(44 + 10)
+    // the label sits inside the picture's top-left corner, as a pill
+    const pill = boxes(badge).find((b) => b.content === '1')!
+    expect(pill.x).toBe(picBadge.x + 12)
+    expect(pill.y).toBe(picBadge.y + 12)
+    expect(pill.radius).toBe(20)
+    expect(pill.color).toBe('var(--dek-accent)')
+  })
+
   it('bakes a gallery written as bare strings — those used to vanish from export', () => {
     const els = bakeToElements({ layout: 'gallery', items: ['a.png', 'b.png'] as never })
     expect(boxes(els).filter((b) => b.src).map((b) => b.src)).toEqual(['a.png', 'b.png'])

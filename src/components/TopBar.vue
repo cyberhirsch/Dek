@@ -525,6 +525,11 @@ const themeSwatches = computed(() => {
             :class="{ on: (slide.columns ?? 'auto') === c }"
             @click="emit('patch', { columns: c as any })">{{ c }}</button>
         </div>
+        <label class="lbl">Labels</label>
+        <div class="seg">
+          <button title="A label row beneath each picture" :class="{ on: (slide.labelPos ?? 'below') === 'below' }" @click="emit('patch', { labelPos: undefined })">below</button>
+          <button title="Short labels (1, A) as a badge on the picture — the pictures get the height" :class="{ on: slide.labelPos === 'overlay' }" @click="emit('patch', { labelPos: 'overlay' })">badge</button>
+        </div>
       </template>
 
       <!-- table: the Table layout or a selected canvas table — same controls -->

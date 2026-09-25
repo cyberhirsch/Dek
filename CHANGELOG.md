@@ -6,6 +6,9 @@
 
 ### Layouts
 
+**Short gallery labels as badges** (#56)
+A gallery's labels can now sit **on** the pictures: `labelPos: overlay` (*Labels: badge* in the top bar) draws a short label — "1", "A" — as a pill in the picture's top-left corner. The label row goes, so a quiz gallery ("which one is real?") gives that height back to its pictures: 54px per row. The badge uses the label's own face, Cormorant light italic, in the accent colour on a dark translucent pill, so it reads over any picture. PowerPoint and Freeform draw the same pill. The editor's ✕ remove button moved to the top-right beside the ⇄ replace button, so both picture controls sit together and the corner belongs to the badge. `+1` test.
+
 **Fixed: galleries ran off the bottom of the slide** (#52)
 A gallery with more than one row of landscape pictures — and some single rows — continued below the stage, with nothing clipped and no warning. Real case: four 16:9 pictures in two columns needed about 750px where the stage has 474. The grid set its columns but not its rows, so every row grew to its tallest picture's natural height at column width. Rows are now explicit, equal shares of the height, and a cell may shrink to its row. However many pictures and whatever their shapes, the grid can't be taller than its box.
 
