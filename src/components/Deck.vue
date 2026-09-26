@@ -129,6 +129,52 @@ function advance(dir: 1 | -1) {
   go(props.modelValue + dir)
 }
 
+// ── drawing while presenting ──
+// D turns the pointer into a pen; D again wipes the ink and leaves the mode.
+// Ink is per slide (flip away and back and it's still there) and never saved —
+// it's chalk on the board, not deck content. Leaving the presentation wipes it.
+const drawing = ref(false)
+const ink = ref<Record<number, string[]>>({})
+const live = ref<string | null>(null)
+const frame = ref<HTMLElement | null>(null)
+function toggleDrawing() {
+  drawing.value = !drawing.value
+  if (!drawing.value) {
+    ink.value = {}
+    live.value = null
+  }
+}
+watch(
+  () => props.editable,
+  (ed) => {
+    if (ed && drawing.value) toggleDrawing()
+  },
+)
+function stagePoint(e: PointerEvent): string {
+  const r = frame.value!.getBoundingClientRect()
+  const x = ((e.clientX - r.left) / r.width) * STAGE_W
+  const y = ((e.clientY - r.top) / r.height) * STAGE_H
+  return `${x.toFixed(1)} ${y.toFixed(1)}`
+}
+function onInkDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  const p = stagePoint(e)
+  // A zero-length segment so a single click leaves a dot.
+  live.value = `M${p} L${p}`
+}
+function onInkMove(e: PointerEvent) {
+  if (live.value === null) return
+  live.value += ` L${stagePoint(e)}`
+}
+function onInkUp() {
+  if (live.value === null) return
+  const i = renderIndex.value
+  ink.value = { ...ink.value, [i]: [...(ink.value[i] ?? []), live.value] }
+  live.value = null
+}
+
 function onKey(e: KeyboardEvent) {
   // Suspended while an overlay (overview / presenter / export) owns the keyboard.
   if (props.navEnabled === false) return
@@ -140,7 +186,10 @@ function onKey(e: KeyboardEvent) {
     if (e.key === 'PageUp') go(props.modelValue - 1)
     return
   }
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+  if (!props.editable && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault()
+    toggleDrawing()
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault()
     advance(1)
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -192,7 +241,8 @@ function onTouchStart(e: TouchEvent) {
   touchStartY = t.clientY
 }
 function onTouchEnd(e: TouchEvent) {
-  if (props.editable || props.navEnabled === false) return
+  // A pen stroke is not a swipe.
+  if (props.editable || props.navEnabled === false || drawing.value) return
   const t = e.changedTouches[0]
   const dx = t.clientX - touchStartX
   const dy = t.clientY - touchStartY
@@ -222,6 +272,7 @@ onUnmounted(() => {
 <template>
   <div ref="stage" class="dek-stage" :style="themeVars">
     <div
+      ref="frame"
       class="dek-frame"
       :style="{
         width: STAGE_W + 'px',
@@ -255,11 +306,49 @@ onUnmounted(() => {
         @drop-link="(u, t) => emit('drop-link', u, t)"
         @ctxmenu="emit('ctxmenu', $event)"
       />
+      <!-- Presenter ink (D). Drawn in slide coordinates, so it scales with
+           the stage; it takes the pointer only while the pen is active. -->
+      <svg
+        v-if="drawing || ink[renderIndex]?.length"
+        class="dek-ink"
+        :class="{ pen: drawing }"
+        :viewBox="`0 0 ${STAGE_W} ${STAGE_H}`"
+        @pointerdown="drawing && onInkDown($event)"
+        @pointermove="onInkMove"
+        @pointerup="onInkUp"
+        @pointercancel="onInkUp"
+      >
+        <path v-for="(d, k) in ink[renderIndex] ?? []" :key="k" :d="d" />
+        <path v-if="live" :d="live" />
+      </svg>
     </div>
   </div>
 </template>
 
 <style scoped>
+.dek-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  pointer-events: none;
+  touch-action: none;
+}
+.dek-ink.pen {
+  pointer-events: auto;
+  /* A pen nib: a small accent dot, hotspot at its centre. */
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Ccircle cx='6' cy='6' r='4' fill='%23fff' stroke='%23000' stroke-opacity='.5'/%3E%3C/svg%3E") 6 6,
+    crosshair;
+}
+.dek-ink path {
+  fill: none;
+  stroke: var(--dek-accent2, #ffb474);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .dek-stage {
   flex: 1;
   position: relative;

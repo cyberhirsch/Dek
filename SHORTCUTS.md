@@ -22,6 +22,7 @@
 | `F` | Toggle fullscreen |
 | `O` | Open slide overview |
 | `P` / `S` | Open presenter view |
+| `D` | Draw on the slide with the pointer; `D` again clears the ink and stops drawing |
 
 ---
 

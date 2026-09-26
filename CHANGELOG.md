@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Presenting
+
+**Draw on slides while presenting (`D`)**
+Press `D` in a presentation and the pointer becomes a pen: draw on the slide to point things out. Press `D` again to wipe everything and put the pen away. Ink belongs to the slide it was drawn on, so flipping away and back keeps it; arrows and the scroll wheel still change slides while the pen is out, and a pen stroke on a touch screen doesn't count as a swipe. Ink is never saved to the deck, and returning to the editor wipes it.
+
+### Images
+
+**Fixed: pan and zoom couldn't reach the cropped parts of a picture**
+A framed picture was cropped *inside* its image element before pan and zoom applied, so dragging slid an already-cropped picture: empty background came in on one side while the hidden side never appeared, and zooming out only shrank the crop. The image element is now the whole fitted picture, centred, clipped only by its frame — dragging reveals the hidden sides up to the picture's own edge, and a Fill picture can zoom out until the whole picture shows. Applies to every framed picture (layouts, gallery, table cells, canvas). Gallery pictures are also clipped by their own frame rather than the slot around it, which put badges and links on the frame's corner, as in export.
+
 ### Export
 
 **Fixed: PowerPoint export stretched pictures out of shape** (#53)
