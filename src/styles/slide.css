@@ -689,7 +689,12 @@
   justify-content: center;
   container-type: size;
 }
+/* position: relative makes the frame the containing block of the absolutely
+   placed picture, badge and link. Without it they resolved against the slot:
+   a hugging frame then clipped a picture sized, fitted and panned for the
+   larger slot — content cut off with no way to pan it back into view. */
 .gallery-cell .frame {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   height: 100%;

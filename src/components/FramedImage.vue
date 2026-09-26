@@ -87,6 +87,7 @@ const style = computed(() => {
 const dragging = ref(false)
 let start = { x: 0, y: 0 }
 let origin = { x: 0, y: 0 }
+let screenPerPx = 1
 
 function curFocus(): Focus {
   return { x: 0, y: 0, scale: 1, ...(props.focus ?? {}) }
@@ -95,6 +96,10 @@ function onMouseDown(e: MouseEvent) {
   if (!props.editable || !props.pannable) return
   dragging.value = true
   start = { x: e.clientX, y: e.clientY }
+  // The stage is CSS-scaled; pointer deltas are screen px, the pan is in the
+  // frame's own px. Convert, so the picture tracks the cursor at any zoom.
+  const el = root.value
+  screenPerPx = el && el.clientWidth ? el.getBoundingClientRect().width / el.clientWidth || 1 : 1
   const f = curFocus()
   // Start from the clamped position the user can actually see, so a drag that
   // begins on a stored out-of-bounds focus doesn't jump.
@@ -109,8 +114,8 @@ function onMove(e: MouseEvent) {
   const b = boundsFor(f.scale)
   emit('update:focus', {
     ...f,
-    x: clampPan(origin.x + (e.clientX - start.x), b.x),
-    y: clampPan(origin.y + (e.clientY - start.y), b.y),
+    x: clampPan(origin.x + (e.clientX - start.x) / screenPerPx, b.x),
+    y: clampPan(origin.y + (e.clientY - start.y) / screenPerPx, b.y),
   })
 }
 function onUp() {
