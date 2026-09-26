@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampPan, panBounds, placePicture } from './pan'
+import { clampPan, minScale, panBounds, placePicture } from './pan'
 
 // A 16:9 picture in a square frame — the case in the editor that exposed the
 // bug: a drag could pull the picture clean off its frame, showing background on
@@ -88,5 +88,28 @@ describe('placePicture — what the frame shows, as a rect + source crop', () =>
 
   it('is null with no size to work from', () => {
     expect(placePicture({ w: 0, h: 0 }, square, 'cover')).toBeNull()
+  })
+})
+
+describe('minScale — how far out a picture may zoom', () => {
+  it('lets cover zoom out until the whole picture fits', () => {
+    // 2:1 in a square: cover is 0.1, contain 0.05 — half the cover scale
+    expect(minScale({ w: 2000, h: 1000 }, { w: 100, h: 100 }, 'cover')).toBeCloseTo(0.5, 9)
+  })
+
+  it('keeps contain at its fit, which already shows everything', () => {
+    expect(minScale({ w: 2000, h: 1000 }, { w: 100, h: 100 }, 'contain')).toBe(1)
+  })
+
+  it('is 1 before the picture has a size', () => {
+    expect(minScale({ w: 0, h: 0 }, { w: 100, h: 100 }, 'cover')).toBe(1)
+  })
+
+  it('at that floor a cover picture is shown whole, exactly as contain', () => {
+    const wide = { w: 2000, h: 1000 }
+    const square = { w: 100, h: 100 }
+    const out = placePicture(wide, square, 'cover', { scale: minScale(wide, square, 'cover') })!
+    expect(out).toEqual(placePicture(wide, square, 'contain'))
+    expect(out.crop).toEqual({ l: 0, t: 0, r: 0, b: 0 })
   })
 })

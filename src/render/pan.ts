@@ -37,6 +37,21 @@ export function panBounds(
   }
 }
 
+/**
+ * The furthest a picture may be zoomed out: the scale at which the WHOLE
+ * picture fits the frame. For `contain` that is the fit itself (1). For
+ * `cover` it is below 1 — cover crops whatever doesn't match the frame's
+ * shape, and a floor of 1 left that crop out of reach: no zoom or pan could
+ * ever show it. Going further than whole-picture only shrinks it into a
+ * smaller box, which reveals nothing, so that is the floor.
+ */
+export function minScale(natural: { w: number; h: number }, frame: { w: number; h: number }, fit: 'cover' | 'contain'): number {
+  const { w: iw, h: ih } = natural
+  const { w, h } = frame
+  if (fit === 'contain' || !(iw > 0 && ih > 0 && w > 0 && h > 0)) return 1
+  return Math.min(w / iw, h / ih) / Math.max(w / iw, h / ih)
+}
+
 /** Clamp one axis of a pan offset into `[-max, max]`. `|| 0` normalises the
  *  `-0` that falls out of clamping a negative offset to a zero bound (and any
  *  NaN from a corrupt stored focus) so the emitted transform stays clean. */

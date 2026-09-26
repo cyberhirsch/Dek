@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Focus } from '../core/types'
-import { clampPan, panBounds } from '../render/pan'
+import { clampPan, minScale, panBounds } from '../render/pan'
 import { rememberNaturalSize } from '../render/naturalSize'
 
 const props = defineProps<{
@@ -127,12 +127,12 @@ function onWheel(e: WheelEvent) {
   if (!props.editable || !props.pannable) return
   e.preventDefault()
   const f = curFocus()
-  // Scale 1 is the fit baseline — the image exactly fills the frame (cover) or
-  // sits fully inside it (contain). Below 1 it just shrinks within the frame,
-  // leaving gaps that read as the image being "cropped" into a small box, and it
-  // can't reveal more of a cover image (that content is already fitted). So 1 is
-  // the floor: zoom in to crop/frame, never out past the natural fit.
-  const scale = Math.max(1, Math.min(5, +(f.scale + (e.deltaY < 0 ? 0.06 : -0.06)).toFixed(2)))
+  // Zoom out as far as the whole picture (render/pan.ts minScale): for cover
+  // that's below 1, so the sides cover cropped away can be brought back.
+  // Further out only shrinks the picture into a smaller box, so it stops there.
+  const floor = minScale(natural.value, frameSize.value, props.fit ?? 'cover')
+  const next = +(f.scale + (e.deltaY < 0 ? 0.06 : -0.06)).toFixed(2)
+  const scale = Math.max(floor, Math.min(5, next))
   // Zooming back out shrinks the pannable range, so re-clamp: otherwise the
   // picture stays stranded at an offset that's now off-frame.
   const b = boundsFor(scale)
