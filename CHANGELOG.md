@@ -21,6 +21,9 @@ Every picture went into the `.pptx` stretched to fill its box. Any picture whose
 
 ### Layouts
 
+**Videos play one segment: start and end times in the URL**
+Put the time window in the video link and the slide plays exactly that part. YouTube: `&start=130&end=220`, or `&t=130` (also `t=2m10s`, `t=1h2m10s`) for the start alone. Vimeo: `#t=75s`; its player has no end time. A video file: the media fragment `clip.mp4#t=30,95`, which the browser honours. YouTube links are also recognised in more of their forms: `v=` anywhere in the query, `/shorts/`, `/live/` and `youtube-nocookie.com`. Autoplay no longer breaks a link that carries a `#t=` fragment. `+12` tests.
+
 **Tables: draggable dividers, row and column editing, cell selection and merging** (#48)
 The table's editing is now complete, the same for the Table layout and for a table on a Freeform canvas:
 
