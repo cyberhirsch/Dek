@@ -73,13 +73,40 @@ const style = computed(() => {
   const b = boundsFor(f.scale)
   const x = clampPan(f.x, b.x)
   const y = clampPan(f.y, b.y)
+  const extra = filters.length ? { filter: filters.join(' ') } : {}
+  const transform = `translate(${x}px, ${y}px) scale(${f.scale})`
+  const { w: iw, h: ih } = natural.value
+  const { w: fw, h: fh } = frameSize.value
+  if (iw > 0 && ih > 0 && fw > 0 && fh > 0) {
+    // The <img> box is the WHOLE fitted picture, centred and overflowing the
+    // frame, which clips it. Not `object-fit` on a frame-sized box: that crops
+    // inside the element, so pan slid an already-cropped picture (background
+    // in, hidden sides never out) and zoom-out only shrank the crop.
+    const k = props.fit === 'contain' ? Math.min(fw / iw, fh / ih) : Math.max(fw / iw, fh / ih)
+    const dw = iw * k
+    const dh = ih * k
+    return {
+      position: 'absolute',
+      left: (fw - dw) / 2 + 'px',
+      top: (fh - dh) / 2 + 'px',
+      width: dw + 'px',
+      height: dh + 'px',
+      maxWidth: 'none',
+      maxHeight: 'none',
+      objectFit: 'fill',
+      transform,
+      transformOrigin: 'center',
+      ...extra,
+    } as Record<string, string>
+  }
+  // Until the picture and frame are measured, fit by CSS (no pan applies yet).
   return {
     width: '100%',
     height: '100%',
     objectFit: props.fit ?? 'cover',
-    transform: `translate(${x}px, ${y}px) scale(${f.scale})`,
+    transform,
     transformOrigin: 'center',
-    ...(filters.length ? { filter: filters.join(' ') } : {}),
+    ...extra,
   } as Record<string, string>
 })
 
