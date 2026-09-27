@@ -9,6 +9,8 @@
 **Draw on slides while presenting (`D`)**
 Press `D` in a presentation and the pointer becomes a pen: draw on the slide to point things out. Press `D` again to wipe everything and put the pen away. Ink belongs to the slide it was drawn on, so flipping away and back keeps it; arrows and the scroll wheel still change slides while the pen is out, and a pen stroke on a touch screen doesn't count as a swipe. Ink is never saved to the deck, and returning to the editor wipes it.
 
+The presentation bar has it too: the **pencil** now toggles the pen (it used to open the editor), and while the pen is out **four colour swatches** appear beside it — the deck theme's accent 2, accent, text and background colours, so the ink always belongs to the deck and follows a theme change. The editor moved to a new **✕** button (*Exit*, same as `Esc`).
+
 ### Images
 
 **Fixed: pan and zoom couldn't reach the cropped parts of a picture**

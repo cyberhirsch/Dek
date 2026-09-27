@@ -9,7 +9,7 @@ import { newElementRect } from './core/bake'
 import { analyzeDeck } from './core/analyze'
 import { splitSlide, type SlideSplitTarget } from './core/split'
 import { fileToOptimizedDataUrl } from './core/image'
-import { themePreset, type ThemeId } from './tokens'
+import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
 import {
   fetchDeck,
   saveSlide,
@@ -393,6 +393,21 @@ const { importing, pending: pendingImport, onImportFile, commitImport, cancelImp
   save: saveWholeDeck,
   setError: (m) => (error.value = m),
   onImported: () => (editMode.value = true),
+})
+
+// ── presenter pen ──
+// The four theme colours, as the pen's palette: they always sit well on the
+// deck they were chosen for, and a theme swap recolours the palette with it.
+const drawing = ref(false)
+const inkPalette = computed(() => {
+  const t = deck.value?.config.theme ?? {}
+  const d = DEFAULT_THEME.color
+  return [t.accent2 ?? d.accent2, t.accent ?? d.accent, t.text ?? d.text, t.bg ?? d.bg]
+})
+const inkChoice = ref(0)
+const inkColor = computed(() => inkPalette.value[inkChoice.value] ?? inkPalette.value[0])
+watch(editMode, (ed) => {
+  if (ed) drawing.value = false
 })
 
 function enterEdit() {
@@ -1789,6 +1804,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :tool="activeTool"
           :selected-el="selectedEls"
           :pending-image="pendingImage"
+          v-model:drawing="drawing"
+          :ink-color="inkColor"
           @patch="patchSlide"
           @config-patch="patchConfig"
           @upload="onUpload"
@@ -1858,7 +1875,19 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Overview (O)" @click="overviewOpen = true">▦</button>
       <button title="Presenter view (P) — opens a separate window" @click="openPresenter">◉</button>
       <button title="Fullscreen (F)" @click="toggleFullscreen">⛶</button>
-      <button title="Edit (Ctrl+E or Esc)" @click="enterEdit">✎</button>
+      <button :class="{ on: drawing }" :title="drawing ? 'Stop drawing and clear (D)' : 'Draw on the slide (D)'" @click="drawing = !drawing">✎</button>
+      <template v-if="drawing">
+        <button
+          v-for="(c, k) in inkPalette"
+          :key="k"
+          class="ink-swatch"
+          :class="{ on: inkChoice === k }"
+          :style="{ background: c }"
+          :title="'Pen colour ' + (k + 1)"
+          @click="inkChoice = k"
+        />
+      </template>
+      <button title="Exit to the editor (Esc)" @click="enterEdit">✕</button>
     </div>
 
     <!-- overlays -->
@@ -2155,4 +2184,17 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   padding: 2px 8px;
 }
 .hud button:hover { color: #fff; }
+.hud button.on { color: var(--dek-accent, #7fc7ff); }
+/* Pen colours: small filled circles; the chosen one gets a ring. The ring is
+   light on a dark HUD whatever the colour, so a bg-coloured swatch still shows. */
+.hud button.ink-swatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.hud button.ink-swatch.on {
+  box-shadow: 0 0 0 2px rgba(18, 20, 24, 0.9), 0 0 0 3.5px #fff;
+}
 </style>

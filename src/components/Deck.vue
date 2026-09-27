@@ -17,9 +17,13 @@ const props = defineProps<{
   tool?: CanvasTool
   selectedEl?: number[]
   pendingImage?: string
+  /** Presenter pen (D / the HUD pencil). Owned by App so the HUD can show it. */
+  drawing?: boolean
+  inkColor?: string
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
+  'update:drawing': [on: boolean]
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number; el?: number }]
@@ -130,26 +134,26 @@ function advance(dir: 1 | -1) {
 }
 
 // ── drawing while presenting ──
-// D turns the pointer into a pen; D again wipes the ink and leaves the mode.
-// Ink is per slide (flip away and back and it's still there) and never saved —
-// it's chalk on the board, not deck content. Leaving the presentation wipes it.
-const drawing = ref(false)
-const ink = ref<Record<number, string[]>>({})
-const live = ref<string | null>(null)
-const frame = ref<HTMLElement | null>(null)
-function toggleDrawing() {
-  drawing.value = !drawing.value
-  if (!drawing.value) {
-    ink.value = {}
-    live.value = null
-  }
+// D (or the HUD pencil) turns the pointer into a pen; turning it off wipes the
+// ink. Ink is per slide (flip away and back and it's still there) and never
+// saved — it's chalk on the board, not deck content. App turns the pen off when
+// the presentation ends, which wipes it too.
+interface Stroke {
+  d: string
+  color: string
 }
-watch(
-  () => props.editable,
-  (ed) => {
-    if (ed && drawing.value) toggleDrawing()
-  },
-)
+const ink = ref<Record<number, Stroke[]>>({})
+const live = ref<Stroke | null>(null)
+const frame = ref<HTMLElement | null>(null)
+const drawing = computed(() => !!props.drawing && !props.editable)
+function toggleDrawing() {
+  emit('update:drawing', !props.drawing)
+}
+watch(drawing, (on) => {
+  if (on) return
+  ink.value = {}
+  live.value = null
+})
 function stagePoint(e: PointerEvent): string {
   const r = frame.value!.getBoundingClientRect()
   const x = ((e.clientX - r.left) / r.width) * STAGE_W
@@ -162,11 +166,11 @@ function onInkDown(e: PointerEvent) {
   ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   const p = stagePoint(e)
   // A zero-length segment so a single click leaves a dot.
-  live.value = `M${p} L${p}`
+  live.value = { d: `M${p} L${p}`, color: props.inkColor ?? 'var(--dek-accent2)' }
 }
 function onInkMove(e: PointerEvent) {
   if (live.value === null) return
-  live.value += ` L${stagePoint(e)}`
+  live.value = { ...live.value, d: live.value.d + ` L${stagePoint(e)}` }
 }
 function onInkUp() {
   if (live.value === null) return
@@ -318,8 +322,8 @@ onUnmounted(() => {
         @pointerup="onInkUp"
         @pointercancel="onInkUp"
       >
-        <path v-for="(d, k) in ink[renderIndex] ?? []" :key="k" :d="d" />
-        <path v-if="live" :d="live" />
+        <path v-for="(st, k) in ink[renderIndex] ?? []" :key="k" :d="st.d" :style="{ stroke: st.color }" />
+        <path v-if="live" :d="live.d" :style="{ stroke: live.color }" />
       </svg>
     </div>
   </div>
