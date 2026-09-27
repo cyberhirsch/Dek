@@ -39,11 +39,10 @@ function overflows(el: HTMLElement): boolean {
   return el.scrollHeight - el.clientHeight > 1 || el.scrollWidth - el.clientWidth > 1
 }
 
-function apply(size: number, reserveButton: boolean) {
+function apply(size: number) {
   const el = body.value
   if (!el) return
   el.style.fontSize = `${size}px`
-  el.style.height = reserveButton ? 'calc(100% - 28px)' : '100%'
 }
 
 // Optical margin correction: only meaningful for left-aligned italic display
@@ -78,7 +77,7 @@ function fit() {
   if (!el || !host || host.clientHeight === 0 || host.clientWidth === 0) return
 
   const base = props.baseSize
-  apply(base, false)
+  apply(base)
   if (!overflows(el)) {
     fitSize.value = base
     shrunk.value = false
@@ -89,7 +88,7 @@ function fit() {
   shrunk.value = true
   let lo = Math.min(props.minSize, base)
   let hi = base
-  apply(lo, props.splittable)
+  apply(lo)
   if (overflows(el)) {
     fitSize.value = lo
     applyOpticalMargin()
@@ -97,12 +96,12 @@ function fit() {
   }
   for (let i = 0; i < 12 && hi - lo > 0.25; i += 1) {
     const mid = (lo + hi) / 2
-    apply(mid, props.splittable)
+    apply(mid)
     if (overflows(el)) hi = mid
     else lo = mid
   }
   const result = Math.floor(lo * 10) / 10
-  apply(result, props.splittable)
+  apply(result)
   fitSize.value = result
   applyOpticalMargin()
 }

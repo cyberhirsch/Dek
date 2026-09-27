@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Text
+
+**Fixed: captions cut through the middle when presenting**
+Once text had to shrink to fit, its box gave up a 28px strip at the bottom for the editor's *Split* button — also while presenting, where there is no button. A caption box is one line (34px), which left 6px for the text: a long caption came out as the top half of one line. The strip is gone everywhere (captions, titles, bullet lists, canvas text boxes); the *Split* button now sits over the bottom-right corner in the editor instead. As a side effect, shrunk text is the same size in the editor as in the presentation — before, lists and canvas boxes shrank more than needed.
+
 ### Presenting
 
 **Draw on slides while presenting (`D`)**

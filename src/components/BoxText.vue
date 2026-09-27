@@ -29,10 +29,9 @@ function overflows(el: HTMLElement): boolean {
 // font-size authoritative (never clear it) so the rendered size is correct even
 // when Vue skips a no-op style patch — e.g. the ResizeObserver refit lands on the
 // same size as last time, so `fitSize` doesn't change and Vue wouldn't re-apply it.
-function apply(px: number, reserveButton: boolean) {
+function apply(px: number) {
   if (!body.value) return
   body.value.style.fontSize = px + 'px'
-  body.value.style.height = reserveButton ? 'calc(100% - 28px)' : '100%'
 }
 
 function fit() {
@@ -45,7 +44,7 @@ function fit() {
   if (host.clientHeight === 0 || host.clientWidth === 0) return
   const base = props.baseSize
   // Measure at the full size first; if it fits, keep it.
-  apply(base, false)
+  apply(base)
   if (!overflows(el)) {
     fitSize.value = base
     shrunk.value = false
@@ -55,19 +54,19 @@ function fit() {
   // Largest size in [MIN, base] that fits — binary search on the live element.
   let lo = MIN
   let hi = base
-  apply(lo, true)
+  apply(lo)
   if (overflows(el)) {
     fitSize.value = lo
     return
   }
   for (let i = 0; i < 12 && hi - lo > 0.4; i++) {
     const mid = (lo + hi) / 2
-    apply(mid, true)
+    apply(mid)
     if (overflows(el)) hi = mid
     else lo = mid
   }
   const result = Math.max(MIN, Math.floor(lo * 10) / 10)
-  apply(result, true) // leave the chosen size on the element, not the last probed mid
+  apply(result) // leave the chosen size on the element, not the last probed mid
   fitSize.value = result
 }
 
