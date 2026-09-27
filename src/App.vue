@@ -10,6 +10,7 @@ import { analyzeDeck } from './core/analyze'
 import { splitSlide, type SlideSplitTarget } from './core/split'
 import { fileToOptimizedDataUrl } from './core/image'
 import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
+import { DROP_FAILED_EVENT } from './render/dropImage'
 import {
   fetchDeck,
   saveSlide,
@@ -210,12 +211,14 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
   window.addEventListener('keydown', onKey)
+  window.addEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.addEventListener('mousemove', resetIdle)
   window.addEventListener('pointerdown', trackClick, true)
   externalTimer = setInterval(() => void pollExternalChange(), 1500)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.removeEventListener('mousemove', resetIdle)
   window.removeEventListener('pointerdown', trackClick, true)
   if (idleTimer) clearTimeout(idleTimer)
@@ -409,6 +412,11 @@ const inkColor = computed(() => inkPalette.value[inkChoice.value] ?? inkPalette.
 watch(editMode, (ed) => {
   if (ed) drawing.value = false
 })
+
+/** A picture dropped from a site that blocks copying (render/dropImage.ts). */
+function onDropFailed(e: Event) {
+  error.value = (e as CustomEvent<string>).detail
+}
 
 function enterEdit() {
   editMode.value = true

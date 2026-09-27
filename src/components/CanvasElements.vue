@@ -10,6 +10,7 @@ import TableGrid from './TableGrid.vue'
 import BoxText from './BoxText.vue'
 import QrCode from './QrCode.vue'
 import { safeLink, urlFromDataTransfer } from '../render/qr'
+import { droppedImage, reportDropFailure, resolveDroppedImage } from '../render/dropImage'
 import { resolveFont } from '../render/theme'
 
 const STAGE_W = 1280
@@ -137,20 +138,23 @@ function onCanvasDrop(e: DragEvent) {
   dropActive.value = false
   if (!props.editable) return
 
-  // A dropped image file wins over any URL the drag also carries — dragging an
-  // image out of a browser exposes both, and the file is the richer intent.
-  const file = e.dataTransfer?.files?.[0]
-  if (file) {
-    if (!file.type.startsWith('image/')) return
+  // A dropped picture wins over any link the drag also carries. From another
+  // browser window it usually comes as an address (the <img> in the dragged
+  // HTML), fetched into a file here; a plain link still becomes a QR code.
+  const nonImageFile = Array.from(e.dataTransfer?.files ?? []).some((f) => !f.type.startsWith('image/'))
+  const picture = droppedImage(e.dataTransfer)
+  if (picture.file || picture.url) {
     e.preventDefault()
     const idx = boxIndexAt(e)
-    if (idx != null) emit('drop-image', file, { kind: 'box', index: idx })
-    else {
-      const p = toStage(e)
-      emit('drop-image', file, { kind: 'new', x: Math.round(p.x), y: Math.round(p.y) })
-    }
+    const p = toStage(e)
+    void resolveDroppedImage(picture).then((file) => {
+      if (!file) return reportDropFailure()
+      if (idx != null) emit('drop-image', file, { kind: 'box', index: idx })
+      else emit('drop-image', file, { kind: 'new', x: Math.round(p.x), y: Math.round(p.y) })
+    })
     return
   }
+  if (nonImageFile) return
 
   const url = urlFromDataTransfer(e.dataTransfer)
   if (!url) return // plain text, or a scheme we refuse to follow

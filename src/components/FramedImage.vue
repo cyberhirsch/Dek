@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Focus } from '../core/types'
 import { clampPan, minScale, panBounds } from '../render/pan'
 import { rememberNaturalSize } from '../render/naturalSize'
+import { droppedImage, reportDropFailure, resolveDroppedImage } from '../render/dropImage'
 
 const props = defineProps<{
   src?: string
@@ -168,10 +169,19 @@ function onWheel(e: WheelEvent) {
 
 // ── drop to replace ──
 const over = ref(false)
-function onDrop(e: DragEvent) {
+const fetching = ref(false)
+async function onDrop(e: DragEvent) {
   over.value = false
-  const file = e.dataTransfer?.files?.[0]
-  if (file && file.type.startsWith('image/')) emit('file', file)
+  // A picture dragged from another browser window usually arrives as its
+  // address, not a file; read both now — the DataTransfer empties after this
+  // handler returns — then fetch the address (render/dropImage.ts).
+  const d = droppedImage(e.dataTransfer)
+  if (!d.file && !d.url) return
+  if (d.url) fetching.value = true
+  const file = await resolveDroppedImage(d)
+  fetching.value = false
+  if (file) emit('file', file)
+  else reportDropFailure()
 }
 // `dragleave` also fires when the pointer crosses onto a child (the drop overlay,
 // the replace button) — clearing `over` there made the "drop to replace" hint
@@ -215,6 +225,7 @@ function onPick(e: Event) {
     <input ref="fileEl" type="file" accept="image/*" class="fi-input" @change="onPick" />
 
     <div v-if="over" class="fi-drop">drop to replace</div>
+    <div v-else-if="fetching" class="fi-drop">fetching the picture…</div>
     <!-- "drag to pan" only when there's hidden overflow to drag into view;
          a fully-visible picture has nothing to pan to, so zoom leads instead. -->
     <div v-if="editable && pannable && src" class="fi-hint">{{ hint }}</div>

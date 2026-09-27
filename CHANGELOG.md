@@ -13,6 +13,9 @@ The presentation bar has it too: the **pencil** now toggles the pen (it used to 
 
 ### Images
 
+**Fixed: pictures dragged from another browser window never arrived**
+A picture dragged out of a web page usually comes over as its address, not as a file, so the frame showed *drop to replace* and then ignored the drop. Dek now reads the picture's address from the drag (the `<img>` itself, not the link around it, so a thumbnail that links to an article still gives the picture), fetches it, and stores it in the deck's Assets folder like any upload. Works on every image frame, gallery and table cell, and on the canvas (where a dragged plain link still becomes a QR code). Some sites don't allow other pages to copy their pictures; Dek then says so, and saving the picture to disk and dropping the file works instead. `+8` tests.
+
 **Fixed: pan and zoom couldn't reach the cropped parts of a picture**
 A framed picture was cropped *inside* its image element before pan and zoom applied, so dragging slid an already-cropped picture: empty background came in on one side while the hidden side never appeared, and zooming out only shrank the crop. The image element is now the whole fitted picture, centred, clipped only by its frame — dragging reveals the hidden sides up to the picture's own edge, and a Fill picture can zoom out until the whole picture shows. Applies to every framed picture (layouts, gallery, table cells, canvas). Gallery pictures are also clipped by their own frame rather than the slot around it, which put badges and links on the frame's corner, as in export.
 
