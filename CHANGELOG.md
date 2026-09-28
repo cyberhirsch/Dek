@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Editing
+
+**Copy and paste slides between tabs and decks**
+Copying slides (Ctrl+C on the slide list, or *Copy Slide*) now also puts them on the system clipboard, as Dek's own text — the same YAML blocks the deck file uses, under a `# Dek slides` line — with every picture inside it. Paste (Ctrl+V on the slide list, or *Paste Slides*) in another tab or another deck, and the slides arrive with their pictures, each saved as a file in the receiving deck's Assets folder under its original name. Pasting back into the same deck in the same tab still uses the exact in-memory copy, so no picture is saved twice. Because it's plain text, the clipboard also works with a text editor or an LLM chat in both directions: copied slides paste as readable YAML, and YAML slides (or a whole deck file) paste into Dek as slides. Ordinary text on the clipboard is ignored — it needs a `layout:` to count as a slide. The context menu's *Paste Slides* may ask for clipboard permission the first time; Ctrl+V doesn't. `+4` tests.
+
 ### Text
 
 **Fixed: captions cut through the middle when presenting**

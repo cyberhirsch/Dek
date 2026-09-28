@@ -155,7 +155,7 @@ const yamlOpts = { lineWidth: 0, indent: 2, flowCollectionPadding: false } as co
  *  (`- [Maya, 42]`) so a table reads as a table in deck.md. Everything else
  *  keeps block style. A row is recognised structurally — an item of the `rows`
  *  sequence inside a `table` map — wherever that sits (slide, stash, element). */
-function stringifyBlock(value: unknown): string {
+export function stringifyBlock(value: unknown): string {
   const doc = new YAML.Document(value)
   YAML.visit(doc, {
     Pair(_key, pair, path) {

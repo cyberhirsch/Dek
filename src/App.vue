@@ -11,6 +11,8 @@ import { splitSlide, type SlideSplitTarget } from './core/split'
 import { fileToOptimizedDataUrl } from './core/image'
 import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
 import { DROP_FAILED_EVENT } from './render/dropImage'
+import { slidesFromText, slidesToText } from './core/slideClipboard'
+import { inlineSlidePictures, storeSlidePictures } from './storage/slideTransfer'
 import {
   fetchDeck,
   saveSlide,
@@ -239,6 +241,7 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
   window.addEventListener('keydown', onKey)
+  window.addEventListener('paste', onPasteEvent)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.addEventListener('mousemove', resetIdle)
@@ -247,6 +250,7 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('paste', onPasteEvent)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.removeEventListener('mousemove', resetIdle)
@@ -466,6 +470,38 @@ function jumpToSlide(index: number) {
 
 // A field is "typing" if it's contenteditable OR a native form control — in any
 // of these the global shortcuts must yield to the field (arrows, letters, undo).
+/** Ctrl+V on the slide list: slides from the system clipboard (another tab,
+ *  another deck, a text editor) — unless it's the copy this tab just made of
+ *  this deck, which pastes from memory instead of saving its pictures again. */
+function onPasteEvent(e: ClipboardEvent) {
+  if (!editMode.value || !navFocused.value || selectedEls.value.length) return
+  if (isTyping(document.activeElement as HTMLElement | null)) return
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  const ours = !!text && text === slideClipboard.text && slideClipboard.deck === deck.value && slideClipboard.slides.length > 0
+  const incoming = ours ? null : slidesFromText(text)
+  if (incoming) {
+    e.preventDefault()
+    void pasteSlides(current.value, incoming)
+  } else if (slideClipboard.slides.length) {
+    e.preventDefault()
+    void pasteSlides(current.value)
+  }
+}
+/** The context menu's Paste has no paste event to read, so it asks for the
+ *  clipboard (the browser may ask for permission the first time). */
+async function pasteSlidesFromMenu(after: number) {
+  let text = ''
+  try {
+    text = await navigator.clipboard.readText()
+  } catch {
+    /* denied or unavailable: fall back to this tab's copy */
+  }
+  const ours = !!text && text === slideClipboard.text && slideClipboard.deck === deck.value && slideClipboard.slides.length > 0
+  const incoming = ours ? null : slidesFromText(text)
+  if (incoming) await pasteSlides(after, incoming)
+  else await pasteSlides(after)
+}
+
 function isTyping(el: HTMLElement | null): boolean {
   return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
 }
@@ -541,11 +577,10 @@ function onKey(e: KeyboardEvent) {
     !typing &&
     navFocused.value &&
     selectedEls.value.length === 0 &&
-    e.key.toLowerCase() === 'v' &&
-    slideClipboard.slides.length
+    e.key.toLowerCase() === 'v'
   ) {
-    e.preventDefault()
-    pasteSlides(current.value)
+    // Nothing here: the browser's `paste` event follows (onPasteEvent), and
+    // only it can read the system clipboard without a permission prompt.
   } else if (e.key === 'Escape' && editMode.value) {
     if (typing) ae!.blur()
     else if (selectedEls.value.length) {
@@ -1343,8 +1378,7 @@ function thumbItems(index: number): CtxEntry[] {
     {
       label: 'Paste Slides',
       hint: 'Ctrl+V',
-      disabled: !slideClipboard.slides.length,
-      action: () => pasteSlides(index),
+      action: () => void pasteSlidesFromMenu(index),
     },
   ]
   if (supportsDir()) {
@@ -1633,9 +1667,21 @@ function moveSlideTo(from: number, to: number) {
 }
 
 // ── slide clipboard (Cut/Copy/Paste in the navigator's context menu) ──
-// Module-level, like the element clipboard, so it survives navigation and
-// works across decks in the same session.
-const slideClipboard: { slides: Slide[] } = { slides: [] }
+// Two copies of what was copied. In memory, for pasting back into the same
+// deck: exact, and no picture gets saved a second time. And on the system
+// clipboard as Dek text (core/slideClipboard.ts) with the pictures inside,
+// which is what crosses to another tab, window or deck — and to a text editor.
+const slideClipboard: { slides: Slide[]; deck: Deck | null; text: string } = { slides: [], deck: null, text: '' }
+async function putSlidesOnClipboard(clones: Slide[]) {
+  slideClipboard.text = ''
+  try {
+    const text = slidesToText(await inlineSlidePictures(clones))
+    slideClipboard.text = text
+    await navigator.clipboard.writeText(text)
+  } catch {
+    /* no clipboard access: the in-memory copy still pastes within this tab */
+  }
+}
 function cloneSlides(indices: number[]): Slide[] {
   if (!deck.value) return []
   return [...new Set(indices)].sort((a, b) => a - b).map((i) => JSON.parse(JSON.stringify(deck.value!.slides[i])) as Slide)
@@ -1643,21 +1689,42 @@ function cloneSlides(indices: number[]): Slide[] {
 function copySlides() {
   const idx = selected.value.length ? selected.value : [current.value]
   const clones = cloneSlides(idx)
-  if (clones.length) slideClipboard.slides = clones
+  if (!clones.length) return
+  slideClipboard.slides = clones
+  slideClipboard.deck = deck.value
+  void putSlidesOnClipboard(clones)
 }
 function cutSlides() {
   const idx = selected.value.length ? selected.value : [current.value]
   const clones = cloneSlides(idx)
   if (!clones.length) return
   slideClipboard.slides = clones
+  slideClipboard.deck = deck.value
+  void putSlidesOnClipboard(clones)
   selected.value = idx
   removeSlide()
 }
-/** Paste the clipboard's slides right after `after`, and select the pasted run. */
-function pasteSlides(after: number) {
-  if (!deck.value || !slideClipboard.slides.length) return
+/** Paste slides right after `after` and select the pasted run: the in-memory
+ *  copy, or `incoming` from the system clipboard (another tab or deck). */
+async function pasteSlides(after: number, incoming?: Slide[]) {
+  if (!deck.value) return
+  let copies: Slide[]
+  if (incoming) {
+    const target = deck.value
+    try {
+      // Pictures arrive inside the text; save them into THIS deck's Assets.
+      copies = await storeSlidePictures(incoming, uploadImage)
+    } catch (e) {
+      error.value = `Paste failed: ${(e as Error).message}`
+      return
+    }
+    void refreshDiskAssets()
+    if (deck.value !== target) return // another deck was opened meanwhile
+  } else {
+    if (!slideClipboard.slides.length) return
+    copies = slideClipboard.slides.map((s) => JSON.parse(JSON.stringify(s)) as Slide)
+  }
   snap('add')
-  const copies = slideClipboard.slides.map((s) => JSON.parse(JSON.stringify(s)) as Slide)
   deck.value.slides.splice(after + 1, 0, ...copies)
   focusSlide(after + 1)
   selected.value = copies.map((_, i) => after + 1 + i)
