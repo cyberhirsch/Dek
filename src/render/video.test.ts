@@ -60,9 +60,9 @@ describe('parseVideo — YouTube', () => {
 
   it('adds autoplay after the time window', () => {
     const p = parseVideo(`https://www.youtube.com/watch?v=${ID}&t=130`)!
-    expect(autoplaySrc(p)).toBe(`https://www.youtube.com/embed/${ID}?start=130&autoplay=1&rel=0`)
+    expect(autoplaySrc(p)).toBe(`https://www.youtube.com/embed/${ID}?start=130&autoplay=1&rel=0&enablejsapi=1`)
     expect(autoplaySrc(parseVideo(`https://www.youtube.com/watch?v=${ID}`)!)).toBe(
-      `https://www.youtube.com/embed/${ID}?autoplay=1&rel=0`,
+      `https://www.youtube.com/embed/${ID}?autoplay=1&rel=0&enablejsapi=1`,
     )
   })
 })

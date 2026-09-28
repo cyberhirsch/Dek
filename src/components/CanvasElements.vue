@@ -4,6 +4,7 @@ import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement
 import { inlineMd, htmlToInline } from '../render/inline'
 import { newElementRect, newArrow, defaultSize } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
+import { listenToPlayer } from '../render/videoControl'
 import FramedImage from './FramedImage.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import TableGrid from './TableGrid.vue'
@@ -769,12 +770,12 @@ defineExpose({ commitEdit })
       <!-- video -->
       <div v-else-if="el.type === 'video'" class="el-video">
         <template v-if="playing.has(i)">
-          <iframe v-if="!isFileVideo(asVideo(el))" :src="videoSrc(asVideo(el))" allow="autoplay; encrypted-media; fullscreen" allowfullscreen />
+          <iframe v-if="!isFileVideo(asVideo(el))" :src="videoSrc(asVideo(el))" :data-dek-video="parseVideo(asVideo(el).video)?.provider" @load="listenToPlayer($event.target as HTMLIFrameElement)" allow="autoplay; encrypted-media; fullscreen" allowfullscreen />
           <video v-else :src="asVideo(el).video" controls autoplay />
         </template>
         <template v-else>
           <FramedImage :src="videoPoster(asVideo(el))" fit="contain" />
-          <button class="vid-play" title="Play" @click.stop="playVideo(i, asVideo(el))" @pointerdown.stop><span class="tri" /></button>
+          <button class="vid-play" data-dek-play title="Play" @click.stop="playVideo(i, asVideo(el))" @pointerdown.stop><span class="tri" /></button>
         </template>
       </div>
 

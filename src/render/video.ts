@@ -76,7 +76,8 @@ export function parseVideo(url?: string): ParsedVideo | null {
 }
 
 export function autoplaySrc(p: ParsedVideo): string {
-  const extra = p.provider === 'youtube' ? 'autoplay=1&rel=0' : p.provider === 'vimeo' ? 'autoplay=1' : ''
+  // enablejsapi lets Dek pause/resume it from the keyboard (render/videoControl.ts).
+  const extra = p.provider === 'youtube' ? 'autoplay=1&rel=0&enablejsapi=1' : p.provider === 'vimeo' ? 'autoplay=1' : ''
   if (!extra) return p.embedUrl
   // Query parameters go before any #fragment (Vimeo's #t= start time).
   const [base, frag] = p.embedUrl.split('#')

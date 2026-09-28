@@ -5,6 +5,7 @@ import { parseContent, rowsToContent, type ContentRow } from '../render/inline'
 import type { SlideSplitTarget } from '../core/split'
 import type { IdleText } from './ContextMenu.vue'
 import { parseVideo, autoplaySrc } from '../render/video'
+import { listenToPlayer } from '../render/videoControl'
 import { safeLink } from '../render/qr'
 import { effectiveFit, galleryBox, galleryColumns } from '../core/gallery'
 import { naturalSize } from '../render/naturalSize'
@@ -396,7 +397,9 @@ watch(
           <iframe
             v-if="pv.provider !== 'file'"
             :src="playSrc"
+            :data-dek-video="pv.provider"
             allow="autoplay; encrypted-media; fullscreen"
+            @load="listenToPlayer($event.target as HTMLIFrameElement)"
             allowfullscreen
           />
           <video v-else :src="pv.embedUrl" controls autoplay />
@@ -412,7 +415,7 @@ watch(
             :editable="editable"
             @file="emit('upload', { field: 'poster', file: $event })"
           />
-          <button class="play" :disabled="!pv" :title="pv ? 'Play' : 'Add a video URL first'" @click="playVideo">
+          <button class="play" data-dek-play :disabled="!pv" :title="pv ? 'Play' : 'Add a video URL first'" @click="playVideo">
             <span class="tri" />
           </button>
           <div v-if="editable" class="vid-url">

@@ -14,8 +14,10 @@
 
 | Shortcut | Action |
 |---|---|
-| `→` / `↓` / `Space` / `PageDown` | Next slide |
+| `→` / `↓` / `PageDown` | Next slide |
 | `←` / `↑` / `PageUp` | Previous slide |
+| `Space` | Play / pause the slide's video; next slide when there is none |
+| `.` / `B` | Play / pause the slide's video (a presenter remote's ■ button) |
 | `Home` | First slide |
 | `End` | Last slide |
 | `Scroll wheel` | Navigate slides |

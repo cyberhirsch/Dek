@@ -11,6 +11,9 @@ Once text had to shrink to fit, its box gave up a 28px strip at the bottom for t
 
 ### Presenting
 
+**Play and pause videos from the keyboard and a presenter remote**
+On a slide with a video, **Space** plays and pauses it — the first press starts it from the poster — and the **arrows** keep turning slides. A presenter remote works the same way: its ◀ ▶ buttons send PageUp/PageDown (previous/next slide), and its ■ button, which sends `.` or `b` (PowerPoint's black-screen keys, used by Kensington and Logitech remotes), plays and pauses. Works for YouTube and Vimeo embeds (through their player API — the toggle follows the player even after someone clicks its own pause button), video files, and video elements on the canvas. Clicking into a player no longer traps the keyboard in it while presenting: focus comes straight back to Dek, so the remote keeps working. On a slide without a video, Space still advances.
+
 **Draw on slides while presenting (`D`)**
 Press `D` in a presentation and the pointer becomes a pen: draw on the slide to point things out. Press `D` again to wipe everything and put the pen away. Ink belongs to the slide it was drawn on, so flipping away and back keeps it; arrows and the scroll wheel still change slides while the pen is out, and a pen stroke on a touch screen doesn't count as a swipe. Ink is never saved to the deck, and returning to the editor wipes it.
 

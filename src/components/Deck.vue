@@ -5,6 +5,7 @@ import type { SlideSplitTarget } from '../core/split'
 import type { IdleText } from './ContextMenu.vue'
 import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
+import { toggleVideoIn } from '../render/videoControl'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
 
@@ -179,6 +180,23 @@ function onInkUp() {
   live.value = null
 }
 
+const PLAY_KEYS = new Set([' ', '.', 'b', 'B', 'MediaPlayPause'])
+
+// A click into a YouTube/Vimeo player moves keyboard focus into its iframe,
+// and from then on every key — the remote's included — goes to the player,
+// out of Dek's reach. While presenting, hand focus straight back: the click
+// itself still reached the player.
+function onWindowBlur() {
+  if (props.editable) return
+  setTimeout(() => {
+    const a = document.activeElement as HTMLElement | null
+    if (a?.tagName === 'IFRAME' && stage.value?.contains(a)) {
+      a.blur()
+      window.focus()
+    }
+  }, 0)
+}
+
 function onKey(e: KeyboardEvent) {
   // Suspended while an overlay (overview / presenter / export) owns the keyboard.
   if (props.navEnabled === false) return
@@ -190,7 +208,18 @@ function onKey(e: KeyboardEvent) {
     if (e.key === 'PageUp') go(props.modelValue - 1)
     return
   }
-  if (!props.editable && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'd') {
+  // Play/pause the slide's video: Space, the media key, and a presenter
+  // remote's ■ button (Kensington and Logitech send `.` or `b` — PowerPoint's
+  // black-screen keys). The arrows and PageUp/PageDown (the remote's ◀ ▶)
+  // keep turning slides. Space still advances on a slide without a video.
+  const mod = e.ctrlKey || e.metaKey || e.altKey
+  if (!props.editable && !mod && PLAY_KEYS.has(e.key)) {
+    e.preventDefault()
+    if (stage.value && toggleVideoIn(stage.value)) return
+    if (e.key === ' ') advance(1)
+    return
+  }
+  if (!props.editable && !mod && e.key.toLowerCase() === 'd') {
     e.preventDefault()
     toggleDrawing()
   } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
@@ -260,6 +289,7 @@ onMounted(() => {
   ro = new ResizeObserver(fit)
   if (stage.value) ro.observe(stage.value)
   window.addEventListener('keydown', onKey)
+  window.addEventListener('blur', onWindowBlur)
   stage.value?.addEventListener('wheel', onWheel, { passive: false })
   stage.value?.addEventListener('touchstart', onTouchStart, { passive: true })
   stage.value?.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -267,6 +297,7 @@ onMounted(() => {
 onUnmounted(() => {
   ro?.disconnect()
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('blur', onWindowBlur)
   stage.value?.removeEventListener('wheel', onWheel)
   stage.value?.removeEventListener('touchstart', onTouchStart)
   stage.value?.removeEventListener('touchend', onTouchEnd)
