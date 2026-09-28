@@ -21,7 +21,8 @@
 | `Home` | First slide |
 | `End` | Last slide |
 | `Scroll wheel` | Navigate slides |
-| `F` | Toggle fullscreen |
+| `F` | Toggle fullscreen (presenting starts in fullscreen) |
+| `Esc` | Back to the editor (leaves fullscreen too) |
 | `O` | Open slide overview |
 | `P` / `S` | Open presenter view |
 | `D` | Draw on the slide with the pointer; `D` again clears the ink and stops drawing |

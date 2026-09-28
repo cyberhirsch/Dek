@@ -116,7 +116,17 @@ const exportOpen = ref(false)
 const reviewOpen = ref(false)
 
 // Presenter popup (a separate window for a second monitor) — see usePresenterSync.
-const { openPresenter } = usePresenterSync({ deck, current, editMode, presenterOpen })
+const { openPresenter: openPresenterWindow } = usePresenterSync({ deck, current, editMode, presenterOpen })
+/** The presenter popup can knock the audience window out of fullscreen
+ *  (Chrome leaves fullscreen when a window opens); that must not end the
+ *  presentation the popup is there to run. */
+function openPresenter() {
+  if (document.fullscreenElement) {
+    keepPresenting = true
+    setTimeout(() => (keepPresenting = false), 1500)
+  }
+  openPresenterWindow()
+}
 
 // Files in the deck's on-disk assets folder (folder backends only). Fed into the
 // analysis so the Review panel can surface — and delete — orphaned images.
@@ -163,7 +173,25 @@ async function onDeleteAsset(filename: string) {
 }
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
-  else document.exitFullscreen?.()
+  else {
+    keepPresenting = true // F leaves fullscreen but stays in the presentation
+    document.exitFullscreen?.()
+  }
+}
+
+// Presenting fills the screen. Every way into it (Present, Ctrl+E, Esc from
+// the editor) is a key or click, which is what the browser requires before it
+// grants fullscreen. Leaving fullscreen by any other route than F — Esc, which
+// the browser takes before the page ever sees it — also leaves the
+// presentation, so one Esc gets back to the editor.
+let keepPresenting = false
+function startPresenting() {
+  editMode.value = false
+  if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => {})
+}
+function onFullscreenChange() {
+  if (!document.fullscreenElement && !editMode.value && !keepPresenting) enterEdit()
+  keepPresenting = false
 }
 
 // auto-hide present-mode chrome after a few seconds of no mouse movement
@@ -211,6 +239,7 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
   window.addEventListener('keydown', onKey)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.addEventListener('mousemove', resetIdle)
   window.addEventListener('pointerdown', trackClick, true)
@@ -218,6 +247,7 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.removeEventListener('mousemove', resetIdle)
   window.removeEventListener('pointerdown', trackClick, true)
@@ -420,6 +450,10 @@ function onDropFailed(e: Event) {
 
 function enterEdit() {
   editMode.value = true
+  if (document.fullscreenElement) {
+    keepPresenting = true // already on the way out; don't re-enter onFullscreenChange's exit
+    void document.exitFullscreen?.().catch(() => {})
+  }
   selected.value = [current.value]
   anchor = current.value
 }
@@ -450,7 +484,7 @@ function onKey(e: KeyboardEvent) {
   const mod = e.ctrlKey || e.metaKey
   if (mod && e.key.toLowerCase() === 'e') {
     e.preventDefault()
-    editMode.value ? (editMode.value = false) : enterEdit()
+    editMode.value ? startPresenting() : enterEdit()
   } else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') {
     e.preventDefault() // Ctrl/Cmd+S saves the deck, not the browser's "save page"
     void saveWholeDeck()
@@ -517,13 +551,12 @@ function onKey(e: KeyboardEvent) {
     else if (selectedEls.value.length) {
       selectedEls.value = []
       activeTool.value = 'select'
-    } else editMode.value = false
+    } else startPresenting()
   } else if (
     e.key === 'Escape' && !editMode.value && !overviewOpen.value && !presenterOpen.value && !exportOpen.value
   ) {
-    // Present mode: Esc returns to editing. But the browser's first Esc exits
-    // fullscreen (unpreventable), so only switch to edit once we're not
-    // fullscreen — a second Esc then drops back to the editor.
+    // Present mode: Esc returns to editing. In fullscreen the browser keeps
+    // Esc for itself; onFullscreenChange handles that case.
     if (!document.fullscreenElement) enterEdit()
   } else if (
     editMode.value &&
@@ -1768,7 +1801,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @redo="redo"
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
-      @close="editMode = false"
+      @close="startPresenting"
       @export="exportOpen = true"
       @review="toggleReview"
       @browse="deckBrowser = 'open'"

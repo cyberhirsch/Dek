@@ -11,6 +11,9 @@ Once text had to shrink to fit, its box gave up a 28px strip at the bottom for t
 
 ### Presenting
 
+**Presenting goes fullscreen**
+*Present* (and Ctrl+E, or Esc from the editor) now also switches to fullscreen. One **Esc** leaves both and returns to the editor — before, the first Esc only left fullscreen and a second was needed. **F** still toggles fullscreen without ending the presentation, and opening the presenter window doesn't end it either, even though the browser may leave fullscreen when the window opens. Leaving the presentation any other way (✕, Ctrl+E) leaves fullscreen too.
+
 **Play and pause videos from the keyboard and a presenter remote**
 On a slide with a video, **Space** plays and pauses it — the first press starts it from the poster — and the **arrows** keep turning slides. A presenter remote works the same way: its ◀ ▶ buttons send PageUp/PageDown (previous/next slide), and its ■ button, which sends `.` or `b` (PowerPoint's black-screen keys, used by Kensington and Logitech remotes), plays and pauses. Works for YouTube and Vimeo embeds (through their player API — the toggle follows the player even after someone clicks its own pause button), video files, and video elements on the canvas. Clicking into a player no longer traps the keyboard in it while presenting: focus comes straight back to Dek, so the remote keeps working. On a slide without a video, Space still advances.
 
