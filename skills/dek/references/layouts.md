@@ -129,7 +129,7 @@ Body on one side, a picture on the other.
 | `title` | string | The heading. |
 | `content` | string | Markdown block, as `text`. |
 | `image` | string | Path relative to the deck. |
-| `caption` | string | Optional small credit under the image. |
+| `caption` | string | Optional small credit under the image. The box is one line at 18px; a longer caption shrinks (to 10px at worst), so keep it under ~60 characters. |
 | `side` | `left` \| `right` | Which side the **image** sits on. Default `right`. |
 | `imageRatio` | `16:9` \| `1:1` \| `9:16` | Frame aspect — and with it the column split. Default `16:9`. |
 | `focus` | `{x, y, scale}` | Pan/zoom inside the frame. Written by the editor. |
@@ -218,7 +218,7 @@ gallery items and table cells only have a `link` of their own.
 | `imageLink` | URL | Makes the picture clickable while presenting and in the HTML export. Only `http(s)://` and `mailto:` links work; anything else is ignored. |
 | `imageInvert` | bool | Inverts the picture's colors. |
 | `imageDesaturate` | bool | Shows it in grayscale. Combines with `imageInvert`. |
-| `focus` | `{x, y, scale}` | Pan/zoom, normally set by dragging and scrolling in the editor. `x`/`y` are pixel offsets (clamped to the picture's overflow); `scale` is the zoom, `1` = the natural fit. All three must be numbers — `focus: center` is flagged as malformed. Omit it rather than guess. |
+| `focus` | `{x, y, scale}` | Pan/zoom, normally set by dragging and scrolling in the editor. `x`/`y` are pixel offsets (clamped to the picture's overflow); `scale` is the zoom, `1` = the natural fit. Under `cover`, `scale` may go below `1`, down to the point where the whole picture shows (the editor stops there); under `contain` it never goes below `1`. All three must be numbers — `focus: center` is flagged as malformed. Omit it rather than guess. |
 
 Invert and desaturate are display filters: the file on disk is untouched, and
 neither survives `.pptx` export.
@@ -264,6 +264,11 @@ that part:
 - A file: a media fragment, `clip.mp4#t=30,95`, is honoured by the browser.
 
 Say the segment in the `caption` too, so it is visible in the editor.
+
+**While presenting**, Space plays and pauses the video (the first press starts
+it from the poster), and so does a presenter remote's ■ button (`.` or `b`);
+the arrows and PageUp/PageDown keep turning slides. YouTube URLs get
+`enablejsapi=1` added for this — don't strip it from a pasted embed URL.
 
 What `video` accepts:
 

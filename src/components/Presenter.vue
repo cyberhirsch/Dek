@@ -4,8 +4,15 @@ import type { Deck } from '../core/types'
 import { parseContent } from '../render/inline'
 import SlideThumb from './SlideThumb.vue'
 
-const props = defineProps<{ deck: Deck; current: number }>()
-const emit = defineEmits<{ 'update:current': [i: number]; close: [] }>()
+const props = defineProps<{
+  deck: Deck
+  current: number
+  /** In the popup: Space and a remote's ■ (`.`/`b`) are handed to the audience
+   *  window, which plays/pauses the slide's video or else advances. */
+  relayMedia?: boolean
+}>()
+const emit = defineEmits<{ 'update:current': [i: number]; close: []; media: [key: string] }>()
+const MEDIA_KEYS = new Set([' ', '.', 'b', 'B', 'MediaPlayPause'])
 
 const slide = computed(() => props.deck.slides[props.current])
 const next = computed(() => props.deck.slides[props.current + 1])
@@ -85,10 +92,14 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 's') {
     e.preventDefault()
     emit('close')
-  } else if (e.key === 'ArrowRight' || e.key === ' ') {
+  } else if (props.relayMedia && MEDIA_KEYS.has(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    emit('media', e.key)
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+    // PageUp/PageDown: what a presenter remote's ◀ ▶ send.
     e.preventDefault()
     go(1)
-  } else if (e.key === 'ArrowLeft') {
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
     e.preventDefault()
     go(-1)
   }

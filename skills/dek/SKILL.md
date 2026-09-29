@@ -256,6 +256,12 @@ cells — is plain text, so `**bold**` there shows its asterisks.
 Add `steps: true` to a `text` or `text-image` slide to reveal its rows one at a
 time while presenting.
 
+While presenting (useful when the user asks, or for speaker notes): Present
+goes fullscreen, one Esc returns to the editor; `D` (or the pencil) draws on the
+slide in the theme's colours and `D` again wipes it; Space and a presenter
+remote's ■ play/pause a slide's video; a remote's ◀ ▶ send PageUp/PageDown.
+Full list: `SHORTCUTS.md` in the repo.
+
 ### Images
 
 In a bundle, image fields hold a path relative to `deck.md`: `Assets/photo.jpg`,
@@ -269,6 +275,24 @@ The single-image layouts (`text-image`, `image-full`, `image-caption`) also take
 `imageFit` (fill or fit the frame), `imageLink` (clickable while presenting),
 `imageInvert` and `imageDesaturate`; gallery items and image table cells carry
 their own `link`. See [Image options](references/layouts.md#image-options).
+
+### Slides on the clipboard
+
+Copying slides in Dek (Ctrl+C on the slide list) puts them on the system
+clipboard as deck text: a `# Dek slides` line, then one `---` block per slide.
+Pictures ride inside as `data:image/…;name=<file>;base64,…` URLs, and on paste
+Dek saves each into the receiving deck's `Assets/` under that name.
+
+- **When the user pastes that text to you**, keep every `data:` URL byte-for-byte
+  (or leave the field untouched); never retype, shorten or "fix" it. Say so if
+  you had to drop one.
+- **To hand slides back for pasting**, write bare slide blocks (each with a
+  `layout:`), separated by `---`, optionally under `# Dek slides`. The user
+  selects a slide in Dek's list and presses Ctrl+V; the slides land after it.
+  Text without a `layout:` pastes as nothing, by design.
+- An `Assets/…` path in pasted slides is kept as written and resolves against
+  the **receiving** deck's folder. Use it only for a file that exists there;
+  otherwise leave the image out and say which picture is missing.
 
 ## How to work on a deck
 

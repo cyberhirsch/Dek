@@ -33,6 +33,10 @@ function setCurrent(i: number) {
   current.value = i
   bc.postMessage({ type: 'nav', index: i })
 }
+/** Space / the remote's ■ pressed here: the audience window has the video. */
+function relayMedia(key: string) {
+  bc.postMessage({ type: 'media', key })
+}
 function bye() {
   bc.postMessage({ type: 'bye' })
 }
@@ -58,7 +62,9 @@ onUnmounted(() => {
     v-if="deck"
     :deck="deck"
     :current="current"
+    relay-media
     @update:current="setCurrent"
+    @media="relayMedia"
     @close="closeWin"
   />
   <div v-else-if="error" class="msg">{{ error }}</div>

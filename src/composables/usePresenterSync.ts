@@ -27,6 +27,12 @@ export function usePresenterSync({ deck, current, editMode, presenterOpen }: Pre
     // this window), so hand it the actual deck rather than letting it reload one.
     else if (m.type === 'hello') sendPresenterDeck()
     else if (m.type === 'bye') presenterWin.value = null
+    // Space / a remote's ■ pressed in the popup: replay it here as that key,
+    // so the audience window's own handling runs (Deck.vue: play/pause the
+    // slide's video, or advance when there is none).
+    else if (m.type === 'media' && typeof (m as { key?: unknown }).key === 'string') {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: (m as { key: string }).key, cancelable: true }))
+    }
   }
 
   /** A File-System-opened deck's images are `blob:` URLs scoped to THIS window,
