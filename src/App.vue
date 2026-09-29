@@ -181,15 +181,31 @@ function toggleFullscreen() {
   }
 }
 
-// Presenting fills the screen. Every way into it (Present, Ctrl+E, Esc from
-// the editor) is a key or click, which is what the browser requires before it
-// grants fullscreen. Leaving fullscreen by any other route than F — Esc, which
-// the browser takes before the page ever sees it — also leaves the
+// Presenting fills the screen. The browser grants fullscreen only during a
+// user action, and it doesn't count Esc as one — so from Esc (or anywhere
+// the request is refused) it waits for the next key or click while
+// presenting, typically the first arrow press. Leaving fullscreen by any route
+// other than F — Esc, which the browser keeps for itself — also leaves the
 // presentation, so one Esc gets back to the editor.
 let keepPresenting = false
-function startPresenting() {
+let fullscreenPending = false
+function requestPresentFullscreen() {
+  if (document.fullscreenElement) return
+  const req = document.documentElement.requestFullscreen?.()
+  if (!req) return
+  fullscreenPending = false
+  req.catch(() => (fullscreenPending = true))
+}
+function startPresenting(e?: KeyboardEvent) {
   editMode.value = false
-  if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => {})
+  if (e?.key === 'Escape') fullscreenPending = !document.fullscreenElement
+  else requestPresentFullscreen()
+}
+/** Capture-phase: the next real key or click while presenting goes fullscreen. */
+function onPendingFullscreen(e: Event) {
+  if (!fullscreenPending || editMode.value) return
+  if (e instanceof KeyboardEvent && (e.key === 'Escape' || e.key.toLowerCase() === 'f')) return
+  requestPresentFullscreen()
 }
 function onFullscreenChange() {
   if (!document.fullscreenElement && !editMode.value && !keepPresenting) enterEdit()
@@ -242,6 +258,8 @@ onMounted(async () => {
   }
   window.addEventListener('keydown', onKey)
   window.addEventListener('paste', onPasteEvent)
+  window.addEventListener('keydown', onPendingFullscreen, true)
+  window.addEventListener('pointerdown', onPendingFullscreen, true)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.addEventListener('mousemove', resetIdle)
@@ -251,6 +269,8 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('paste', onPasteEvent)
+  window.removeEventListener('keydown', onPendingFullscreen, true)
+  window.removeEventListener('pointerdown', onPendingFullscreen, true)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener(DROP_FAILED_EVENT, onDropFailed)
   window.removeEventListener('mousemove', resetIdle)
@@ -454,6 +474,7 @@ function onDropFailed(e: Event) {
 
 function enterEdit() {
   editMode.value = true
+  fullscreenPending = false
   if (document.fullscreenElement) {
     keepPresenting = true // already on the way out; don't re-enter onFullscreenChange's exit
     void document.exitFullscreen?.().catch(() => {})
@@ -586,7 +607,7 @@ function onKey(e: KeyboardEvent) {
     else if (selectedEls.value.length) {
       selectedEls.value = []
       activeTool.value = 'select'
-    } else startPresenting()
+    } else startPresenting(e)
   } else if (
     e.key === 'Escape' && !editMode.value && !overviewOpen.value && !presenterOpen.value && !exportOpen.value
   ) {
@@ -1868,7 +1889,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @redo="redo"
       @toggle-autosave="autosave = !autosave"
       @save="saveCurrentSlide"
-      @close="startPresenting"
+      @close="startPresenting()"
       @export="exportOpen = true"
       @review="toggleReview"
       @browse="deckBrowser = 'open'"

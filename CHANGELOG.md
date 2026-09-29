@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Slides
+
+**Copy and paste slides between tabs and decks**
+Ctrl+C / Ctrl+X on the slide list now also puts the slides on the system clipboard, as Dek text — the same YAML blocks a deck file is made of, under a `# Dek slides` line. Ctrl+V on the slide list of any Dek tab or deck pastes them after the current slide. Pictures travel inside the text and are saved into the receiving deck's Assets folder under their own names, so nothing points back at the other deck. Pasting within the same deck still uses the exact in-memory copy, without saving pictures a second time. Because it's text, slides also paste into a text editor or an LLM chat, and slide blocks written there (anything with a `layout:`, or a whole deck file) paste back in as slides. The slide menu's *Paste Slides* reads the clipboard too (the browser may ask for permission once). `+4` tests.
+
 ### Editing
 
 **Copy and paste slides between tabs and decks**
@@ -17,8 +22,7 @@ Once text had to shrink to fit, its box gave up a 28px strip at the bottom for t
 ### Presenting
 
 **Presenting goes fullscreen**
-*Present* (and Ctrl+E, or Esc from the editor) now also switches to fullscreen. One **Esc** leaves both and returns to the editor — before, the first Esc only left fullscreen and a second was needed. **F** still toggles fullscreen without ending the presentation, and opening the presenter window doesn't end it either, even though the browser may leave fullscreen when the window opens. Leaving the presentation any other way (✕, Ctrl+E) leaves fullscreen too.
-
+*Present* and Ctrl+E switch to fullscreen as the presentation starts. Esc from the editor starts the presentation too, but browsers don't grant fullscreen for Esc, so there it follows on the next key or click (usually the first arrow). One **Esc** leaves fullscreen and the presentation together. **F** still toggles fullscreen without ending the presentation, and opening the presenter window doesn't end it either, even though the browser may leave fullscreen when the window opens. Leaving the presentation any other way (✕, Ctrl+E) leaves fullscreen too.
 **Play and pause videos from the keyboard and a presenter remote**
 On a slide with a video, **Space** plays and pauses it — the first press starts it from the poster — and the **arrows** keep turning slides. A presenter remote works the same way: its ◀ ▶ buttons send PageUp/PageDown (previous/next slide), and its ■ button, which sends `.` or `b` (PowerPoint's black-screen keys, used by Kensington and Logitech remotes), plays and pauses. Works for YouTube and Vimeo embeds (through their player API — the toggle follows the player even after someone clicks its own pause button), video files, and video elements on the canvas. Clicking into a player no longer traps the keyboard in it while presenting: focus comes straight back to Dek, so the remote keeps working. On a slide without a video, Space still advances.
 
