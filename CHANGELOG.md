@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Dek Helper
+
+**A local helper that voices narration from inside Dek**
+`npm run helper` (in the Dek folder) starts the **Dek Helper**, a small server on this machine that does what a web page can't: run the local voice model. In a presentation, ⚙ → *Local voice* now finds it, asks once for the pairing code it prints, and offers **Voice N missing lines**. The helper voices them (the model loads once per job and the graphics card is free again when it ends); each finished line is fetched straight away and saved into the deck's `voice/` folder, so narration can use it before the job is done. Before starting it checks free graphics memory and says so instead of crashing — close ComfyUI, or *Try with CPU offload*. It listens on 127.0.0.1 only and answers only Dek's own pages with the pairing code; it never writes into decks itself. `npm run narrate:audio` still works for voicing from the command line.
+
 ### Slides
 
 **Copy and paste slides between tabs and decks**

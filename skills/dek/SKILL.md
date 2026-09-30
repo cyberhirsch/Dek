@@ -279,7 +279,10 @@ stays for German decks):
 npm run narrate:audio -- "D:\...\Week 01.dek" [--voice Seb] [--pace 1.0] [--prune]
 ```
 
-Run from the Dek repo. It writes `voice/<id>.wav` beside `deck.md`, one per
+Or from inside Dek: `npm run helper` starts the Dek Helper; then present → ⚙
+→ Local voice → *Voice N missing lines* (pair once with the code it prints).
+
+The command runs from the Dek repo. It writes `voice/<id>.wav` beside `deck.md`, one per
 spoken line; the id is a hash of the line's text, so an edited line simply has
 no audio until the next run (narration uses the browser voice for it
 meanwhile). Re-runs only voice new or changed lines; `--prune` deletes files no
