@@ -282,7 +282,7 @@ npm run narrate:audio -- "D:\...\Week 01.dek" [--voice Seb] [--pace 1.0] [--prun
 ```
 
 Or from inside Dek: `npm run helper` starts the Dek Helper; then present → ⚙
-→ Local voice → *Voice N missing lines* (pair once with the code it prints).
+→ Local voice → *Voice N missing lines* (or double-click `run helper.bat` in the Dek folder).
 With **Voice new lines automatically** ticked there, Dek keeps the open deck
 voiced by itself — on open, ~30 s after an edit to spoken text, and when
 `deck.md` changes on disk — so after you edit `>` passages in a deck file the

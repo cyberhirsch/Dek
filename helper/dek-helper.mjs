@@ -10,16 +10,16 @@
 // live and never writes into them.
 //
 // Who may talk to it: only Dek's own pages (the published site and the dev
-// server), and only with the pairing code printed at startup, so no other
-// website can use your GPU or voice. No other packages needed.
-//
-// Environment: DEK_TTS_PYTHON / DEK_TTS_SCRIPT (the voice tool), DEK_HELPER_PORT.
+// server) — a browser always tells the helper which page is asking, and a page
+// can't fake that — so no other website can use your GPU or voice. It listens
+// on 127.0.0.1 only, so nothing on the network can reach it. No other packages
+// needed.
 
 import { spawn, execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const VERSION = 1
@@ -30,13 +30,6 @@ const SPEAK = process.env.DEK_TTS_SCRIPT ?? 'G:\\AI\\_TTS\\AuK\\speak.py'
 const VRAM_NEEDED = 18000
 const VRAM_NEEDED_OFFLOAD = 10000
 const ORIGINS = new Set(['https://cyberhirsch.github.io', 'http://localhost:5173', 'http://127.0.0.1:5173'])
-
-// ── pairing code: made once, kept in ~/.dek-helper ──
-const home = join(homedir(), '.dek-helper')
-mkdirSync(home, { recursive: true })
-const tokenFile = join(home, 'pairing-code.txt')
-if (!existsSync(tokenFile)) writeFileSync(tokenFile, randomBytes(4).toString('hex'))
-const TOKEN = readFileSync(tokenFile, 'utf8').trim()
 
 const voiceTool = existsSync(PYTHON) && existsSync(SPEAK)
 
@@ -151,16 +144,15 @@ const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {}, cors)
 
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
-  // Status is open (no secrets in it), so Dek can say "found — enter the code".
   if (url.pathname === '/status' && req.method === 'GET') {
-    const paired = req.headers.authorization === `Bearer ${TOKEN}`
     return send(
       res,
       200,
       {
         helper: 'dek-helper',
         version: VERSION,
-        paired,
+        // Kept for Dek builds that still ask for a pairing code.
+        paired: true,
         voiceTool,
         voices: voiceTool ? ['Seb'] : [],
         busy: !!job && (job.state === 'loading' || job.state === 'running'),
@@ -168,7 +160,6 @@ const server = createServer(async (req, res) => {
       cors,
     )
   }
-  if (req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: 'Pairing code needed.' }, cors)
 
   // POST /jobs {items:[{id,text}], voice?, cpuOffload?}
   if (url.pathname === '/jobs' && req.method === 'POST') {
@@ -219,6 +210,6 @@ const server = createServer(async (req, res) => {
 // Loopback only: nothing on the network can reach it.
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Dek Helper ${VERSION} on http://127.0.0.1:${PORT}`)
-  console.log(`Pairing code: ${TOKEN}   (enter it once in Dek: present → ⚙)`)
+  console.log('Dek finds it by itself: present → ⚙ → Local voice.')
   console.log(voiceTool ? `Voice tool: ${SPEAK}` : `Voice tool NOT found: ${SPEAK} — set DEK_TTS_PYTHON / DEK_TTS_SCRIPT`)
 })

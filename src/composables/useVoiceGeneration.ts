@@ -146,7 +146,7 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
       await refresh()
       const s = status.value
       if (!s?.running || !s.paired || !s.voiceTool) {
-        autoState.value = !s?.running ? 'Waiting for the Dek Helper.' : !s.paired ? 'Pair the Dek Helper to voice automatically.' : 'The Dek Helper has no voice tool.'
+        autoState.value = !s?.running ? 'Waiting for the Dek Helper.' : !s.paired ? 'Restart the Dek Helper (older version).' : 'The Dek Helper has no voice tool.'
         return schedule(WAIT_RETRY)
       }
       if (german.value) {

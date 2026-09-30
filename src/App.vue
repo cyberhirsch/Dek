@@ -15,7 +15,6 @@ import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
 import { useVoiceGeneration } from './composables/useVoiceGeneration'
-import { setHelperCode } from './render/helper'
 import { slidesFromText, slidesToText } from './core/slideClipboard'
 import { inlineSlidePictures, storeSlidePictures } from './storage/slideTransfer'
 import {
@@ -527,15 +526,9 @@ async function onSaveRecording() {
 }
 /** Local voice: coverage, and voicing the missing lines via the Dek Helper. */
 const voiceGen = useVoiceGeneration(deck, () => !!recording.value)
-const helperCodeInput = ref('')
 watch(voicePanel, (open) => {
   if (open) void voiceGen.refresh()
 })
-function pairHelper() {
-  setHelperCode(helperCodeInput.value)
-  helperCodeInput.value = ''
-  void voiceGen.refresh()
-}
 const recordedLabel = computed(() => {
   const r = recorded.value
   if (!r) return ''
@@ -2120,13 +2113,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
               <p>Dek Helper isn't running. Start it with <code>npm run helper</code> in the Dek folder.</p>
               <button class="panel-btn" @click="voiceGen.refresh()">Check again</button>
             </template>
-            <template v-else-if="!voiceGen.status.value.paired">
-              <p>Dek Helper found. Enter the pairing code it shows:</p>
-              <div class="pair">
-                <input v-model="helperCodeInput" placeholder="code" spellcheck="false" @keydown.enter.stop="pairHelper" />
-                <button class="panel-btn" @click="pairHelper">Pair</button>
-              </div>
-            </template>
+            <p v-else-if="!voiceGen.status.value.paired">This Dek Helper is an older version. Close its window and start it again.</p>
             <p v-else-if="!voiceGen.status.value.voiceTool">Dek Helper can't find the voice tool on this machine.</p>
             <template v-else-if="voiceGen.job.value">
               <p>
@@ -2138,7 +2125,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
               Voice {{ voiceGen.missing.value.length }} missing {{ voiceGen.missing.value.length === 1 ? 'line' : 'lines' }}
             </button>
           </div>
-          <label v-if="voiceGen.status.value?.paired" class="check">
+          <label class="check">
             <input v-model="voiceSettings.autoVoice" type="checkbox" />
             Voice new lines automatically
           </label>
@@ -2497,10 +2484,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
-}
-.voice-panel .pair {
-  display: flex;
-  gap: 6px;
 }
 .voice-panel input {
   width: 110px;

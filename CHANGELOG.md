@@ -6,8 +6,11 @@
 
 ### Dek Helper
 
+**No pairing code**
+The Dek Helper connects as soon as it's running — no code to enter. It already answers only Dek's own pages (the browser tells it which page is asking, and a page can't fake that) and listens only on this machine, so the code added nothing that mattered. `run helper.bat` in the Dek folder starts it. An older helper still asking for a code says so in ⚙: restart it.
+
 **Narration voices itself**
-⚙ → *Local voice* has a new switch, **Voice new lines automatically** (off until you turn it on; shown once the Dek Helper is paired). With it on, Dek keeps the open deck voiced without being asked: when a deck opens, about 30 seconds after the last edit to its spoken text, and when `deck.md` changes on disk while it's open (an LLM or another session editing it), it voices whatever lines lack audio. A busy graphics card — ComfyUI, a render — gets no error box: Dek waits and tries again every few minutes, with one quiet status line in ⚙. Nothing starts during an MP4 recording, and a job still running when one starts is stopped. German narration is left to the browser voice. Files of edited or removed lines are pruned only once every line has audio, so undoing an edit in the same session still finds its old file.
+⚙ → *Local voice* has a new switch, **Voice new lines automatically** (off until you turn it on). With it on, Dek keeps the open deck voiced without being asked: when a deck opens, about 30 seconds after the last edit to its spoken text, and when `deck.md` changes on disk while it's open (an LLM or another session editing it), it voices whatever lines lack audio. A busy graphics card — ComfyUI, a render — gets no error box: Dek waits and tries again every few minutes, with one quiet status line in ⚙. Nothing starts during an MP4 recording, and a job still running when one starts is stopped. German narration is left to the browser voice. Files of edited or removed lines are pruned only once every line has audio, so undoing an edit in the same session still finds its old file.
 
 For decks that aren't open, `npm run narrate:watch -- "<folder>"` keeps every `*.dek` under a folder voiced in the background — one deck at a time, same 30-second settle, graphics-card check, German skip and prune rule. `npm run narrate:audio` now sends only lines without audio to the voice tool, so a fully voiced deck never loads the model; `--english-only` skips German decks. `+10` tests.
 

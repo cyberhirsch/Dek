@@ -2,13 +2,10 @@
 // runs on their own machine for what a web page can't do — for now, voicing
 // narration with the local voice model.
 //
-// It listens on 127.0.0.1 only and answers only Dek, and only with the
-// pairing code it prints at startup (entered once in ⚙, kept per browser).
-// Everything here degrades to "not running": the helper is optional.
-import { ref } from 'vue'
+// It listens on 127.0.0.1 only and answers only Dek's own pages. Everything
+// here degrades to "not running": the helper is optional.
 
 const BASE = 'http://127.0.0.1:7880'
-const TOKEN_KEY = 'dek:helper-code'
 
 export interface HelperStatus {
   running: boolean
@@ -24,27 +21,17 @@ export interface HelperJob {
   error?: string
 }
 
-function readCode(): string {
-  try {
-    return localStorage.getItem(TOKEN_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
-export const helperCode = ref(readCode())
-export function setHelperCode(code: string) {
-  helperCode.value = code.trim()
-  try {
-    localStorage.setItem(TOKEN_KEY, helperCode.value)
-  } catch {
-    /* private mode: re-enter next time */
-  }
+/** A pairing code from before the helper stopped needing one — dropped. */
+try {
+  localStorage.removeItem('dek:helper-code')
+} catch {
+  /* nothing stored */
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(BASE + path, {
     ...init,
-    headers: { ...(init.headers ?? {}), Authorization: `Bearer ${helperCode.value}`, 'Content-Type': 'application/json' },
+    headers: { ...(init.headers ?? {}), 'Content-Type': 'application/json' },
   })
 }
 async function errorOf(r: Response): Promise<string> {
