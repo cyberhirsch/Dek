@@ -2096,7 +2096,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         />
       </template>
       <span class="hud-sep" />
-      <button :class="{ on: narrating }" :title="narrating ? 'Stop narrating (Enter)' : 'Narrate: Dek presents and speaks the notes’ > lines (Enter)'" @click="narrating = !narrating">▷</button>
+      <button :class="{ on: narrating }" :title="narrating ? 'Stop narrating (Enter)' : 'Narrate: Dek presents and speaks the notes from each > on (Enter)'" @click="narrating = !narrating">▷</button>
       <button :class="{ on: voicePanel }" title="Narration voice" @click="voicePanel = !voicePanel">⚙</button>
       <button class="rec" :class="{ on: !!recording }" :title="recording ? 'Stop recording' : 'Record an MP4 (starts narrating)'" @click="toggleRecording">●</button>
       <span class="hud-sep" />
@@ -2154,7 +2154,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           Speed {{ voiceSettings.rate.toFixed(2) }}×
           <input v-model.number="voiceSettings.rate" type="range" min="0.6" max="1.6" step="0.05" />
         </label>
-        <p>Spoken: notes lines starting with <code>&gt;</code>. Generated audio plays inside the tab, so recording the Dek tab captures it. The browser voice doesn't: for that, record the entire screen with “Also share system audio”.</p>
+        <p>Spoken: the notes from each <code>&gt;</code> to the next (one per bullet on build slides); notes before the first <code>&gt;</code> stay private. Generated audio plays inside the tab, so recording the Dek tab captures it. The browser voice doesn't: for that, record the entire screen with “Also share system audio”.</p>
       </div>
     </div>
 

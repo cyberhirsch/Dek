@@ -26,6 +26,9 @@ Once text had to shrink to fit, its box gave up a 28px strip at the bottom for t
 
 ### Presenting
 
+**A `>` starts a spoken passage, not just a spoken line**
+Narrate mode used to speak only the line a `>` stood on, so anything written on the lines after it was dropped. Now a `>` begins a passage that runs until the next `>`: everything after the first `>` is spoken, and notes before it stay private. On a build slide, put one `>` per bullet — passage k is said as bullet k appears. The audio generator follows the same rule, so lines voiced before this change are voiced again on the next run.
+
 **Narration voices every build row, not just the first**
 On a `steps: true` slide whose spoken text wasn't written as one `>` line per row, all of it played with the first row and the others appeared in silence. Now each row gets its share: one `>` line per row still maps one-to-one; otherwise the spoken text is split into sentences — and a list said as a single sentence at its commas — and each piece goes, in order, to the row it shares the most words with (spread evenly when nothing matches). Narrate mode and `npm run narrate:audio` use the same split, so generated audio still matches; audio already generated for such slides is regenerated on the next run. `+8` tests.
 

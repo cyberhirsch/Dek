@@ -256,13 +256,15 @@ cells — is plain text, so `**bold**` there shows its asterisks.
 Add `steps: true` to a `text` or `text-image` slide to reveal its rows one at a
 time while presenting.
 
-**Spoken lines.** In `notes`, a line starting with `> ` is spoken aloud in
-narrate mode (Enter while presenting; also recorded to MP4). Everything else in
-the notes stays private. Write `>` lines as finished spoken sentences — no
-stage directions, no "delete?", no sources. Never start a private note with `>`.
+**Spoken passages.** In `notes`, a line starting with `> ` begins a passage
+that is spoken aloud in narrate mode (Enter while presenting; also recorded to
+MP4). The passage runs over the following lines until the next `>` — so
+**everything after the first `>` is spoken**. Private notes (reminders,
+"delete?", sources) go *before* the first `>`. Write passages as finished
+spoken sentences — no stage directions, no sources.
 
-On a `steps: true` slide each row is voiced as it appears. Best: **one `>` line
-per row**, in row order — then line k goes exactly with row k. Otherwise Dek
+On a `steps: true` slide each row is voiced as it appears. Best: **one `>` per
+row**, in row order — then passage k goes exactly with row k. Otherwise Dek
 splits the spoken text into sentences (and, for a list said as one sentence,
 at its commas) and hands each piece to the row it shares words with; a row
 nothing is said about appears silently. So the narration should actually talk

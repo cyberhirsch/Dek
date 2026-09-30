@@ -1,17 +1,27 @@
 // What narrate mode says on a slide, and when.
 //
-// The spoken text lives in the speaker notes: every line that starts with `>`
-// is said aloud; the rest of the notes stay private (reminders, "delete?",
-// sources). One place for everything the presenter knows about a slide.
+// The spoken text lives in the speaker notes. A line starting with `>` begins
+// a spoken passage, which runs over the following lines until the next `>`.
+// Notes before the first `>` stay private (reminders, "delete?", sources).
+// One place for everything the presenter knows about a slide.
 import { parseContent } from '../render/inline'
 
-/** The `>` lines of a slide's notes, marker removed, in order. */
+/**
+ * The spoken passages of a slide's notes, in order: each `>` starts one, and
+ * the lines after it (up to the next `>`) belong to it, joined with spaces.
+ * On a build slide, passage k is said as bullet k appears.
+ */
 export function spokenLines(notes: string | undefined): string[] {
   if (!notes) return []
-  return notes
-    .split(/\r?\n/)
-    .map((l) => /^\s*>\s?(.*)$/.exec(l)?.[1]?.trim())
-    .filter((l): l is string => !!l)
+  const out: string[][] = []
+  for (const line of notes.split(/\r?\n/)) {
+    const m = /^\s*>\s?(.*)$/.exec(line)
+    if (m) out.push([m[1]])
+    else if (out.length) out[out.length - 1].push(line)
+  }
+  return out
+    .map((parts) => parts.map((p) => p.trim()).filter(Boolean).join(' '))
+    .filter(Boolean)
 }
 
 /** One unit of narration: reveal this many build rows (undefined on a slide

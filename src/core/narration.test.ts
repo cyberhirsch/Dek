@@ -2,14 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { deckSpokenLines, lineId, narrationBeats, slideBeats, speechChunks, spokenLines } from './narration'
 
 describe('spokenLines', () => {
-  it('takes only the > lines, marker removed', () => {
-    const notes = 'Ask for hands first.\n> Who has used Blender?\ndelete? cut for time\n>No wrong answers.\n>   '
-    expect(spokenLines(notes)).toEqual(['Who has used Blender?', 'No wrong answers.'])
+  it('starts a passage at each >, marker removed', () => {
+    expect(spokenLines('> Who has used Blender?\n>No wrong answers.')).toEqual(['Who has used Blender?', 'No wrong answers.'])
   })
 
-  it('is empty without notes', () => {
+  it('keeps the lines after a > in its passage, up to the next >', () => {
+    const notes = '> First point.\nIt goes on here.\n\nAnd here.\n> Second point.\nMore.'
+    expect(spokenLines(notes)).toEqual(['First point. It goes on here. And here.', 'Second point. More.'])
+  })
+
+  it('keeps notes before the first > private', () => {
+    expect(spokenLines('delete? cut for time\nAsk for hands.\n> Spoken.')).toEqual(['Spoken.'])
+  })
+
+  it('is empty without notes or without any >', () => {
     expect(spokenLines(undefined)).toEqual([])
     expect(spokenLines('just private notes')).toEqual([])
+    expect(spokenLines('>   ')).toEqual([])
   })
 })
 
@@ -106,7 +115,7 @@ describe('lineId', () => {
 
 describe('deckSpokenLines', () => {
   it('lists every spoken line once, in deck order, with its id', async () => {
-    const lines = await deckSpokenLines([{ notes: '> One.\nprivate' }, {}, { notes: '> Two.\n> One.' }])
+    const lines = await deckSpokenLines([{ notes: 'private\n> One.' }, {}, { notes: '> Two.\n> One.' }])
     expect(lines.map((l) => l.text)).toEqual(['One.', 'Two.'])
     expect(lines[0].id).toBe(await lineId('One.'))
   })
