@@ -30,7 +30,7 @@ const SPEAK = process.env.DEK_TTS_SCRIPT ?? 'G:\\AI\\_TTS\\AuK\\speak.py'
 
 function usage(msg) {
   if (msg) console.error(msg)
-  console.error('usage: npm run narrate:audio -- "<deck.md | Talk.dek>" [--voice Seb] [--pace 1.0] [--cpu-offload] [--prune]')
+  console.error('usage: npm run narrate:audio -- "<deck.md | Talk.dek>" [--voice Seb] [--pace 1.0] [--cpu-offload] [--prune] [--english-only]')
   process.exit(1)
 }
 
@@ -39,6 +39,7 @@ const args = process.argv.slice(2)
 let target
 let voice = 'Seb'
 let prune = false
+let englishOnly = false
 const passThrough = []
 for (let i = 0; i < args.length; i++) {
   const a = args[i]
@@ -46,6 +47,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === '--pace') passThrough.push('--pace', args[++i])
   else if (a === '--cpu-offload') passThrough.push('--cpu-offload')
   else if (a === '--prune') prune = true
+  else if (a === '--english-only') englishOnly = true
   else if (a.startsWith('--')) usage(`unknown option ${a}`)
   else target = a
 }
@@ -63,7 +65,7 @@ const bundlePath = join(ROOT, 'node_modules', '.cache', 'dek-narration.mjs')
 mkdirSync(dirname(bundlePath), { recursive: true })
 await build({
   stdin: {
-    contents: "export { parseDeck } from './src/core/deck'\nexport { deckSpokenLines } from './src/core/narration'\n",
+    contents: "export { parseDeck } from './src/core/deck'\nexport { deckSpokenLines, looksGerman } from './src/core/narration'\n",
     resolveDir: ROOT,
     loader: 'ts',
   },
@@ -74,7 +76,7 @@ await build({
   outfile: bundlePath,
   logLevel: 'silent',
 })
-const { parseDeck, deckSpokenLines } = await import(pathToFileURL(bundlePath).href)
+const { parseDeck, deckSpokenLines, looksGerman } = await import(pathToFileURL(bundlePath).href)
 
 const deck = parseDeck(readFileSync(deckPath, 'utf8'))
 const items = await deckSpokenLines(deck.slides)
@@ -83,11 +85,31 @@ if (!items.length) {
   process.exit(0)
 }
 
-mkdirSync(outDir, { recursive: true })
-const itemsFile = join(tmpdir(), `dek-narration-${process.pid}.json`)
-writeFileSync(itemsFile, JSON.stringify(items, null, 2))
+// The voice model speaks English only.
+if (englishOnly && looksGerman(items.map((it) => it.text))) {
+  console.log(`${deck.config.deck ?? deckPath}: German narration — left to the browser voice.`)
+  process.exit(0)
+}
 
-console.log(`${deck.config.deck ?? deckPath}: ${items.length} spoken lines → ${outDir}`)
+mkdirSync(outDir, { recursive: true })
+const wanted = new Set(items.map((it) => `${it.id}.wav`))
+const staleFiles = () => readdirSync(outDir).filter((f) => /^[0-9a-f]{12}\.wav$/.test(f) && !wanted.has(f))
+// Only lines without a file go to the voice tool, so a fully voiced deck
+// never loads the model at all.
+const missing = items.filter((it) => !existsSync(join(outDir, `${it.id}.wav`)))
+if (!missing.length) {
+  const stale = staleFiles()
+  if (prune) for (const f of stale) rmSync(join(outDir, f))
+  console.log(
+    `${deck.config.deck ?? deckPath}: all ${items.length} lines have audio.` +
+      (stale.length ? (prune ? ` Removed ${stale.length} unused files.` : ` ${stale.length} files are no longer used (--prune removes them).`) : ''),
+  )
+  process.exit(0)
+}
+const itemsFile = join(tmpdir(), `dek-narration-${process.pid}.json`)
+writeFileSync(itemsFile, JSON.stringify(missing, null, 2))
+
+console.log(`${deck.config.deck ?? deckPath}: ${missing.length} of ${items.length} spoken lines need audio → ${outDir}`)
 console.log('The voice model needs ~18 GB of free VRAM: close ComfyUI and other GPU apps. First line takes ~45 s to load.')
 
 // ── run the voice tool, one JSON progress line per item ──
@@ -117,7 +139,7 @@ const code = await new Promise((ok) => {
       if (!r.cached) fresh++
       const text = items.find((it) => it.id === r.id)?.text ?? ''
       console.log(
-        `[${done}/${items.length}] ${r.cached ? 'cached' : `${Number(r.took ?? 0).toFixed(1)} s`}  ${Number(r.seconds ?? 0).toFixed(1)} s  ${text.slice(0, 70)}`,
+        `[${done}/${missing.length}] ${r.cached ? 'cached' : `${Number(r.took ?? 0).toFixed(1)} s`}  ${Number(r.seconds ?? 0).toFixed(1)} s  ${text.slice(0, 70)}`,
       )
     }
   })
@@ -129,9 +151,9 @@ if (code !== 0) {
   process.exit(code ?? 1)
 }
 
-// ── stale files: lines edited or removed since they were voiced ──
-const wanted = new Set(items.map((it) => `${it.id}.wav`))
-const stale = readdirSync(outDir).filter((f) => f.endsWith('.wav') && !wanted.has(f))
+// ── stale files: lines edited or removed since they were voiced. Pruned only
+//    now that every line has audio (the run succeeded). ──
+const stale = staleFiles()
 if (stale.length && prune) for (const f of stale) rmSync(join(outDir, f))
 
 const min = Math.floor(seconds / 60)

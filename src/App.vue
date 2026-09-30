@@ -526,7 +526,7 @@ async function onSaveRecording() {
   }
 }
 /** Local voice: coverage, and voicing the missing lines via the Dek Helper. */
-const voiceGen = useVoiceGeneration(deck)
+const voiceGen = useVoiceGeneration(deck, () => !!recording.value)
 const helperCodeInput = ref('')
 watch(voicePanel, (open) => {
   if (open) void voiceGen.refresh()
@@ -2138,6 +2138,11 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
               Voice {{ voiceGen.missing.value.length }} missing {{ voiceGen.missing.value.length === 1 ? 'line' : 'lines' }}
             </button>
           </div>
+          <label v-if="voiceGen.status.value?.paired" class="check">
+            <input v-model="voiceSettings.autoVoice" type="checkbox" />
+            Voice new lines automatically
+          </label>
+          <p v-if="voiceSettings.autoVoice && voiceGen.autoState.value">{{ voiceGen.autoState.value }}</p>
           <p v-if="voiceGen.error.value" class="panel-err">
             {{ voiceGen.error.value }}
             <button v-if="/GPU/.test(voiceGen.error.value)" class="panel-btn" @click="voiceGen.generate(true)">Try with CPU offload</button>
@@ -2512,6 +2517,11 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   border: 1px solid rgba(127, 199, 255, 0.45);
   border-radius: 6px;
   color: #cfe6ff;
+}
+.voice-panel label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 .voice-panel .panel-err {
   color: #fecaca;

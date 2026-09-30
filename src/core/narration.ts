@@ -194,3 +194,26 @@ export async function deckSpokenLines(
   }
   return out
 }
+
+const GERMAN = new Set(
+  'und der die das nicht ist ich sie wir ihr ein eine einen mit auf für von zu den dem des sich auch oder aber wenn dann wie was hier jetzt noch schon'.split(' '),
+)
+const ENGLISH = new Set(
+  'the and is are was were you we they this that with for not but what when then how here now already also or of to in on it'.split(' '),
+)
+/**
+ * Whether narration text is German rather than English, by its most common
+ * small words. The local voice model speaks English only, so German decks
+ * stay on the browser voice and are never sent to it.
+ */
+export function looksGerman(texts: string[]): boolean {
+  let de = 0
+  let en = 0
+  for (const t of texts) {
+    for (const w of t.toLowerCase().split(/[^\p{L}]+/u)) {
+      if (GERMAN.has(w)) de++
+      else if (ENGLISH.has(w)) en++
+    }
+  }
+  return de > en
+}

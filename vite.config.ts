@@ -154,6 +154,13 @@ function dekApi() {
             fs.writeFileSync(path.join(vd, name), Buffer.concat(chunks))
             return json(res, 200, { ok: true })
           }
+          if (url === '/api/voice' && req.method === 'DELETE') {
+            const name = u.searchParams.get('name') ?? ''
+            if (!/^[0-9a-f]{12}[.]wav$/.test(name)) return json(res, 400, { error: 'bad name' })
+            const abs = path.join(path.dirname(resolveDeck(file)), 'voice', name)
+            if (fs.existsSync(abs)) fs.rmSync(abs)
+            return json(res, 200, { ok: true })
+          }
           if (url === '/api/voice' && req.method === 'GET') {
             const name = u.searchParams.get('name') ?? ''
             if (!/^[\w.-]+\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })

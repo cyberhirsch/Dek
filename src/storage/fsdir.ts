@@ -616,6 +616,13 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
       await ws.write(data)
       await ws.close()
     },
+    async deleteVoice(_file, name) {
+      try {
+        await (await dir.getDirectoryHandle(VOICE_DIR)).removeEntry(name)
+      } catch {
+        /* already gone */
+      }
+    },
     async listVoice() {
       try {
         const vd = await dir.getDirectoryHandle(VOICE_DIR)

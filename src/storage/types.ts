@@ -37,6 +37,9 @@ export interface StorageBackend {
   listVoice?(file: string | undefined): Promise<string[]>
   /** Store one narration audio file (from the Dek Helper) in `voice/`. */
   writeVoice?(file: string | undefined, name: string, data: Blob): Promise<void>
+  /** Remove a narration audio file no spoken line uses any more. These are
+   *  generated and can always be made again, so this deletes outright. */
+  deleteVoice?(file: string | undefined, name: string): Promise<void>
   /** Delete a single file from the assets folder by name. */
   deleteAsset?(filename: string): Promise<void>
   /** True when the file changed on disk since this backend last read or wrote

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deckSpokenLines, lineId, narrationBeats, slideBeats, speechChunks, spokenLines } from './narration'
+import { deckSpokenLines, lineId, looksGerman, narrationBeats, slideBeats, speechChunks, spokenLines } from './narration'
 
 describe('spokenLines', () => {
   it('starts a passage at each >, marker removed', () => {
@@ -118,5 +118,16 @@ describe('deckSpokenLines', () => {
     const lines = await deckSpokenLines([{ notes: 'private\n> One.' }, {}, { notes: '> Two.\n> One.' }])
     expect(lines.map((l) => l.text)).toEqual(['One.', 'Two.'])
     expect(lines[0].id).toBe(await lineId('One.'))
+  })
+})
+
+describe('looksGerman', () => {
+  it('tells German narration from English', () => {
+    expect(looksGerman(['Das ist die erste Folie, und wir schauen uns die Gestaltgesetze an.'])).toBe(true)
+    expect(looksGerman(['This is the first slide, and we look at the Gestalt laws.'])).toBe(false)
+  })
+
+  it('counts nothing as English', () => {
+    expect(looksGerman([])).toBe(false)
   })
 })

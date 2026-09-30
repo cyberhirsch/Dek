@@ -283,6 +283,13 @@ npm run narrate:audio -- "D:\...\Week 01.dek" [--voice Seb] [--pace 1.0] [--prun
 
 Or from inside Dek: `npm run helper` starts the Dek Helper; then present → ⚙
 → Local voice → *Voice N missing lines* (pair once with the code it prints).
+With **Voice new lines automatically** ticked there, Dek keeps the open deck
+voiced by itself — on open, ~30 s after an edit to spoken text, and when
+`deck.md` changes on disk — so after you edit `>` passages in a deck file the
+user has open, the audio catches up without anyone running anything. For decks
+that aren't open: `npm run narrate:watch -- "<folder>"` watches every `*.dek`
+under it. Both wait out a busy graphics card, skip German decks, never run
+during a recording, and prune stale files only once every line has audio.
 
 The command runs from the Dek repo. It writes `voice/<id>.wav` beside `deck.md`, one per
 spoken line; the id is a hash of the line's text, so an edited line simply has

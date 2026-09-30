@@ -16,6 +16,9 @@ export interface VoiceSettings {
   /** SpeechSynthesisVoice.voiceURI; empty = the browser's default voice. */
   voice: string
   rate: number
+  /** Keep the open deck voiced by itself through the Dek Helper
+   *  (composables/useVoiceGeneration.ts). Opt-in. */
+  autoVoice: boolean
 }
 
 const KEY = 'dek:voice'
@@ -26,9 +29,10 @@ function load(): VoiceSettings {
       source: v.source === 'local' ? 'local' : 'browser',
       voice: typeof v.voice === 'string' ? v.voice : '',
       rate: typeof v.rate === 'number' ? v.rate : 1,
+      autoVoice: v.autoVoice === true,
     }
   } catch {
-    return { source: 'browser', voice: '', rate: 1 }
+    return { source: 'browser', voice: '', rate: 1, autoVoice: false }
   }
 }
 /** Per browser, like the pen colour: which voices exist depends on the machine. */

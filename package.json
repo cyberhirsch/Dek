@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "narrate:audio": "node scripts/narration-audio.mjs",
-    "helper": "node helper/dek-helper.mjs"
+    "helper": "node helper/dek-helper.mjs",
+    "narrate:watch": "node scripts/narration-watch.mjs"
   },
   "dependencies": {
     "jszip": "^3.10.1",

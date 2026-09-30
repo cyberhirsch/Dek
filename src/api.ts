@@ -193,6 +193,11 @@ export async function writeVoiceFile(name: string, data: Blob): Promise<boolean>
   await b.writeVoice(currentFile, name, data)
   return true
 }
+/** Delete a stale narration audio file from the active deck's `voice/`. */
+export async function deleteVoiceFile(name: string): Promise<void> {
+  const b = await active()
+  if (b.deleteVoice) await b.deleteVoice(currentFile, name)
+}
 /** The narration audio files the active deck has. */
 export async function listVoiceFiles(): Promise<string[]> {
   const b = await active()
