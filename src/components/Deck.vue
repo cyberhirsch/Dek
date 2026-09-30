@@ -7,7 +7,7 @@ import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
 import { playToEnd, toggleVideoIn } from '../render/videoControl'
 import { narrationBeats, spokenLines } from '../core/narration'
-import { browserVoice, type VoiceEngine } from '../render/voice'
+import { currentVoice } from '../render/voice'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
 
@@ -119,7 +119,6 @@ watch(
 // moves on. Turning pages by hand while it runs just continues from there.
 // The voice is an engine (render/voice.ts): the browser's speech now, audio
 // from a local model later.
-const voice: VoiceEngine = browserVoice
 const narrating = computed(() => !!props.narrating && !props.editable)
 let narration: AbortController | null = null
 const pause = (ms: number, signal: AbortSignal) =>
@@ -148,7 +147,7 @@ async function narrateSlide(signal: AbortSignal) {
   for (const b of beats) {
     if (signal.aborted) return
     if (b.reveal != null) revealed.value = b.reveal
-    if (b.text) await voice.speak(b.text, signal)
+    if (b.text) await currentVoice().speak(b.text, signal)
     else await pause(1200, signal)
   }
   if (signal.aborted) return

@@ -455,6 +455,9 @@ export async function saveAsFolder(_name: string, deck: Deck): Promise<{ backend
   return { backend, deck: await backend.loadDeck(md), dirName: bundle.name, dir: bundle, md }
 }
 
+/** Narration audio lives here, beside Assets/, in the deck's folder. */
+const VOICE_DIR = 'voice'
+
 export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend {
   let md = mdName
   const urlToPath = new Map<string, string>() // objectURL -> on-disk asset path
@@ -598,6 +601,24 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
     },
     async newDeck() {
       return md
+    },
+    async readVoice(_file, name) {
+      try {
+        const vd = await dir.getDirectoryHandle(VOICE_DIR)
+        return await (await vd.getFileHandle(name)).getFile()
+      } catch {
+        return null
+      }
+    },
+    async listVoice() {
+      try {
+        const vd = await dir.getDirectoryHandle(VOICE_DIR)
+        const out: string[] = []
+        for await (const h of vd.values()) if (!isDir(h)) out.push(h.name)
+        return out
+      } catch {
+        return []
+      }
     },
     async listAssets() {
       try {

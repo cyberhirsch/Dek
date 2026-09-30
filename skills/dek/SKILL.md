@@ -263,6 +263,27 @@ stage directions, no "delete?", no sources — and on a `steps: true` slide put
 them in the order of the rows: line k is said as row k appears. Never start a
 private note with `>`.
 
+Write `>` lines **for the ear**: plain sentences, one or two per line (a line
+is one audio clip, and short ones sound best); numbers and acronyms written as
+they should be said; no Markdown, no parentheses or symbols a voice can't read.
+
+**Voicing a deck with the local voice model** (English only; the browser voice
+stays for German decks):
+
+```bash
+npm run narrate:audio -- "D:\...\Week 01.dek" [--voice Seb] [--pace 1.0] [--prune]
+```
+
+Run from the Dek repo. It writes `voice/<id>.wav` beside `deck.md`, one per
+spoken line; the id is a hash of the line's text, so an edited line simply has
+no audio until the next run (narration uses the browser voice for it
+meanwhile). Re-runs only voice new or changed lines; `--prune` deletes files no
+line uses. The model needs ~18 GB of free VRAM: ask the user to close ComfyUI
+and other GPU apps first, and never start it during a render. In Dek, ⚙ →
+Source → *Local voice* plays the files and shows how many lines have audio.
+Words the model misreads are respelled in `G:\AI\_TTS\AuK\pronunciations.json`
+(whole word, case-sensitive) — add only what you've heard go wrong.
+
 While presenting (useful when the user asks, or for speaker notes): Present
 goes fullscreen, one Esc returns to the editor; `D` (or the pencil) draws on the
 slide in the theme's colours and `D` again wipes it; Space and a presenter

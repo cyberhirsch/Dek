@@ -37,6 +37,15 @@ export const serverBackend: StorageBackend = {
   id: 'server',
   label: 'local files',
 
+  async readVoice(file, name) {
+    const r = await fetch(`/api/voice${q(file)}${file ? '&' : '?'}name=${encodeURIComponent(name)}`)
+    return r.ok ? r.blob() : null
+  },
+  async listVoice(file) {
+    const r = await fetch(`/api/voice-list${q(file)}`)
+    return r.ok ? ((await r.json()).files as string[]) : []
+  },
+
   async listDecks(): Promise<DeckRef[]> {
     const r = await fetch('/api/decks')
     if (!r.ok) throw new Error('failed to list decks')

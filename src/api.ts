@@ -181,6 +181,17 @@ export async function uploadImage(filename: string, dataUrl: string): Promise<st
   return (await active()).uploadAsset(currentFile, filename, dataUrl)
 }
 
+/** One narration audio file from the active deck's `voice/` folder, or null. */
+export async function readVoiceFile(name: string): Promise<Blob | null> {
+  const b = await active()
+  return b.readVoice ? b.readVoice(currentFile, name) : null
+}
+/** The narration audio files the active deck has. */
+export async function listVoiceFiles(): Promise<string[]> {
+  const b = await active()
+  return b.listVoice ? b.listVoice(currentFile) : []
+}
+
 /** Filenames in the active deck's on-disk assets folder, or [] if the backend has
  *  no real folder (orphan detection then stays off). */
 export async function listDeckAssets(): Promise<string[]> {

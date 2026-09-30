@@ -14,6 +14,7 @@ import { DROP_FAILED_EVENT } from './render/dropImage'
 import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
+import { deckSpokenLines } from './core/narration'
 import { slidesFromText, slidesToText } from './core/slideClipboard'
 import { inlineSlidePictures, storeSlidePictures } from './storage/slideTransfer'
 import {
@@ -21,6 +22,7 @@ import {
   saveSlide,
   saveDeck,
   uploadImage,
+  listVoiceFiles,
   openDeck,
   newDeck,
   listDeckAssets,
@@ -523,6 +525,14 @@ async function onSaveRecording() {
     if ((e as Error).name !== 'AbortError') error.value = (e as Error).message
   }
 }
+/** How much of this deck the local voice covers, counted when ⚙ opens. */
+const voiceCoverage = ref<{ have: number; total: number } | null>(null)
+watch(voicePanel, async (open) => {
+  if (!open || !deck.value) return
+  const lines = await deckSpokenLines(deck.value.slides)
+  const files = new Set(await listVoiceFiles().catch(() => [] as string[]))
+  voiceCoverage.value = { have: lines.filter((l) => files.has(`${l.id}.wav`)).length, total: lines.length }
+})
 const recordedLabel = computed(() => {
   const r = recorded.value
   if (!r) return ''
@@ -2090,7 +2100,18 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       <button title="Exit to the editor (Esc)" @click="enterEdit">✕</button>
       <div v-if="voicePanel" class="voice-panel" @click.stop>
         <label>
-          Voice
+          Source
+          <select v-model="voiceSettings.source">
+            <option value="browser">Browser voice</option>
+            <option value="local">Local voice (generated audio)</option>
+          </select>
+        </label>
+        <p v-if="voiceSettings.source === 'local'">
+          <template v-if="voiceCoverage">{{ voiceCoverage.have }} of {{ voiceCoverage.total }} spoken lines have audio.</template>
+          Lines without it use the browser voice below. Generate with <code>npm run narrate:audio -- "&lt;deck&gt;"</code>.
+        </p>
+        <label>
+          {{ voiceSettings.source === 'local' ? 'Browser voice (for lines without audio)' : 'Voice' }}
           <select v-model="voiceSettings.voice">
             <option value="">Browser default</option>
             <option v-for="v in browserVoices" :key="v.voiceURI" :value="v.voiceURI">{{ v.name }} · {{ v.lang }}</option>
@@ -2100,7 +2121,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           Speed {{ voiceSettings.rate.toFixed(2) }}×
           <input v-model.number="voiceSettings.rate" type="range" min="0.6" max="1.6" step="0.05" />
         </label>
-        <p>Spoken: notes lines starting with <code>&gt;</code>. To record the browser voice, record the entire screen with “Also share system audio”.</p>
+        <p>Spoken: notes lines starting with <code>&gt;</code>. Generated audio plays inside the tab, so recording the Dek tab captures it. The browser voice doesn't: for that, record the entire screen with “Also share system audio”.</p>
       </div>
     </div>
 

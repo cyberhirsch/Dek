@@ -52,3 +52,32 @@ export function speechChunks(text: string, max = 220): string[] {
   if (cur.trim()) out.push(cur.trim())
   return out
 }
+
+/**
+ * A spoken line's audio id: the first 12 hex digits of SHA-1 over the line as
+ * spokenLines() returns it. Content-addressed on purpose — the generation
+ * script and the player compute it independently, and a line edited after its
+ * audio was made simply has no file, so it falls back to the browser voice
+ * instead of playing stale words. Same text, same id, in any deck.
+ */
+export async function lineId(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text)
+  const hash = await globalThis.crypto.subtle.digest('SHA-1', bytes)
+  return Array.from(new Uint8Array(hash).slice(0, 6), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Every spoken line of a deck, in order, with its audio id — what the
+ *  generation script voices and what the ⚙ menu counts. */
+export async function deckSpokenLines(slides: { notes?: string }[]): Promise<{ id: string; text: string }[]> {
+  const out: { id: string; text: string }[] = []
+  const seen = new Set<string>()
+  for (const s of slides) {
+    for (const text of spokenLines(s.notes)) {
+      const id = await lineId(text)
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, text })
+    }
+  }
+  return out
+}

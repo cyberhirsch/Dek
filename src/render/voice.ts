@@ -3,13 +3,16 @@
 // used now can later be swapped for pre-generated audio from a local model
 // without touching the narration loop.
 import { ref, watch } from 'vue'
-import { speechChunks } from '../core/narration'
+import { lineId, speechChunks } from '../core/narration'
 
 export interface VoiceEngine {
   speak(text: string, signal: AbortSignal): Promise<void>
 }
 
 export interface VoiceSettings {
+  /** `browser`: the browser's speech. `local`: audio files generated from the
+   *  notes by a local voice model (scripts/narration-audio.mjs). */
+  source: 'browser' | 'local'
   /** SpeechSynthesisVoice.voiceURI; empty = the browser's default voice. */
   voice: string
   rate: number
@@ -19,9 +22,13 @@ const KEY = 'dek:voice'
 function load(): VoiceSettings {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<VoiceSettings>
-    return { voice: typeof v.voice === 'string' ? v.voice : '', rate: typeof v.rate === 'number' ? v.rate : 1 }
+    return {
+      source: v.source === 'local' ? 'local' : 'browser',
+      voice: typeof v.voice === 'string' ? v.voice : '',
+      rate: typeof v.rate === 'number' ? v.rate : 1,
+    }
   } catch {
-    return { voice: '', rate: 1 }
+    return { source: 'browser', voice: '', rate: 1 }
   }
 }
 /** Per browser, like the pen colour: which voices exist depends on the machine. */
@@ -82,4 +89,58 @@ export const browserVoice: VoiceEngine = {
       await sayOne(chunk, signal)
     }
   },
+}
+
+/** Play an audio blob to its end; stop and resolve early on abort. */
+function playBlob(blob: Blob, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve()
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    const done = () => {
+      signal.removeEventListener('abort', stop)
+      URL.revokeObjectURL(url)
+      resolve()
+    }
+    const stop = () => {
+      audio.pause()
+      done()
+    }
+    audio.onended = done
+    audio.onerror = done
+    signal.addEventListener('abort', stop)
+    audio.play().catch(done)
+  })
+}
+
+/**
+ * Pre-generated audio: `voice/<lineId>.wav` in the deck's folder. A line
+ * without a file (not generated yet, or edited since) is spoken by
+ * `fallback` instead, so narration never goes silent or stale. No
+ * speechChunks here: the generator already split and joined long lines.
+ */
+export function makeLocalVoice(
+  read: (name: string) => Promise<Blob | null>,
+  play: (blob: Blob, signal: AbortSignal) => Promise<void>,
+  fallback: VoiceEngine,
+): VoiceEngine {
+  return {
+    async speak(text, signal) {
+      const blob = await read(`${await lineId(text)}.wav`).catch(() => null)
+      if (signal.aborted) return
+      if (blob && blob.size) return play(blob, signal)
+      return fallback.speak(text, signal)
+    },
+  }
+}
+
+export const localVoice: VoiceEngine = makeLocalVoice(
+  async (name) => (await import('../api')).readVoiceFile(name),
+  playBlob,
+  browserVoice,
+)
+
+/** The engine the ⚙ menu has chosen. */
+export function currentVoice(): VoiceEngine {
+  return voiceSettings.value.source === 'local' ? localVoice : browserVoice
 }

@@ -139,6 +139,21 @@ function dekApi() {
             }
           }
 
+          // Narration audio: `voice/` next to the deck file.
+          if (url === '/api/voice-list' && req.method === 'GET') {
+            const vd = path.join(path.dirname(resolveDeck(file)), 'voice')
+            return json(res, 200, { files: fs.existsSync(vd) ? fs.readdirSync(vd).filter((f) => f.endsWith('.wav')) : [] })
+          }
+          if (url === '/api/voice' && req.method === 'GET') {
+            const name = u.searchParams.get('name') ?? ''
+            if (!/^[\w.-]+\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })
+            const abs = path.join(path.dirname(resolveDeck(file)), 'voice', name)
+            if (!fs.existsSync(abs)) return json(res, 404, { error: 'no such voice file' })
+            res.writeHead(200, { 'Content-Type': 'audio/wav' })
+            fs.createReadStream(abs).pipe(res)
+            return
+          }
+
           if (url === '/api/decks' && req.method === 'GET') {
             return json(res, 200, { decks: listDecks() })
           }

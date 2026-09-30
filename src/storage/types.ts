@@ -29,6 +29,12 @@ export interface StorageBackend {
    *  with a real folder (File System Access) implement this; others omit it, and
    *  the UI then skips orphan detection. */
   listAssets?(): Promise<string[]>
+  /** Narration audio: the deck's `voice/` folder, where the generation script
+   *  (scripts/narration-audio.mjs) writes one `<line id>.wav` per spoken line.
+   *  Kept apart from Assets so the orphan scan never offers them for deletion.
+   *  Backends without a real folder omit both. */
+  readVoice?(file: string | undefined, name: string): Promise<Blob | null>
+  listVoice?(file: string | undefined): Promise<string[]>
   /** Delete a single file from the assets folder by name. */
   deleteAsset?(filename: string): Promise<void>
   /** True when the file changed on disk since this backend last read or wrote
