@@ -48,7 +48,7 @@ export function narrationBeats(lines: string[], rows = 0, rowTexts: string[] = [
   let groups: string[][]
   if (lines.length === rows) groups = lines.map((l) => [l])
   else {
-    // Direction tags ([calm], [slower]…) belong to the whole passage: take them
+    // Direction tags ([calm], [breath]…) belong to the whole passage: take them
     // off before splitting, match rows on the words alone, and give every piece
     // its passage's tags back — so each piece is voiced, and hashed, with them.
     let pieces = lines.flatMap((l) => {
@@ -72,14 +72,14 @@ export function narrationBeats(lines: string[], rows = 0, rowTexts: string[] = [
 
 // ── voice direction tags ──
 // A spoken passage may open with tags for the local voice tool, e.g.
-// "> [calm] [slower] Hand it in before class starts." The tool reads and strips
+// "> [calm] [breath] Hand it in before class starts." The tool reads and strips
 // them; they stay in the text Dek hashes and sends it (so changing a tag
 // re-voices that line). Everything that speaks, shows or matches text in Dek
 // itself uses the text without them. A Markdown link [label](url) isn't a tag.
 
 const VOICE_TAGS = /^(\s*\[[A-Za-z]+\](?!\())+\s*/
 /** Tags the voice tool acts on; others are dropped by it with a warning. */
-export const KNOWN_VOICE_TAGS = new Set(['calm', 'happy', 'slower', 'slow', 'breath'])
+export const KNOWN_VOICE_TAGS = new Set(['calm', 'happy', 'breath'])
 
 /** Leading direction tags of a passage (as written, brackets included), and the rest. */
 export function splitVoiceTags(text: string): { tags: string[]; body: string } {

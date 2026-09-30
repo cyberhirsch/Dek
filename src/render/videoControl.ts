@@ -116,8 +116,13 @@ async function playerIn(root: HTMLElement): Promise<HTMLVideoElement | HTMLIFram
  * end (or its `end=` segment). False when the slide has no video Dek can
  * play and follow. Resolves early when `signal` aborts.
  */
+/** Whether the slide inside `root` has a video Dek can play and follow. */
+export function slideHasVideo(root: HTMLElement): boolean {
+  return !!root.querySelector('[data-dek-play]:not(:disabled), video, iframe[data-dek-video]')
+}
+
 export async function playToEnd(root: HTMLElement, signal: AbortSignal): Promise<boolean> {
-  if (!root.querySelector('[data-dek-play]:not(:disabled), video, iframe[data-dek-video]')) return false
+  if (!slideHasVideo(root)) return false
   const play = root.querySelector<HTMLButtonElement>('[data-dek-play]:not(:disabled)')
   if (play) play.click()
   const player = await playerIn(root)

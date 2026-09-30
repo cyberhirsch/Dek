@@ -263,8 +263,12 @@ MP4). The passage runs over the following lines until the next `>` — so
 "delete?", sources) go *before* the first `>`. Write passages as finished
 spoken sentences — no stage directions, no sources.
 A passage may open with direction tags for the local voice, e.g.
-`> [calm] [slower] Hand it in before class starts.`: `[calm]`, `[happy]`,
-`[slower]`/`[slow]`, `[breath]`. Only at the start; others are ignored.
+`> [calm] [breath] Hand it in before class starts.`: `[calm]`, `[happy]`,
+`[breath]`. Only at the start; others (including `[slower]`, dropped) are ignored.
+
+**Video slides:** the first `>` passage is said *before* the video (credit,
+what to watch for), the video plays to its end, and every later passage is
+said *after* it (the discussion). One passage: speak, then the video.
 
 On a `steps: true` slide each row is voiced as it appears. Best: **one `>` per
 row**, in row order — then passage k goes exactly with row k. Otherwise Dek

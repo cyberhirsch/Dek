@@ -168,7 +168,7 @@ describe('respellings', () => {
 
 describe('voice direction tags', () => {
   it('splits leading tags off, but never a Markdown link', () => {
-    expect(splitVoiceTags('[calm] [slower] Hand it in.')).toEqual({ tags: ['[calm]', '[slower]'], body: 'Hand it in.' })
+    expect(splitVoiceTags('[calm] [breath] Hand it in.')).toEqual({ tags: ['[calm]', '[breath]'], body: 'Hand it in.' })
     expect(splitVoiceTags('[the site](https://x.io) is up.')).toEqual({ tags: [], body: '[the site](https://x.io) is up.' })
     expect(splitVoiceTags('Say [calm] mid-line.')).toEqual({ tags: [], body: 'Say [calm] mid-line.' })
   })
@@ -187,8 +187,8 @@ describe('voice direction tags', () => {
   })
 
   it('puts tags once, at the start, when pieces share a row', () => {
-    const beats = narrationBeats(['[slower] Aaa one. Bbb two. Ccc three. Ddd four.'], 2)
-    expect(beats.map((b) => b.text)).toEqual(['[slower] Aaa one. Bbb two.', '[slower] Ccc three. Ddd four.'])
+    const beats = narrationBeats(['[breath] Aaa one. Bbb two. Ccc three. Ddd four.'], 2)
+    expect(beats.map((b) => b.text)).toEqual(['[breath] Aaa one. Bbb two.', '[breath] Ccc three. Ddd four.'])
   })
 
   it('leaves one-passage-per-row slides exactly as written', () => {
@@ -196,7 +196,7 @@ describe('voice direction tags', () => {
   })
 
   it('lists tags the voice tool ignores', () => {
-    expect(unknownVoiceTags('[calm] [Excited] [slow] Go.')).toEqual(['excited'])
+    expect(unknownVoiceTags('[calm] [Excited] [slower] [breath] Go.')).toEqual(['excited', 'slower'])
     expect(unknownVoiceTags('Plain.')).toEqual([])
   })
 })

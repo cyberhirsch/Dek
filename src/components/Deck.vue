@@ -5,7 +5,7 @@ import type { SlideSplitTarget } from '../core/split'
 import type { IdleText } from './ContextMenu.vue'
 import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
-import { playToEnd, toggleVideoIn } from '../render/videoControl'
+import { playToEnd, slideHasVideo, toggleVideoIn } from '../render/videoControl'
 import { slideBeats } from '../core/narration'
 import { currentVoice } from '../render/voice'
 import SlideView from './SlideView.vue'
@@ -144,16 +144,26 @@ async function narrateSlide(signal: AbortSignal) {
   const slide = props.deck.slides[index]
   const rows = stepRows(index)
   const beats = slideBeats(slide)
-  for (const b of beats) {
-    if (signal.aborted) return
+  // On a video slide the first passage introduces the film (credit, what to
+  // watch for), the video plays to its end, and the passages after it are the
+  // discussion. Without a video, every passage in turn.
+  const video = !!stage.value && slideHasVideo(stage.value)
+  const say = async (b: (typeof beats)[number]) => {
     if (b.reveal != null) revealed.value = b.reveal
     if (b.text) await currentVoice().speak(b.text, signal)
     else await pause(1200, signal)
   }
+  const [intro, ...rest] = beats
+  if (intro) await say(intro)
+  if (signal.aborted) return
+  if (video && stage.value) await playToEnd(stage.value, signal)
+  for (const b of rest) {
+    if (signal.aborted) return
+    await say(b)
+  }
   if (signal.aborted) return
   if (rows) revealed.value = rows
-  const hadVideo = stage.value ? await playToEnd(stage.value, signal) : false
-  if (!beats.length && !hadVideo) await pause(QUIET_SLIDE_MS, signal)
+  if (!beats.length && !video) await pause(QUIET_SLIDE_MS, signal)
   await pause(BETWEEN_SLIDES_MS, signal)
   if (signal.aborted) return
   if (index >= props.deck.slides.length - 1) {

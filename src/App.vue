@@ -2130,7 +2130,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
             Voice new lines automatically
           </label>
           <p v-if="voiceGen.unknownTags.value.length" class="panel-err">
-            The voice ignores {{ voiceGen.unknownTags.value.map((t) => `[${t}]`).join(' ') }} — it knows [calm] [happy] [slower] [breath].
+            The voice ignores {{ voiceGen.unknownTags.value.map((t) => `[${t}]`).join(' ') }} — it knows [calm] [happy] [breath].
           </p>
           <p v-if="voiceSettings.autoVoice && voiceGen.autoState.value">{{ voiceGen.autoState.value }}</p>
           <p v-if="voiceGen.error.value" class="panel-err">
