@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deckSpokenLines, lineId, narrationBeats, speechChunks, spokenLines } from './narration'
+import { deckSpokenLines, lineId, narrationBeats, slideBeats, speechChunks, spokenLines } from './narration'
 
 describe('spokenLines', () => {
   it('takes only the > lines, marker removed', () => {
@@ -25,16 +25,60 @@ describe('narrationBeats', () => {
     ])
   })
 
-  it('still reveals every row when there are fewer lines', () => {
-    expect(narrationBeats(['a'], 3)).toEqual([{ reveal: 1, text: 'a' }, { reveal: 2 }, { reveal: 3 }])
+  it('gives each row its share of one long spoken paragraph', () => {
+    // the reported case: one > line, three rows — each row gets a sentence
+    const beats = narrationBeats(['Names reveal purpose. Parenting reveals dependency. Collections group things.'], 3)
+    expect(beats).toEqual([
+      { reveal: 1, text: 'Names reveal purpose.' },
+      { reveal: 2, text: 'Parenting reveals dependency.' },
+      { reveal: 3, text: 'Collections group things.' },
+    ])
   })
 
-  it('says extra lines with everything shown', () => {
-    expect(narrationBeats(['a', 'b', 'c'], 2)).toEqual([
-      { reveal: 1, text: 'a' },
-      { reveal: 2, text: 'b' },
-      { reveal: 2, text: 'c' },
+  it('hands sentences to the row they talk about', () => {
+    const rows = ['Names reveal purpose', 'Parenting reveals dependency']
+    const beats = narrationBeats(
+      ['A good name says what an object is for. Nobody should have to guess. Parenting shows what depends on what.'],
+      2,
+      rows,
+    )
+    expect(beats).toEqual([
+      { reveal: 1, text: 'A good name says what an object is for. Nobody should have to guess.' },
+      { reveal: 2, text: 'Parenting shows what depends on what.' },
     ])
+  })
+
+  it('splits a list said as one sentence at its commas, matching the rows', () => {
+    const rows = ['Proximity', 'Similarity', 'Closure']
+    const beats = narrationBeats(["Here's the checklist: proximity, similarity, and closure."], 3, rows)
+    expect(beats.map((b) => b.text)).toEqual(["Here's the checklist: proximity,", 'similarity,', 'and closure.'])
+  })
+
+  it('keeps numbers with commas whole', () => {
+    expect(narrationBeats(['It costs 1,000 euros, then more.'], 2).map((b) => b.text)).toEqual(['It costs 1,000 euros,', 'then more.'])
+  })
+
+  it('still reveals every row when there are fewer sentences, starting at the first', () => {
+    expect(narrationBeats(['Only one.'], 3)).toEqual([{ reveal: 1, text: 'Only one.' }, { reveal: 2 }, { reveal: 3 }])
+  })
+
+  it('spreads extra lines over the rows instead of piling them on the last', () => {
+    expect(narrationBeats(['Aaa one.', 'Bbb two.', 'Ccc three.', 'Ddd four.'], 2)).toEqual([
+      { reveal: 1, text: 'Aaa one. Bbb two.' },
+      { reveal: 2, text: 'Ccc three. Ddd four.' },
+    ])
+  })
+})
+
+describe('slideBeats', () => {
+  it('reads the build rows from the slide itself', () => {
+    const beats = slideBeats({ steps: true, content: '- Alpha\n- Beta', notes: '> First sentence. Second sentence.' })
+    expect(beats.map((b) => b.reveal)).toEqual([1, 2])
+    expect(beats.map((b) => b.text)).toEqual(['First sentence.', 'Second sentence.'])
+  })
+
+  it('has no reveals on a slide without steps', () => {
+    expect(slideBeats({ content: '- Alpha\n- Beta', notes: '> Hi.' })).toEqual([{ text: 'Hi.' }])
   })
 })
 

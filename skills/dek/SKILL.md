@@ -259,9 +259,14 @@ time while presenting.
 **Spoken lines.** In `notes`, a line starting with `> ` is spoken aloud in
 narrate mode (Enter while presenting; also recorded to MP4). Everything else in
 the notes stays private. Write `>` lines as finished spoken sentences — no
-stage directions, no "delete?", no sources — and on a `steps: true` slide put
-them in the order of the rows: line k is said as row k appears. Never start a
-private note with `>`.
+stage directions, no "delete?", no sources. Never start a private note with `>`.
+
+On a `steps: true` slide each row is voiced as it appears. Best: **one `>` line
+per row**, in row order — then line k goes exactly with row k. Otherwise Dek
+splits the spoken text into sentences (and, for a list said as one sentence,
+at its commas) and hands each piece to the row it shares words with; a row
+nothing is said about appears silently. So the narration should actually talk
+about each row, in order.
 
 Write `>` lines **for the ear**: plain sentences, one or two per line (a line
 is one audio clip, and short ones sound best); numbers and acronyms written as

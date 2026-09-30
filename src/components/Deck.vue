@@ -6,7 +6,7 @@ import type { IdleText } from './ContextMenu.vue'
 import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
 import { playToEnd, toggleVideoIn } from '../render/videoControl'
-import { narrationBeats, spokenLines } from '../core/narration'
+import { slideBeats } from '../core/narration'
 import { currentVoice } from '../render/voice'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
@@ -143,7 +143,7 @@ async function narrateSlide(signal: AbortSignal) {
   const index = props.modelValue
   const slide = props.deck.slides[index]
   const rows = stepRows(index)
-  const beats = narrationBeats(spokenLines(slide?.notes), rows)
+  const beats = slideBeats(slide)
   for (const b of beats) {
     if (signal.aborted) return
     if (b.reveal != null) revealed.value = b.reveal
