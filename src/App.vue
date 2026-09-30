@@ -11,6 +11,9 @@ import { splitSlide, type SlideSplitTarget } from './core/split'
 import { fileToOptimizedDataUrl } from './core/image'
 import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
 import { DROP_FAILED_EVENT } from './render/dropImage'
+import { startRecording, saveVideo, type Recording } from './render/recorder'
+import { cleanDeckName } from './storage/assets'
+import { browserVoices, voiceSettings } from './render/voice'
 import { slidesFromText, slidesToText } from './core/slideClipboard'
 import { inlineSlidePictures, storeSlidePictures } from './storage/slideTransfer'
 import {
@@ -465,6 +468,67 @@ const inkChoice = ref(0)
 const inkColor = computed(() => inkPalette.value[inkChoice.value] ?? inkPalette.value[0])
 watch(editMode, (ed) => {
   if (ed) drawing.value = false
+})
+
+// ── narrate mode + recording ──
+// Narrate (Enter, or ▷) lets Dek present by itself, speaking the notes' `>`
+// lines (Deck.vue runs it). Record (●) captures that as an MP4: pick the Dek
+// tab and the video is just the slide; pick the entire screen with system
+// audio to catch the browser's voice, which Windows plays outside the tab.
+const narrating = ref(false)
+const voicePanel = ref(false)
+const recording = ref<Recording | null>(null)
+const recorded = ref<{ blob: Blob; seconds: number } | null>(null)
+watch(editMode, (ed) => {
+  if (!ed) return
+  narrating.value = false
+  voicePanel.value = false
+  void stopRecording()
+})
+async function toggleRecording() {
+  if (recording.value) return void stopRecording()
+  const frame = document.querySelector<HTMLElement>('.stage-wrap .dek-frame')
+  if (!frame) return
+  error.value = ''
+  try {
+    const rec = await startRecording(frame)
+    recording.value = rec
+    recorded.value = null
+    rec.onEnded(() => void stopRecording())
+    narrating.value = true // record = narrate from this slide on
+  } catch (e) {
+    // Cancelling the browser's picker is a choice, not an error.
+    if ((e as Error).name !== 'NotAllowedError') error.value = (e as Error).message
+  }
+}
+async function stopRecording() {
+  const rec = recording.value
+  if (!rec) return
+  recording.value = null
+  narrating.value = false
+  const blob = await rec.stop()
+  if (blob.size) recorded.value = { blob, seconds: Math.round((Date.now() - rec.started) / 1000) }
+}
+/** Narration ran off the last slide: the recording is complete. */
+function onNarrationEnd() {
+  void stopRecording()
+}
+async function onSaveRecording() {
+  const r = recorded.value
+  if (!r) return
+  try {
+    await saveVideo(r.blob, `${cleanDeckName(deck.value?.config.deck ?? 'deck')}.mp4`)
+    recorded.value = null
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') error.value = (e as Error).message
+  }
+}
+const recordedLabel = computed(() => {
+  const r = recorded.value
+  if (!r) return ''
+  const m = Math.floor(r.seconds / 60)
+  const sec = String(r.seconds % 60).padStart(2, '0')
+  return `${m}:${sec} · ${(r.blob.size / 1e6).toFixed(0)} MB`
 })
 
 /** A picture dropped from a site that blocks copying (render/dropImage.ts). */
@@ -1934,6 +1998,8 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :selected-el="selectedEls"
           :pending-image="pendingImage"
           v-model:drawing="drawing"
+          v-model:narrating="narrating"
+          @narration-end="onNarrationEnd"
           :ink-color="inkColor"
           @patch="patchSlide"
           @config-patch="patchConfig"
@@ -2016,7 +2082,26 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           @click="inkChoice = k"
         />
       </template>
+      <span class="hud-sep" />
+      <button :class="{ on: narrating }" :title="narrating ? 'Stop narrating (Enter)' : 'Narrate: Dek presents and speaks the notes’ > lines (Enter)'" @click="narrating = !narrating">▷</button>
+      <button :class="{ on: voicePanel }" title="Narration voice" @click="voicePanel = !voicePanel">⚙</button>
+      <button class="rec" :class="{ on: !!recording }" :title="recording ? 'Stop recording' : 'Record an MP4 (starts narrating)'" @click="toggleRecording">●</button>
+      <span class="hud-sep" />
       <button title="Exit to the editor (Esc)" @click="enterEdit">✕</button>
+      <div v-if="voicePanel" class="voice-panel" @click.stop>
+        <label>
+          Voice
+          <select v-model="voiceSettings.voice">
+            <option value="">Browser default</option>
+            <option v-for="v in browserVoices" :key="v.voiceURI" :value="v.voiceURI">{{ v.name }} · {{ v.lang }}</option>
+          </select>
+        </label>
+        <label>
+          Speed {{ voiceSettings.rate.toFixed(2) }}×
+          <input v-model.number="voiceSettings.rate" type="range" min="0.6" max="1.6" step="0.05" />
+        </label>
+        <p>Spoken: notes lines starting with <code>&gt;</code>. To record the browser voice, record the entire screen with “Also share system audio”.</p>
+      </div>
     </div>
 
     <!-- overlays -->
@@ -2059,6 +2144,11 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     <!-- Chrome downgrades a remembered handle's readwrite grant to "prompt" on a
          new session. Re-granting needs a user gesture, but only shows a small
          allow bubble — never a file/folder picker. -->
+    <div v-if="recorded" class="toast reconnect">
+      <span>Recording ready — {{ recordedLabel }}</span>
+      <button class="toast-btn" @click="onSaveRecording">Save MP4</button>
+      <button class="toast-x" title="Discard" @click="recorded = null">✕</button>
+    </div>
     <div v-if="reconnectName" class="toast reconnect">
       <span>Reopen “{{ reconnectName }}” — your last deck.</span>
       <button class="toast-btn" @click="onReconnectFolder">Reopen</button>
@@ -2314,6 +2404,40 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
 }
 .hud button:hover { color: #fff; }
 .hud button.on { color: var(--dek-accent, #7fc7ff); }
+.hud button.rec.on { color: #f87171; }
+.voice-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(18, 20, 24, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-size: 11px;
+  color: rgba(230, 236, 242, 0.8);
+}
+.voice-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.voice-panel select {
+  background: #0c0e12;
+  color: #e6ecf2;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+}
+.voice-panel p {
+  margin: 0;
+  line-height: 1.5;
+  color: rgba(230, 236, 242, 0.55);
+}
 /* Pen colours: small filled circles; the chosen one gets a ring. The ring is
    light on a dark HUD whatever the colour, so a bg-coloured swatch still shows. */
 .hud button.ink-swatch {

@@ -256,6 +256,13 @@ cells — is plain text, so `**bold**` there shows its asterisks.
 Add `steps: true` to a `text` or `text-image` slide to reveal its rows one at a
 time while presenting.
 
+**Spoken lines.** In `notes`, a line starting with `> ` is spoken aloud in
+narrate mode (Enter while presenting; also recorded to MP4). Everything else in
+the notes stays private. Write `>` lines as finished spoken sentences — no
+stage directions, no "delete?", no sources — and on a `steps: true` slide put
+them in the order of the rows: line k is said as row k appears. Never start a
+private note with `>`.
+
 While presenting (useful when the user asks, or for speaker notes): Present
 goes fullscreen, one Esc returns to the editor; `D` (or the pencil) draws on the
 slide in the theme's colours and `D` again wipes it; Space and a presenter

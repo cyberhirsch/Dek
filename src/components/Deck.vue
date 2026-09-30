@@ -5,7 +5,9 @@ import type { SlideSplitTarget } from '../core/split'
 import type { IdleText } from './ContextMenu.vue'
 import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
-import { toggleVideoIn } from '../render/videoControl'
+import { playToEnd, toggleVideoIn } from '../render/videoControl'
+import { narrationBeats, spokenLines } from '../core/narration'
+import { browserVoice, type VoiceEngine } from '../render/voice'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
 
@@ -21,10 +23,15 @@ const props = defineProps<{
   /** Presenter pen (D / the HUD pencil). Owned by App so the HUD can show it. */
   drawing?: boolean
   inkColor?: string
+  /** Narrate mode (Enter): Dek presents by itself, speaking the notes' `>` lines. */
+  narrating?: boolean
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   'update:drawing': [on: boolean]
+  'update:narrating': [on: boolean]
+  /** Narration ran off the end of the deck. */
+  'narration-end': []
   patch: [p: Partial<Slide>]
   'config-patch': [p: Partial<DeckConfig>]
   upload: [e: { field: 'image' | 'poster' | 'portraits' | 'gallery' | 'table'; file: File; index?: number; el?: number }]
@@ -105,6 +112,67 @@ watch(
     }
   },
 )
+
+// ── narrate mode ──
+// Enter starts and stops it. On each slide Dek says the notes' `>` lines
+// (revealing build rows as it goes), plays the slide's video to its end, then
+// moves on. Turning pages by hand while it runs just continues from there.
+// The voice is an engine (render/voice.ts): the browser's speech now, audio
+// from a local model later.
+const voice: VoiceEngine = browserVoice
+const narrating = computed(() => !!props.narrating && !props.editable)
+let narration: AbortController | null = null
+const pause = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const t = setTimeout(done, ms)
+    function done() {
+      clearTimeout(t)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    signal.addEventListener('abort', done)
+  })
+/** Silence on a slide with nothing to say and no video, so it can be read. */
+const QUIET_SLIDE_MS = 4000
+const BETWEEN_SLIDES_MS = 800
+async function narrateSlide(signal: AbortSignal) {
+  // Let the throttled render catch up, then give the slide a moment to mount
+  // its media (a video's poster and play button).
+  for (let i = 0; i < 40 && renderIndex.value !== props.modelValue; i++) await pause(50, signal)
+  await pause(350, signal)
+  if (signal.aborted) return
+  const index = props.modelValue
+  const slide = props.deck.slides[index]
+  const rows = stepRows(index)
+  const beats = narrationBeats(spokenLines(slide?.notes), rows)
+  for (const b of beats) {
+    if (signal.aborted) return
+    if (b.reveal != null) revealed.value = b.reveal
+    if (b.text) await voice.speak(b.text, signal)
+    else await pause(1200, signal)
+  }
+  if (signal.aborted) return
+  if (rows) revealed.value = rows
+  const hadVideo = stage.value ? await playToEnd(stage.value, signal) : false
+  if (!beats.length && !hadVideo) await pause(QUIET_SLIDE_MS, signal)
+  await pause(BETWEEN_SLIDES_MS, signal)
+  if (signal.aborted) return
+  if (index >= props.deck.slides.length - 1) {
+    emit('update:narrating', false)
+    emit('narration-end')
+    return
+  }
+  revealIntent = 'start'
+  go(index + 1)
+}
+function restartNarration() {
+  narration?.abort()
+  narration = null
+  if (!narrating.value) return
+  narration = new AbortController()
+  void narrateSlide(narration.signal)
+}
+watch([() => props.modelValue, narrating], restartNarration)
 
 function fit() {
   const el = stage.value
@@ -219,6 +287,11 @@ function onKey(e: KeyboardEvent) {
     if (e.key === ' ') advance(1)
     return
   }
+  if (!props.editable && !mod && e.key === 'Enter') {
+    e.preventDefault()
+    emit('update:narrating', !props.narrating)
+    return
+  }
   if (!props.editable && !mod && e.key.toLowerCase() === 'd') {
     e.preventDefault()
     toggleDrawing()
@@ -295,6 +368,7 @@ onMounted(() => {
   stage.value?.addEventListener('touchend', onTouchEnd, { passive: true })
 })
 onUnmounted(() => {
+  narration?.abort()
   ro?.disconnect()
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('blur', onWindowBlur)

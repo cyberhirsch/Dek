@@ -25,6 +25,7 @@
 | `Esc` | Back to the editor (leaves fullscreen too) |
 | `O` | Open slide overview |
 | `P` / `S` | Open presenter view |
+| `Enter` | Narrate mode on/off: Dek presents by itself, speaking the notes' `>` lines |
 | `D` | Draw on the slide with the pointer; `D` again clears the ink and stops drawing |
 
 ---

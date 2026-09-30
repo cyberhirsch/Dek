@@ -16,6 +16,13 @@ type Provider = 'youtube' | 'vimeo'
 /** Last known state per player iframe. Missing = not heard from yet; players
  *  are started with autoplay, so that reads as playing. */
 const paused = new WeakMap<HTMLIFrameElement, boolean>()
+/** Narrate mode waiting for a player to finish (playToEnd). */
+const endWaiters = new WeakMap<HTMLIFrameElement, Array<() => void>>()
+function notifyEnded(frame: HTMLIFrameElement) {
+  const ws = endWaiters.get(frame) ?? []
+  endWaiters.delete(frame)
+  for (const w of ws) w()
+}
 
 function post(frame: HTMLIFrameElement, msg: unknown) {
   frame.contentWindow?.postMessage(JSON.stringify(msg), '*')
@@ -33,6 +40,7 @@ export function listenToPlayer(frame: HTMLIFrameElement) {
   if (p === 'vimeo') {
     post(frame, { method: 'addEventListener', value: 'play' })
     post(frame, { method: 'addEventListener', value: 'pause' })
+    post(frame, { method: 'addEventListener', value: 'ended' })
   }
 }
 
@@ -52,9 +60,11 @@ function onPlayerMessage(e: MessageEvent) {
   const state = data.info?.playerState
   if (state === 1) paused.set(frame, false)
   else if (state === 2 || state === 0) paused.set(frame, true)
+  if (state === 0) notifyEnded(frame)
   // Vimeo
   if (data.event === 'play') paused.set(frame, false)
   if (data.event === 'pause' || data.event === 'ended') paused.set(frame, true)
+  if (data.event === 'ended') notifyEnded(frame)
 }
 if (typeof window !== 'undefined') window.addEventListener('message', onPlayerMessage)
 
@@ -86,4 +96,47 @@ export function toggleVideoIn(root: HTMLElement): boolean {
     return true
   }
   return false
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** The playing video inside `root`, once a poster's play button has swapped
+ *  it in — it mounts a moment after the click. */
+async function playerIn(root: HTMLElement): Promise<HTMLVideoElement | HTMLIFrameElement | null> {
+  for (let i = 0; i < 30; i++) {
+    const v = root.querySelector<HTMLVideoElement>('video') ?? root.querySelector<HTMLIFrameElement>('iframe[data-dek-video]')
+    if (v) return v
+    await sleep(100)
+  }
+  return null
+}
+
+/**
+ * Narrate mode: start the slide's video and wait until it has played to its
+ * end (or its `end=` segment). False when the slide has no video Dek can
+ * play and follow. Resolves early when `signal` aborts.
+ */
+export async function playToEnd(root: HTMLElement, signal: AbortSignal): Promise<boolean> {
+  if (!root.querySelector('[data-dek-play]:not(:disabled), video, iframe[data-dek-video]')) return false
+  const play = root.querySelector<HTMLButtonElement>('[data-dek-play]:not(:disabled)')
+  if (play) play.click()
+  const player = await playerIn(root)
+  if (!player || signal.aborted) return !!player
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    signal.addEventListener('abort', finish)
+    if (player instanceof HTMLVideoElement) {
+      if (player.ended) return finish()
+      player.addEventListener('ended', finish, { once: true })
+      player.addEventListener('error', finish, { once: true })
+      if (player.paused) void player.play().catch(() => {})
+    } else {
+      endWaiters.set(player, [...(endWaiters.get(player) ?? []), finish])
+      if (paused.get(player)) toggleFrame(player)
+    }
+  })
+  return true
 }

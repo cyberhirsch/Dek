@@ -21,6 +21,11 @@ Once text had to shrink to fit, its box gave up a 28px strip at the bottom for t
 
 ### Presenting
 
+**Narrate mode and MP4 recording**
+Press **Enter** while presenting (or ▷ on the presentation bar) and Dek presents by itself: on each slide it speaks the speaker-notes lines that start with `>`, reveals build rows as it goes (one row per spoken line), plays the slide's video to its end — YouTube, Vimeo, files, including a segment's `end=` — then moves on, and stops after the last slide. Other notes lines stay private. Turning pages by hand while it runs continues from there; Enter again stops it. It works from the presenter window too. For now the voice is the browser's own (⚙ picks the voice and speed, remembered per browser); the engine is separate, so audio from a local voice model can replace it later.
+
+**●** records it as an **MP4**: the browser asks what to share, and narration starts from the current slide; recording ends with ●, at the last slide, or when sharing stops, and *Save MP4* writes the file. Pick the Dek tab and the video is exactly the slide — no bar, no browser — with the tab's sound, including embedded videos. On Windows the browser's voice plays outside the tab; to have it in the recording, pick the entire screen and tick *Also share system audio*. Needs Chrome, Edge or Brave from 2024 on. `+8` tests.
+
 **Presenting goes fullscreen**
 *Present* and Ctrl+E switch to fullscreen as the presentation starts. Esc from the editor starts the presentation too, but browsers don't grant fullscreen for Esc, so there it follows on the next key or click (usually the first arrow). One **Esc** leaves fullscreen and the presentation together. **F** still toggles fullscreen without ending the presentation, and opening the presenter window doesn't end it either, even though the browser may leave fullscreen when the window opens. Leaving the presentation any other way (✕, Ctrl+E) leaves fullscreen too.
 **Play and pause videos from the keyboard and a presenter remote**

@@ -12,7 +12,8 @@ const props = defineProps<{
   relayMedia?: boolean
 }>()
 const emit = defineEmits<{ 'update:current': [i: number]; close: []; media: [key: string] }>()
-const MEDIA_KEYS = new Set([' ', '.', 'b', 'B', 'MediaPlayPause'])
+// Enter: narrate mode, which runs in the audience window.
+const MEDIA_KEYS = new Set([' ', '.', 'b', 'B', 'MediaPlayPause', 'Enter'])
 
 const slide = computed(() => props.deck.slides[props.current])
 const next = computed(() => props.deck.slides[props.current + 1])
