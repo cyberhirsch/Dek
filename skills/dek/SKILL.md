@@ -262,6 +262,9 @@ MP4). The passage runs over the following lines until the next `>` — so
 **everything after the first `>` is spoken**. Private notes (reminders,
 "delete?", sources) go *before* the first `>`. Write passages as finished
 spoken sentences — no stage directions, no sources.
+A passage may open with direction tags for the local voice, e.g.
+`> [calm] [slower] Hand it in before class starts.`: `[calm]`, `[happy]`,
+`[slower]`/`[slow]`, `[breath]`. Only at the start; others are ignored.
 
 On a `steps: true` slide each row is voiced as it appears. Best: **one `>` per
 row**, in row order — then passage k goes exactly with row k. Otherwise Dek
@@ -298,7 +301,7 @@ meanwhile). Re-runs only voice new or changed lines; `--prune` deletes files no
 line uses. The model needs ~18 GB of free VRAM: ask the user to close ComfyUI
 and other GPU apps first, and never start it during a render. In Dek, ⚙ →
 Source → *Local voice* plays the files and shows how many lines have audio.
-Words the model misreads are respelled in `G:\AI\_TTS\AuK\pronunciations.json`
+A changed respelling re-voices the lines that contain the word (`voice/voiced.json` records which respellings each file was made with). Words the model misreads are respelled in `G:\AI\_TTS\AuK\pronunciations.json`
 (whole word, case-sensitive) — add only what you've heard go wrong.
 
 While presenting (useful when the user asks, or for speaker notes): Present

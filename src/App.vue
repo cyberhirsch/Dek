@@ -2129,6 +2129,9 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
             <input v-model="voiceSettings.autoVoice" type="checkbox" />
             Voice new lines automatically
           </label>
+          <p v-if="voiceGen.unknownTags.value.length" class="panel-err">
+            The voice ignores {{ voiceGen.unknownTags.value.map((t) => `[${t}]`).join(' ') }} — it knows [calm] [happy] [slower] [breath].
+          </p>
           <p v-if="voiceSettings.autoVoice && voiceGen.autoState.value">{{ voiceGen.autoState.value }}</p>
           <p v-if="voiceGen.error.value" class="panel-err">
             {{ voiceGen.error.value }}

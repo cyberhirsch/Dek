@@ -6,6 +6,12 @@
 
 ### Dek Helper
 
+**Voice direction tags**
+A spoken passage may now open with direction tags for the local voice: `> [calm] [slower] Hand it in before class starts.` — `[calm]`, `[happy]`, `[slower]` (or `[slow]`) and `[breath]`. The voice tool reads and strips them; Dek keeps them in the text it hashes and sends, so changing a tag re-voices only that line, but never lets the browser voice read them out or uses them to match a passage to its build row. When a passage is split across build rows, every piece keeps the passage's tags. Tags the voice doesn't know are flagged in ⚙ and by `npm run narrate:audio`. A Markdown link `[label](url)` is never taken for a tag. `+7` tests.
+
+**A respelling fix reaches the audio**
+Adding or changing a respelling in the voice tool's `pronunciations.json` (e.g. *Gestalt* → *Gheshtalt*) used to leave every line with that word on its old recording, because a line only counted as missing when it had no file. Each voiced file now records which respellings applied to its line, in `voice/voiced.json` next to the audio; when they no longer match, the line counts as missing and is voiced again — by *Voice N missing lines*, by automatic voicing, by `npm run narrate:audio` and by the folder watcher. Dek reads the respellings through the Dek Helper; files voiced before this change are redone only if a respelling applies to their line. `+6` tests.
+
 **No pairing code**
 The Dek Helper connects as soon as it's running — no code to enter. It already answers only Dek's own pages (the browser tells it which page is asking, and a page can't fake that) and listens only on this machine, so the code added nothing that mattered. `run helper.bat` in the Dek folder starts it. An older helper still asking for a code says so in ⚙: restart it.
 

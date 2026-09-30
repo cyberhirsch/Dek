@@ -7,22 +7,29 @@ const api = vi.hoisted(() => ({
   files: [] as string[],
   deleted: [] as string[],
   written: [] as string[],
+  manifest: null as string | null,
 }))
 vi.mock('../api', () => ({
   listVoiceFiles: async () => [...api.files],
+  readVoiceFile: async (name: string) => (name === 'voiced.json' && api.manifest ? new Blob([api.manifest]) : null),
   deleteVoiceFile: async (name: string) => {
     api.deleted.push(name)
     api.files = api.files.filter((f) => f !== name)
   },
-  writeVoiceFile: async (name: string) => {
+  writeVoiceFile: async (name: string, data: Blob) => {
+    if (name === 'voiced.json') {
+      api.manifest = await data.text()
+      return true
+    }
     api.written.push(name)
-    api.files.push(name)
+    if (!api.files.includes(name)) api.files.push(name)
     return true
   },
 }))
-const helper = vi.hoisted(() => ({ start: vi.fn() }))
+const helper = vi.hoisted(() => ({ start: vi.fn(), respell: {} as Record<string, string> }))
 vi.mock('../render/helper', () => ({
   helperStatus: async () => ({ running: true, paired: true, voiceTool: true, busy: false }),
+  helperRespellings: async () => helper.respell,
   startVoiceJob: (...a: unknown[]) => helper.start(...a),
   voiceJob: async () => ({ id: 'j', state: 'done', total: 1, ready: [] }),
   voiceJobAudio: async () => new Blob(['RIFF']),
@@ -34,9 +41,12 @@ import { voiceSettings } from '../render/voice'
 
 const deckWith = (notes: string): Deck => ({ config: {}, slides: [{ layout: 'text', notes }] }) as Deck
 
-/** Real async work (hashing, mocked calls) interleaved with fake timers. */
+/** Real async work (hashing, mocked calls) interleaved with fake timers:
+ *  a few real milliseconds, taken with the timer from before faking, so it
+ *  holds up under a busy parallel test run. */
+const realSetTimeout = globalThis.setTimeout
 async function flush() {
-  for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r))
+  for (let i = 0; i < 5; i++) await new Promise((r) => realSetTimeout(r, 10))
 }
 async function settle(ms: number) {
   await flush()
@@ -58,6 +68,8 @@ describe('auto-voicing', () => {
     api.files = []
     api.deleted = []
     api.written = []
+    api.manifest = null
+    helper.respell = {}
     helper.start.mockReset()
     voiceSettings.value = { ...voiceSettings.value, autoVoice: false }
   })
@@ -120,5 +132,27 @@ describe('auto-voicing', () => {
     make(deckWith('> A new line.'))
     await settle(60_000)
     expect(helper.start).not.toHaveBeenCalled()
+  })
+
+  it('voices a line again when its respelling changes, and records the new one', async () => {
+    const id = await lineId('The Gestalt laws.')
+    api.files = [`${id}.wav`]
+    // voiced before "Gestalt" was respelled: no manifest entry
+    helper.respell = { Gestalt: 'Gheshtalt' }
+    helper.start.mockResolvedValue({ id: 'j', state: 'loading', total: 1, ready: [] })
+    const g = make(deckWith('> The Gestalt laws.'))
+    await g.refresh()
+    expect(g.missing.value.map((l) => l.id)).toEqual([id])
+  })
+
+  it('keeps a file whose respellings are unchanged', async () => {
+    const id = await lineId('The Gestalt laws.')
+    api.files = [`${id}.wav`]
+    helper.respell = { Gestalt: 'Gheshtalt' }
+    const { respellingStamp } = await import('../core/narration')
+    api.manifest = JSON.stringify({ version: 1, lines: { [id]: await respellingStamp('The Gestalt laws.', helper.respell) } })
+    const g = make(deckWith('> The Gestalt laws.'))
+    await g.refresh()
+    expect(g.missing.value).toEqual([])
   })
 })

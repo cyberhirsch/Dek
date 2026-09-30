@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deckSpokenLines, lineId, looksGerman, narrationBeats, slideBeats, speechChunks, spokenLines } from './narration'
+import { deckSpokenLines, lineId, looksGerman, narrationBeats, respellingOutdated, respellingStamp, respellingsIn, type VoiceManifest, slideBeats, speechChunks, splitVoiceTags, spokenLines, unknownVoiceTags } from './narration'
 
 describe('spokenLines', () => {
   it('starts a passage at each >, marker removed', () => {
@@ -129,5 +129,74 @@ describe('looksGerman', () => {
 
   it('counts nothing as English', () => {
     expect(looksGerman([])).toBe(false)
+  })
+})
+
+describe('respellings', () => {
+  const map = { Gestalt: 'Gheshtalt', LTS: 'L T S', _note: 'ignored' }
+
+  it('applies whole words only, case-sensitive', () => {
+    expect(respellingsIn('The Gestalt laws.', map)).toEqual([['Gestalt', 'Gheshtalt']])
+    expect(respellingsIn('Gestaltung and gestalt.', map)).toEqual([])
+    expect(respellingsIn('Ubuntu LTS, Gestalt-style.', map)).toEqual([
+      ['Gestalt', 'Gheshtalt'],
+      ['LTS', 'L T S'],
+    ])
+  })
+
+  it('stamps nothing when no respelling applies', async () => {
+    expect(await respellingStamp('Plain words.', map)).toBe('')
+    expect(await respellingStamp('The Gestalt laws.', map)).toMatch(/^[0-9a-f]{12}$/)
+  })
+
+  it('changes the stamp when the respelling changes', async () => {
+    const before = await respellingStamp('The Gestalt laws.', { Gestalt: 'Geshtalt' })
+    const after = await respellingStamp('The Gestalt laws.', { Gestalt: 'Gheshtalt' })
+    expect(before).not.toBe(after)
+  })
+
+  it('marks a file outdated when its stamp no longer matches', () => {
+    const m: VoiceManifest = { version: 1, lines: { aaa: 's1', bbb: '' } }
+    expect(respellingOutdated(m, 'aaa', 's1')).toBe(false)
+    expect(respellingOutdated(m, 'aaa', 's2')).toBe(true)
+    expect(respellingOutdated(m, 'bbb', 's3')).toBe(true)
+    // voiced before stamps existed: outdated only if a respelling applies now
+    expect(respellingOutdated(null, 'ccc', '')).toBe(false)
+    expect(respellingOutdated(null, 'ccc', 's1')).toBe(true)
+  })
+})
+
+describe('voice direction tags', () => {
+  it('splits leading tags off, but never a Markdown link', () => {
+    expect(splitVoiceTags('[calm] [slower] Hand it in.')).toEqual({ tags: ['[calm]', '[slower]'], body: 'Hand it in.' })
+    expect(splitVoiceTags('[the site](https://x.io) is up.')).toEqual({ tags: [], body: '[the site](https://x.io) is up.' })
+    expect(splitVoiceTags('Say [calm] mid-line.')).toEqual({ tags: [], body: 'Say [calm] mid-line.' })
+  })
+
+  it('keeps tags out of what the browser voice says', () => {
+    expect(speechChunks('[calm] Hand it in.')).toEqual(['Hand it in.'])
+  })
+
+  it('keeps tags in the text that is hashed, so changing a tag re-voices the line', async () => {
+    expect(await lineId('[calm] Hand it in.')).not.toBe(await lineId('Hand it in.'))
+  })
+
+  it("gives every piece of a split passage the passage's tags", () => {
+    const beats = narrationBeats(['[calm] First point. Second point.'], 2)
+    expect(beats.map((b) => b.text)).toEqual(['[calm] First point.', '[calm] Second point.'])
+  })
+
+  it('puts tags once, at the start, when pieces share a row', () => {
+    const beats = narrationBeats(['[slower] Aaa one. Bbb two. Ccc three. Ddd four.'], 2)
+    expect(beats.map((b) => b.text)).toEqual(['[slower] Aaa one. Bbb two.', '[slower] Ccc three. Ddd four.'])
+  })
+
+  it('leaves one-passage-per-row slides exactly as written', () => {
+    expect(narrationBeats(['[happy] Welcome.', 'Next.'], 2).map((b) => b.text)).toEqual(['[happy] Welcome.', 'Next.'])
+  })
+
+  it('lists tags the voice tool ignores', () => {
+    expect(unknownVoiceTags('[calm] [Excited] [slow] Go.')).toEqual(['excited'])
+    expect(unknownVoiceTags('Plain.')).toEqual([])
   })
 })

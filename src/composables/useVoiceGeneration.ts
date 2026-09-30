@@ -11,11 +11,20 @@
 // has audio, so undoing an edit in the same session still finds its file.
 import { ref, watch, type Ref } from 'vue'
 import type { Deck } from '../core/types'
-import { deckSpokenLines, looksGerman } from '../core/narration'
-import { deleteVoiceFile, listVoiceFiles, writeVoiceFile } from '../api'
+import {
+  VOICE_MANIFEST,
+  deckSpokenLines,
+  looksGerman,
+  respellingOutdated,
+  respellingStamp,
+  unknownVoiceTags,
+  type VoiceManifest,
+} from '../core/narration'
+import { deleteVoiceFile, listVoiceFiles, readVoiceFile, writeVoiceFile } from '../api'
 import { voiceSettings } from '../render/voice'
 import {
   cancelVoiceJob,
+  helperRespellings,
   helperStatus,
   startVoiceJob,
   voiceJob,
@@ -41,6 +50,8 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
   const missing = ref<{ id: string; text: string }[]>([])
   const stale = ref<string[]>([])
   const german = ref(false)
+  /** Direction tags in the deck that the voice tool ignores, e.g. [excited]. */
+  const unknownTags = ref<string[]>([])
   const status = ref<HelperStatus | null>(null)
   const job = ref<HelperJob | null>(null)
   const written = ref(0)
@@ -49,6 +60,25 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
   const autoState = ref('')
   let stopRequested = false
 
+  // voice/voiced.json: which respellings each file was voiced with (see
+  // core/narration.ts). A line whose respellings have changed since counts as
+  // missing, so a fix in pronunciations.json reaches the audio too.
+  let manifest: VoiceManifest = { version: 1, lines: {} }
+  const stamps = new Map<string, string>()
+  async function readManifest(): Promise<VoiceManifest | null> {
+    try {
+      const b = await readVoiceFile(VOICE_MANIFEST)
+      if (!b) return null
+      const m = JSON.parse(await b.text()) as Partial<VoiceManifest>
+      return m && typeof m.lines === 'object' && m.lines ? { version: 1, lines: { ...m.lines } } : null
+    } catch {
+      return null
+    }
+  }
+  async function saveManifest() {
+    await writeVoiceFile(VOICE_MANIFEST, new Blob([JSON.stringify(manifest, null, 1)], { type: 'application/json' }))
+  }
+
   async function refresh() {
     status.value = await helperStatus()
     if (!deck.value) return
@@ -56,9 +86,18 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
     const files = await listVoiceFiles().catch(() => [] as string[])
     const have = new Set(files)
     const wanted = new Set(lines.map((l) => `${l.id}.wav`))
-    missing.value = lines.filter((l) => !have.has(`${l.id}.wav`))
+    // Without the helper the respellings can't be read: judge nothing outdated.
+    const respell = status.value.running ? await helperRespellings() : null
+    const stored = await readManifest()
+    manifest = stored ?? { version: 1, lines: {} }
+    stamps.clear()
+    for (const l of lines) stamps.set(l.id, respell ? await respellingStamp(l.text, respell) : (manifest.lines[l.id] ?? ''))
+    missing.value = lines.filter(
+      (l) => !have.has(`${l.id}.wav`) || (respell != null && respellingOutdated(stored, l.id, stamps.get(l.id) ?? '')),
+    )
     stale.value = files.filter((f) => /^[0-9a-f]{12}\.wav$/.test(f) && !wanted.has(f))
     german.value = looksGerman(lines.map((l) => l.text))
+    unknownTags.value = [...new Set(lines.flatMap((l) => unknownVoiceTags(l.text)))]
     coverage.value = { have: lines.length - missing.value.length, total: lines.length }
   }
 
@@ -104,6 +143,8 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
           const wav = await voiceJobAudio(j.id, it.id)
           if (deck.value !== target) break
           if (!(await writeVoiceFile(`${it.id}.wav`, wav))) throw new Error('This deck has no folder to keep audio in — open it from disk.')
+          manifest.lines[it.id] = stamps.get(it.id) ?? ''
+          await saveManifest()
           saved.add(it.id)
           written.value = saved.size
           if (coverage.value) coverage.value = { ...coverage.value, have: coverage.value.have + 1 }
@@ -156,6 +197,9 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
       if (!missing.value.length) {
         // Only now: while any line lacks audio, an undo may still want an old file.
         for (const f of stale.value) await deleteVoiceFile(f)
+        const gone = Object.keys(manifest.lines).filter((id) => !stamps.has(id))
+        for (const id of gone) delete manifest.lines[id]
+        if (gone.length) await saveManifest()
         if (stale.value.length) await refresh()
         autoState.value = 'Every line has audio.'
         return
@@ -197,5 +241,5 @@ export function useVoiceGeneration(deck: Ref<Deck | null>, isRecording: () => bo
     { immediate: true },
   )
 
-  return { coverage, missing, stale, german, status, job, written, error, autoState, refresh, generate, stop }
+  return { coverage, missing, stale, german, unknownTags, status, job, written, error, autoState, refresh, generate, stop }
 }

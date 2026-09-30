@@ -20,12 +20,14 @@ import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const VERSION = 1
 const PORT = Number(process.env.DEK_HELPER_PORT ?? 7880)
 const PYTHON = process.env.DEK_TTS_PYTHON ?? 'G:\\AI\\_TTS\\AuK\\venv\\Scripts\\python.exe'
 const SPEAK = process.env.DEK_TTS_SCRIPT ?? 'G:\\AI\\_TTS\\AuK\\speak.py'
+/** Words the voice tool respells; Dek re-voices lines whose respellings change. */
+const PRONUNCIATIONS = process.env.DEK_TTS_PRONUNCIATIONS ?? join(dirname(SPEAK), 'pronunciations.json')
 /** Free VRAM the voice model needs, in MB (with --cpu-offload: ~10 GB). */
 const VRAM_NEEDED = 18000
 const VRAM_NEEDED_OFFLOAD = 10000
@@ -159,6 +161,15 @@ const server = createServer(async (req, res) => {
       },
       cors,
     )
+  }
+
+  // The voice tool's respellings, read fresh each time (they change by hand).
+  if (url.pathname === '/pronunciations' && req.method === 'GET') {
+    try {
+      return send(res, 200, JSON.parse(readFileSync(PRONUNCIATIONS, 'utf8')), cors)
+    } catch {
+      return send(res, 200, {}, cors)
+    }
   }
 
   // POST /jobs {items:[{id,text}], voice?, cpuOffload?}

@@ -52,6 +52,17 @@ export async function helperStatus(): Promise<HelperStatus> {
   }
 }
 
+/** The voice tool's respellings (word to how it's said), or null when the
+ *  helper can't be reached: then nothing is judged outdated. */
+export async function helperRespellings(): Promise<Record<string, string> | null> {
+  try {
+    const r = await call('/pronunciations', { signal: AbortSignal.timeout(1500) })
+    return r.ok ? ((await r.json()) as Record<string, string>) : null
+  } catch {
+    return null
+  }
+}
+
 export async function startVoiceJob(items: { id: string; text: string }[], opts: { voice?: string; cpuOffload?: boolean } = {}): Promise<HelperJob> {
   const r = await call('/jobs', { method: 'POST', body: JSON.stringify({ items, ...opts }) })
   if (!r.ok) throw new Error(await errorOf(r))

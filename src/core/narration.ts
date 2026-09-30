@@ -48,13 +48,56 @@ export function narrationBeats(lines: string[], rows = 0, rowTexts: string[] = [
   let groups: string[][]
   if (lines.length === rows) groups = lines.map((l) => [l])
   else {
-    let pieces = lines.flatMap(splitSentences)
+    // Direction tags ([calm], [slower]…) belong to the whole passage: take them
+    // off before splitting, match rows on the words alone, and give every piece
+    // its passage's tags back — so each piece is voiced, and hashed, with them.
+    let pieces = lines.flatMap((l) => {
+      const { tags, body } = splitVoiceTags(l)
+      return splitSentences(body).map((text) => ({ tags, text }))
+    })
     // A list said as one sentence ("…: proximity, similarity, closure…") has
     // fewer sentences than rows; its clauses are what the rows are about.
-    if (pieces.length < rows) pieces = pieces.flatMap(splitClauses)
-    groups = pieces.length === rows ? pieces.map((x) => [x]) : alignToRows(pieces, rows, rowTexts)
+    if (pieces.length < rows) pieces = pieces.flatMap((p) => splitClauses(p.text).map((text) => ({ tags: p.tags, text })))
+    const runs = pieces.length === rows ? pieces.map((p) => [p.text]) : alignToRows(pieces.map((p) => p.text), rows, rowTexts)
+    let at = 0
+    groups = runs.map((run) => {
+      const mine = pieces.slice(at, (at += run.length))
+      // One set of tags per spoken line, at its start (the voice tool ignores
+      // tags anywhere else): the first piece's.
+      return mine.length ? [...mine[0].tags, ...mine.map((p) => p.text)] : []
+    })
   }
   return groups.map((g, k) => ({ reveal: k + 1, ...(g.length ? { text: g.join(' ') } : {}) }))
+}
+
+// ── voice direction tags ──
+// A spoken passage may open with tags for the local voice tool, e.g.
+// "> [calm] [slower] Hand it in before class starts." The tool reads and strips
+// them; they stay in the text Dek hashes and sends it (so changing a tag
+// re-voices that line). Everything that speaks, shows or matches text in Dek
+// itself uses the text without them. A Markdown link [label](url) isn't a tag.
+
+const VOICE_TAGS = /^(\s*\[[A-Za-z]+\](?!\())+\s*/
+/** Tags the voice tool acts on; others are dropped by it with a warning. */
+export const KNOWN_VOICE_TAGS = new Set(['calm', 'happy', 'slower', 'slow', 'breath'])
+
+/** Leading direction tags of a passage (as written, brackets included), and the rest. */
+export function splitVoiceTags(text: string): { tags: string[]; body: string } {
+  const m = VOICE_TAGS.exec(text)
+  if (!m) return { tags: [], body: text }
+  return { tags: m[0].match(/\[[A-Za-z]+\]/g) ?? [], body: text.slice(m[0].length) }
+}
+
+/** The passage without its leading direction tags — what a person hears or reads. */
+export function stripVoiceTags(text: string): string {
+  return splitVoiceTags(text).body
+}
+
+/** Leading tags the voice tool doesn't know (it drops them), lowercased. */
+export function unknownVoiceTags(text: string): string[] {
+  return splitVoiceTags(text)
+    .tags.map((t) => t.slice(1, -1).toLowerCase())
+    .filter((t) => !KNOWN_VOICE_TAGS.has(t))
 }
 
 /** A slide's beats, from its notes and its build rows. The one place both
@@ -150,6 +193,8 @@ export function alignToRows(sentences: string[], rows: number, rowTexts: string[
 /** Split long text into sentence-sized pieces: browser voices stall or cut
  *  off on long utterances, and short ones let a stop take effect promptly. */
 export function speechChunks(text: string, max = 220): string[] {
+  // Direction tags are for the local voice tool; a browser voice would read them out.
+  text = stripVoiceTags(text)
   const sentences = text.match(/[^.!?…]+[.!?…]+["'”’)]*\s*|[^.!?…]+$/g) ?? [text]
   const out: string[] = []
   let cur = ''
@@ -216,4 +261,47 @@ export function looksGerman(texts: string[]): boolean {
     }
   }
   return de > en
+}
+
+// ── respellings ──
+// The voice tool respells words it gets wrong (pronunciations.json next to
+// speak.py: whole word, case-sensitive, keys starting with `_` ignored). A
+// line's audio id hashes the text as written, so a new or changed respelling
+// wouldn't make its file look outdated. Each voiced file therefore records a
+// stamp of the respellings that applied to its line (voice/voiced.json); when
+// the stamp no longer matches, the line counts as missing and is voiced again.
+
+export type Respellings = Record<string, string>
+
+/** The manifest beside the audio files: line id → respelling stamp. */
+export const VOICE_MANIFEST = 'voiced.json'
+export interface VoiceManifest {
+  version: 1
+  lines: Record<string, string>
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The respellings that apply to `text`, sorted, as [word, spoken as]. */
+export function respellingsIn(text: string, map: Respellings): [string, string][] {
+  return Object.entries(map)
+    .filter(([k, v]) => k && !k.startsWith('_') && typeof v === 'string')
+    .filter(([k]) => new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRe(k)}(?![\\p{L}\\p{N}_])`, 'u').test(text))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+/** '' when no respelling applies; otherwise a short hash of those that do. */
+export async function respellingStamp(text: string, map: Respellings): Promise<string> {
+  const hits = respellingsIn(text, map)
+  return hits.length ? lineId(JSON.stringify(hits)) : ''
+}
+
+/**
+ * Whether a line with a file still needs voicing because its respellings
+ * changed. A file voiced before stamps existed (no entry) is outdated only if
+ * some respelling applies to its line now.
+ */
+export function respellingOutdated(manifest: VoiceManifest | null, id: string, stamp: string): boolean {
+  const had = manifest?.lines[id]
+  return had === undefined ? stamp !== '' : had !== stamp
 }

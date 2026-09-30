@@ -146,7 +146,7 @@ function dekApi() {
           }
           if (url === '/api/voice' && req.method === 'PUT') {
             const name = u.searchParams.get('name') ?? ''
-            if (!/^[0-9a-f]{12}\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })
+            if (!/^([0-9a-f]{12}\.wav|voiced\.json)$/.test(name)) return json(res, 400, { error: 'bad name' })
             const vd = path.join(path.dirname(resolveDeck(file)), 'voice')
             fs.mkdirSync(vd, { recursive: true })
             const chunks: Buffer[] = []
@@ -163,7 +163,7 @@ function dekApi() {
           }
           if (url === '/api/voice' && req.method === 'GET') {
             const name = u.searchParams.get('name') ?? ''
-            if (!/^[\w.-]+\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })
+            if (!/^([\w.-]+\.wav|voiced\.json)$/.test(name)) return json(res, 400, { error: 'bad name' })
             const abs = path.join(path.dirname(resolveDeck(file)), 'voice', name)
             if (!fs.existsSync(abs)) return json(res, 404, { error: 'no such voice file' })
             res.writeHead(200, { 'Content-Type': 'audio/wav' })

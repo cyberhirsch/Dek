@@ -27,6 +27,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PYTHON = process.env.DEK_TTS_PYTHON ?? 'G:\\AI\\_TTS\\AuK\\venv\\Scripts\\python.exe'
 const SPEAK = process.env.DEK_TTS_SCRIPT ?? 'G:\\AI\\_TTS\\AuK\\speak.py'
+/** The voice tool's respellings; a line whose respellings changed is voiced again. */
+const PRONUNCIATIONS = process.env.DEK_TTS_PRONUNCIATIONS ?? join(dirname(SPEAK), 'pronunciations.json')
 
 function usage(msg) {
   if (msg) console.error(msg)
@@ -65,7 +67,8 @@ const bundlePath = join(ROOT, 'node_modules', '.cache', 'dek-narration.mjs')
 mkdirSync(dirname(bundlePath), { recursive: true })
 await build({
   stdin: {
-    contents: "export { parseDeck } from './src/core/deck'\nexport { deckSpokenLines, looksGerman } from './src/core/narration'\n",
+    contents:
+      "export { parseDeck } from './src/core/deck'\nexport { deckSpokenLines, looksGerman, respellingStamp, respellingOutdated, unknownVoiceTags, VOICE_MANIFEST } from './src/core/narration'\n",
     resolveDir: ROOT,
     loader: 'ts',
   },
@@ -76,13 +79,21 @@ await build({
   outfile: bundlePath,
   logLevel: 'silent',
 })
-const { parseDeck, deckSpokenLines, looksGerman } = await import(pathToFileURL(bundlePath).href)
+const { parseDeck, deckSpokenLines, looksGerman, respellingStamp, respellingOutdated, unknownVoiceTags, VOICE_MANIFEST } = await import(
+  pathToFileURL(bundlePath).href
+)
 
 const deck = parseDeck(readFileSync(deckPath, 'utf8'))
 const items = await deckSpokenLines(deck.slides)
 if (!items.length) {
   console.log('No spoken lines: add notes lines starting with "> " to the slides you want narrated.')
   process.exit(0)
+}
+
+// Direction tags the voice tool drops (it knows calm, happy, slower/slow, breath).
+for (const it of items) {
+  const bad = unknownVoiceTags(it.text)
+  if (bad.length) console.warn(`Ignored by the voice: ${bad.map((t) => `[${t}]`).join(' ')} in "${it.text.slice(0, 60)}"`)
 }
 
 // The voice model speaks English only.
@@ -94,12 +105,41 @@ if (englishOnly && looksGerman(items.map((it) => it.text))) {
 mkdirSync(outDir, { recursive: true })
 const wanted = new Set(items.map((it) => `${it.id}.wav`))
 const staleFiles = () => readdirSync(outDir).filter((f) => /^[0-9a-f]{12}\.wav$/.test(f) && !wanted.has(f))
-// Only lines without a file go to the voice tool, so a fully voiced deck
-// never loads the model at all.
-const missing = items.filter((it) => !existsSync(join(outDir, `${it.id}.wav`)))
+// Which respellings each file was voiced with (voice/voiced.json, shared with
+// Dek). A line whose respellings changed since is voiced again.
+const manifestPath = join(outDir, VOICE_MANIFEST)
+let stored = null
+try {
+  const m = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  if (m && typeof m.lines === 'object') stored = { version: 1, lines: { ...m.lines } }
+} catch {
+  /* none yet */
+}
+const manifest = stored ?? { version: 1, lines: {} }
+let respell = {}
+try {
+  respell = JSON.parse(readFileSync(PRONUNCIATIONS, 'utf8'))
+} catch {
+  /* no respellings file */
+}
+const stamps = new Map()
+for (const it of items) stamps.set(it.id, await respellingStamp(it.text, respell))
+function saveManifest() {
+  for (const id of Object.keys(manifest.lines)) if (!stamps.has(id) && prune) delete manifest.lines[id]
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 1))
+}
+
+// Only lines without an up-to-date file go to the voice tool, so a fully
+// voiced deck never loads the model at all.
+const missing = items.filter(
+  (it) => !existsSync(join(outDir, `${it.id}.wav`)) || respellingOutdated(stored, it.id, stamps.get(it.id)),
+)
 if (!missing.length) {
   const stale = staleFiles()
-  if (prune) for (const f of stale) rmSync(join(outDir, f))
+  if (prune) {
+    for (const f of stale) rmSync(join(outDir, f))
+    if (existsSync(manifestPath)) saveManifest()
+  }
   console.log(
     `${deck.config.deck ?? deckPath}: all ${items.length} lines have audio.` +
       (stale.length ? (prune ? ` Removed ${stale.length} unused files.` : ` ${stale.length} files are no longer used (--prune removes them).`) : ''),
@@ -135,6 +175,10 @@ const code = await new Promise((ok) => {
         continue
       }
       done++
+      if (r.id && stamps.has(r.id)) {
+        manifest.lines[r.id] = stamps.get(r.id)
+        saveManifest()
+      }
       seconds += r.seconds ?? 0
       if (!r.cached) fresh++
       const text = items.find((it) => it.id === r.id)?.text ?? ''
