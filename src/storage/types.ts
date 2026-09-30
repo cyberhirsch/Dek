@@ -35,6 +35,8 @@ export interface StorageBackend {
    *  Backends without a real folder omit both. */
   readVoice?(file: string | undefined, name: string): Promise<Blob | null>
   listVoice?(file: string | undefined): Promise<string[]>
+  /** Store one narration audio file (from the Dek Helper) in `voice/`. */
+  writeVoice?(file: string | undefined, name: string, data: Blob): Promise<void>
   /** Delete a single file from the assets folder by name. */
   deleteAsset?(filename: string): Promise<void>
   /** True when the file changed on disk since this backend last read or wrote

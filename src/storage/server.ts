@@ -41,6 +41,10 @@ export const serverBackend: StorageBackend = {
     const r = await fetch(`/api/voice${q(file)}${file ? '&' : '?'}name=${encodeURIComponent(name)}`)
     return r.ok ? r.blob() : null
   },
+  async writeVoice(file, name, data) {
+    const r = await fetch(`/api/voice${q(file)}${file ? '&' : '?'}name=${encodeURIComponent(name)}`, { method: 'PUT', body: data })
+    if (!r.ok) throw new Error(`Saving ${name} failed`)
+  },
   async listVoice(file) {
     const r = await fetch(`/api/voice-list${q(file)}`)
     return r.ok ? ((await r.json()).files as string[]) : []

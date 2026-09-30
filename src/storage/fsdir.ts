@@ -610,6 +610,12 @@ export function fsDirBackend(dir: DirHandle, mdName = 'deck.md'): StorageBackend
         return null
       }
     },
+    async writeVoice(_file, name, data) {
+      const vd = await dir.getDirectoryHandle(VOICE_DIR, { create: true })
+      const ws = await (await vd.getFileHandle(name, { create: true })).createWritable()
+      await ws.write(data)
+      await ws.close()
+    },
     async listVoice() {
       try {
         const vd = await dir.getDirectoryHandle(VOICE_DIR)

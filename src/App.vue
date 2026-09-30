@@ -14,7 +14,8 @@ import { DROP_FAILED_EVENT } from './render/dropImage'
 import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
-import { deckSpokenLines } from './core/narration'
+import { useVoiceGeneration } from './composables/useVoiceGeneration'
+import { setHelperCode } from './render/helper'
 import { slidesFromText, slidesToText } from './core/slideClipboard'
 import { inlineSlidePictures, storeSlidePictures } from './storage/slideTransfer'
 import {
@@ -22,7 +23,6 @@ import {
   saveSlide,
   saveDeck,
   uploadImage,
-  listVoiceFiles,
   openDeck,
   newDeck,
   listDeckAssets,
@@ -525,14 +525,17 @@ async function onSaveRecording() {
     if ((e as Error).name !== 'AbortError') error.value = (e as Error).message
   }
 }
-/** How much of this deck the local voice covers, counted when ⚙ opens. */
-const voiceCoverage = ref<{ have: number; total: number } | null>(null)
-watch(voicePanel, async (open) => {
-  if (!open || !deck.value) return
-  const lines = await deckSpokenLines(deck.value.slides)
-  const files = new Set(await listVoiceFiles().catch(() => [] as string[]))
-  voiceCoverage.value = { have: lines.filter((l) => files.has(`${l.id}.wav`)).length, total: lines.length }
+/** Local voice: coverage, and voicing the missing lines via the Dek Helper. */
+const voiceGen = useVoiceGeneration(deck)
+const helperCodeInput = ref('')
+watch(voicePanel, (open) => {
+  if (open) void voiceGen.refresh()
 })
+function pairHelper() {
+  setHelperCode(helperCodeInput.value)
+  helperCodeInput.value = ''
+  void voiceGen.refresh()
+}
 const recordedLabel = computed(() => {
   const r = recorded.value
   if (!r) return ''
@@ -2106,10 +2109,40 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
             <option value="local">Local voice (generated audio)</option>
           </select>
         </label>
-        <p v-if="voiceSettings.source === 'local'">
-          <template v-if="voiceCoverage">{{ voiceCoverage.have }} of {{ voiceCoverage.total }} spoken lines have audio.</template>
-          Lines without it use the browser voice below. Generate with <code>npm run narrate:audio -- "&lt;deck&gt;"</code>.
-        </p>
+        <template v-if="voiceSettings.source === 'local'">
+          <p>
+            <template v-if="voiceGen.coverage.value">{{ voiceGen.coverage.value.have }} of {{ voiceGen.coverage.value.total }} spoken lines have audio.</template>
+            Lines without it use the browser voice below.
+          </p>
+          <!-- Voicing the missing lines runs in the Dek Helper on this machine. -->
+          <div class="helper-row">
+            <template v-if="!voiceGen.status.value?.running">
+              <p>Dek Helper isn't running. Start it with <code>npm run helper</code> in the Dek folder.</p>
+              <button class="panel-btn" @click="voiceGen.refresh()">Check again</button>
+            </template>
+            <template v-else-if="!voiceGen.status.value.paired">
+              <p>Dek Helper found. Enter the pairing code it shows:</p>
+              <div class="pair">
+                <input v-model="helperCodeInput" placeholder="code" spellcheck="false" @keydown.enter.stop="pairHelper" />
+                <button class="panel-btn" @click="pairHelper">Pair</button>
+              </div>
+            </template>
+            <p v-else-if="!voiceGen.status.value.voiceTool">Dek Helper can't find the voice tool on this machine.</p>
+            <template v-else-if="voiceGen.job.value">
+              <p>
+                {{ voiceGen.job.value.state === 'loading' ? 'Loading the voice model (about a minute)…' : `Voicing ${voiceGen.written.value} of ${voiceGen.job.value.total}…` }}
+              </p>
+              <button class="panel-btn" @click="voiceGen.stop()">Stop</button>
+            </template>
+            <button v-else-if="voiceGen.missing.value.length" class="panel-btn" @click="voiceGen.generate()">
+              Voice {{ voiceGen.missing.value.length }} missing {{ voiceGen.missing.value.length === 1 ? 'line' : 'lines' }}
+            </button>
+          </div>
+          <p v-if="voiceGen.error.value" class="panel-err">
+            {{ voiceGen.error.value }}
+            <button v-if="/GPU/.test(voiceGen.error.value)" class="panel-btn" @click="voiceGen.generate(true)">Try with CPU offload</button>
+          </p>
+        </template>
         <label>
           {{ voiceSettings.source === 'local' ? 'Browser voice (for lines without audio)' : 'Voice' }}
           <select v-model="voiceSettings.voice">
@@ -2453,6 +2486,35 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   border-radius: 6px;
   padding: 4px 6px;
   font: inherit;
+}
+.voice-panel .helper-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.voice-panel .pair {
+  display: flex;
+  gap: 6px;
+}
+.voice-panel input {
+  width: 110px;
+  background: #0c0e12;
+  color: #e6ecf2;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+}
+.hud .voice-panel .panel-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid rgba(127, 199, 255, 0.45);
+  border-radius: 6px;
+  color: #cfe6ff;
+}
+.voice-panel .panel-err {
+  color: #fecaca;
 }
 .voice-panel p {
   margin: 0;

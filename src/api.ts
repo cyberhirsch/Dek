@@ -186,6 +186,13 @@ export async function readVoiceFile(name: string): Promise<Blob | null> {
   const b = await active()
   return b.readVoice ? b.readVoice(currentFile, name) : null
 }
+/** Store a narration audio file in the active deck's `voice/` folder. */
+export async function writeVoiceFile(name: string, data: Blob): Promise<boolean> {
+  const b = await active()
+  if (!b.writeVoice) return false
+  await b.writeVoice(currentFile, name, data)
+  return true
+}
 /** The narration audio files the active deck has. */
 export async function listVoiceFiles(): Promise<string[]> {
   const b = await active()

@@ -144,6 +144,16 @@ function dekApi() {
             const vd = path.join(path.dirname(resolveDeck(file)), 'voice')
             return json(res, 200, { files: fs.existsSync(vd) ? fs.readdirSync(vd).filter((f) => f.endsWith('.wav')) : [] })
           }
+          if (url === '/api/voice' && req.method === 'PUT') {
+            const name = u.searchParams.get('name') ?? ''
+            if (!/^[0-9a-f]{12}\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })
+            const vd = path.join(path.dirname(resolveDeck(file)), 'voice')
+            fs.mkdirSync(vd, { recursive: true })
+            const chunks: Buffer[] = []
+            for await (const c of req) chunks.push(c as Buffer)
+            fs.writeFileSync(path.join(vd, name), Buffer.concat(chunks))
+            return json(res, 200, { ok: true })
+          }
           if (url === '/api/voice' && req.method === 'GET') {
             const name = u.searchParams.get('name') ?? ''
             if (!/^[\w.-]+\.wav$/.test(name)) return json(res, 400, { error: 'bad name' })
