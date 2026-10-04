@@ -5,11 +5,16 @@ import type { AssetRef, DeckAnalysis, DeckIssue, IssueSeverity } from '../core/a
 const props = defineProps<{
   analysis: DeckAnalysis
   current: number
+  /** "Find QR codes in pictures": scanning progress and what was found
+   *  (pictures without a link whose QR code holds one). Null before a scan. */
+  qrScan?: { scanning: boolean; progress: string; found: { slide: number; url: string }[] } | null
 }>()
 const emit = defineEmits<{
   close: []
   jump: [index: number]
   'delete-asset': [filename: string]
+  'scan-qr': []
+  'link-qr': []
 }>()
 
 const mode = ref<'issues' | 'assets'>('issues')
@@ -104,6 +109,22 @@ function formatBytes(bytes?: number): string {
     </section>
 
     <section v-else class="pane assets">
+      <!-- Pictures holding a QR code: read each code, link the picture to it. -->
+      <div class="qr-box">
+        <button class="qr-btn" :disabled="qrScan?.scanning" @click="emit('scan-qr')">
+          {{ qrScan?.scanning ? qrScan.progress : 'Find QR codes in pictures' }}
+        </button>
+        <template v-if="qrScan && !qrScan.scanning">
+          <div v-if="!qrScan.found.length" class="qr-none">No unlinked picture holds a QR code with a link.</div>
+          <template v-else>
+            <button v-for="f in qrScan.found" :key="f.slide + f.url" class="qr-hit" @click="jump(f.slide)">
+              <span class="slide">#{{ f.slide }}</span>
+              <span class="ref">{{ f.url }}</span>
+            </button>
+            <button class="qr-btn on" @click="emit('link-qr')">Link {{ qrScan.found.length === 1 ? 'this picture' : `all ${qrScan.found.length} pictures` }}</button>
+          </template>
+        </template>
+      </div>
       <div class="asset-summary">
         <span>{{ analysis.assets.length }} refs</span>
         <span>{{ assetCounts.local }} local</span>
@@ -150,7 +171,8 @@ function formatBytes(bytes?: number): string {
   position: fixed;
   top: 50px;
   right: 0;
-  bottom: 92px;
+  /* clear of the editor's notes strip, which can be resized */
+  bottom: var(--dek-notes-h, 92px);
   z-index: 65;
   width: min(390px, 40vw);
   min-width: 330px;
@@ -314,6 +336,47 @@ button.asset-main:hover { background: rgba(127, 199, 255, 0.08); }
   font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+.qr-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.qr-btn {
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6ecf2;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.qr-btn.on {
+  border-color: rgba(127, 199, 255, 0.7);
+  color: #bfdbfe;
+  background: rgba(127, 199, 255, 0.12);
+}
+.qr-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.qr-hit {
+  display: flex;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.qr-none {
+  color: rgba(230, 236, 242, 0.45);
+  font-size: 11px;
 }
 .asset-summary {
   display: flex;

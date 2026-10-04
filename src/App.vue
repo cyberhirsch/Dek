@@ -12,6 +12,8 @@ import { fileToOptimizedDataUrl } from './core/image'
 import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
 import { DROP_FAILED_EVENT } from './render/dropImage'
 import { moveSlides } from './core/grouping'
+import { pictureLinkPatch, slidePictures, type PictureRef } from './core/pictureLinks'
+import { readQrLink } from './render/qrRead'
 import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
@@ -470,6 +472,99 @@ const inkChoice = ref(0)
 const inkColor = computed(() => inkPalette.value[inkChoice.value] ?? inkPalette.value[0])
 watch(editMode, (ed) => {
   if (ed) drawing.value = false
+})
+
+// ── speaker-notes strip (editor) ──
+// Resizable by its top edge (height remembered per browser; double-click the
+// edge for the default). The text takes the largest size, 11–28 px, at which
+// the notes fit the strip; past the smallest size it scrolls.
+const NOTES_DEFAULT = 92
+const NOTES_MIN = 48
+const NOTES_KEY = 'dek:notes-height'
+const NOTES_FONT_MIN = 11
+const NOTES_FONT_MAX = 28
+function readNotesHeight(): number {
+  try {
+    const n = Number(localStorage.getItem(NOTES_KEY))
+    return Number.isFinite(n) && n >= NOTES_MIN ? n : NOTES_DEFAULT
+  } catch {
+    return NOTES_DEFAULT
+  }
+}
+const notesHeight = ref(readNotesHeight())
+const notesFont = ref(13)
+const notesScroll = ref<HTMLElement | null>(null)
+function setNotesHeight(h: number) {
+  const max = Math.max(NOTES_MIN, Math.round(window.innerHeight * 0.6))
+  notesHeight.value = Math.round(Math.max(NOTES_MIN, Math.min(max, h)))
+  try {
+    localStorage.setItem(NOTES_KEY, String(notesHeight.value))
+  } catch {
+    /* private mode: the height just isn't remembered */
+  }
+}
+// Keeps the Review panel clear of the strip whatever its height.
+watch(notesHeight, (h) => document.documentElement.style.setProperty('--dek-notes-h', `${h}px`), { immediate: true })
+function onNotesGripDown(e: PointerEvent) {
+  e.preventDefault()
+  const startY = e.clientY
+  const startH = notesHeight.value
+  const bar = (e.currentTarget as HTMLElement).parentElement
+  bar?.classList.add('resizing')
+  const move = (ev: PointerEvent) => setNotesHeight(startH + (startY - ev.clientY))
+  const up = () => {
+    bar?.classList.remove('resizing')
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
+/** Largest font size at which the notes fit the strip, by binary search on the
+ *  live element (the same way slide text fits its box). */
+function fitNotes() {
+  const el = notesScroll.value
+  if (!el || !el.clientHeight) return
+  const fits = (px: number) => {
+    el.style.fontSize = `${px}px`
+    return el.scrollHeight <= el.clientHeight + 1
+  }
+  let lo = NOTES_FONT_MIN
+  let hi = NOTES_FONT_MAX
+  if (fits(hi)) lo = hi
+  else if (!fits(lo)) hi = lo
+  else {
+    for (let i = 0; i < 8 && hi - lo > 0.5; i++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) lo = mid
+      else hi = mid
+    }
+  }
+  const size = Math.floor(lo * 2) / 2
+  el.style.fontSize = `${size}px`
+  notesFont.value = size
+}
+let notesFrame = 0
+const scheduleNotesFit = () => {
+  cancelAnimationFrame(notesFrame)
+  notesFrame = requestAnimationFrame(fitNotes)
+}
+let notesResize: ResizeObserver | null = null
+let notesMutate: MutationObserver | null = null
+watch(notesScroll, (el) => {
+  notesResize?.disconnect()
+  notesMutate?.disconnect()
+  if (!el) return
+  notesResize = new ResizeObserver(scheduleNotesFit)
+  notesResize.observe(el)
+  notesMutate = new MutationObserver(scheduleNotesFit)
+  notesMutate.observe(el, { childList: true, characterData: true, subtree: true })
+  scheduleNotesFit()
+})
+watch(current, scheduleNotesFit, { flush: 'post' })
+onUnmounted(() => {
+  notesResize?.disconnect()
+  notesMutate?.disconnect()
 })
 
 // ── narrate mode + recording ──
@@ -965,6 +1060,7 @@ async function onElementImage(index: number, file: File) {
     i === index ? ({ ...el, src: url, fit: 'cover' } as SlideElement) : el,
   )
   patchSlide({ elements: els })
+  void offerQrLink(current.value, { kind: 'box', el: index })
 }
 // ── image clipboard / download (shared by freeform boxes and layout images) ──
 /** Copy a resolved image URL to the system clipboard as real image bytes. */
@@ -1053,6 +1149,7 @@ async function onDropImage(
       i === target.index ? ({ ...el, src: url, fit: 'cover' } as SlideElement) : el,
     )
     patchSlide({ elements: els })
+    void offerQrLink(current.value, { kind: 'box', el: target.index })
     return
   }
   // Read natural dimensions so the new box keeps the image's aspect ratio.
@@ -1069,6 +1166,8 @@ async function onDropImage(
   const x = Math.max(0, Math.min(1280 - w, target.x - w / 2))
   const y = Math.max(0, Math.min(720 - h, target.y - h / 2))
   onCreateElement(newElementRect('image', x, y, w, h, url))
+  const added = (deck.value.slides[current.value].elements?.length ?? 0) - 1
+  void offerQrLink(current.value, { kind: 'box', el: added })
 }
 
 /**
@@ -1167,6 +1266,96 @@ function closeCtx() {
 // target is either a freeform box element or one of the slide's image fields
 // (the single `image`, or a `portraits` / `gallery` slot by index).
 type ImageField = { field: 'image' | 'portraits' | 'gallery' | 'table'; index?: number; el?: number }
+
+// ── QR codes in pictures → links ──
+// A picture holding a QR code (a poster, a screenshot of a slide) gets the
+// code's link attached, so it's clickable while presenting. The picture itself
+// stays. Three ways in: offered when a picture is added, "Link from QR Code"
+// on its right-click menu, and the Review panel's deck-wide scan.
+const sameRef = (a: PictureRef, b: PictureRef) => JSON.stringify(a) === JSON.stringify(b)
+function fieldRef(t: ImageField): PictureRef | null {
+  if (t.field === 'image') return { kind: 'image' }
+  if (t.field === 'gallery') return { kind: 'gallery', index: t.index ?? -1 }
+  if (t.field === 'table') return { kind: 'table', cell: t.index ?? -1, ...(t.el != null ? { el: t.el } : {}) }
+  return null // portraits: nowhere to keep a link
+}
+function pictureAt(slideIndex: number, ref: PictureRef) {
+  const s = deck.value?.slides[slideIndex]
+  return s ? slidePictures(s).find((p) => sameRef(p.ref, ref)) : undefined
+}
+/** Attach `link` to one picture, on any slide. */
+function setPictureLink(slideIndex: number, ref: PictureRef, link: string) {
+  const s = deck.value?.slides[slideIndex]
+  const patch = s && pictureLinkPatch(s, ref, link)
+  if (!patch || !deck.value) return
+  if (slideIndex === current.value) return patchSlide(patch)
+  snap('qr-link')
+  deck.value.slides[slideIndex] = { ...s, ...patch }
+  void saveWholeDeck()
+}
+/** After a picture is added: if it holds a QR code with a link and has no link
+ *  yet, offer to attach it, never silently. */
+const qrOffer = ref<{ slide: number; ref: PictureRef; url: string } | null>(null)
+async function offerQrLink(slideIndex: number, ref: PictureRef | null) {
+  if (!ref) return
+  const pic = pictureAt(slideIndex, ref)
+  if (!pic || pic.link) return
+  const url = await readQrLink(pic.src)
+  // Still the same picture, still unlinked?
+  const now = pictureAt(slideIndex, ref)
+  if (url && now?.src === pic.src && !now.link) qrOffer.value = { slide: slideIndex, ref, url }
+}
+function acceptQrOffer() {
+  const o = qrOffer.value
+  qrOffer.value = null
+  if (o && pictureAt(o.slide, o.ref)) setPictureLink(o.slide, o.ref, o.url)
+}
+/** Right-click, "Link from QR Code": read it now and attach it. */
+async function linkFromQr(ref: PictureRef | null) {
+  if (!ref) return
+  const slideIndex = current.value
+  const pic = pictureAt(slideIndex, ref)
+  if (!pic) return
+  const url = await readQrLink(pic.src)
+  if (url) setPictureLink(slideIndex, ref, url)
+  else error.value = 'No QR code with a web link found in this picture.'
+}
+/** Review, Assets, "Find QR codes in pictures": every unlinked picture. */
+type QrHit = { slide: number; ref: PictureRef; url: string }
+const qrScan = ref<{ scanning: boolean; progress: string; found: QrHit[] } | null>(null)
+async function scanDeckForQr() {
+  if (!deck.value || qrScan.value?.scanning) return
+  const target = deck.value
+  const todo = target.slides.flatMap((s, i) => slidePictures(s).filter((p) => !p.link).map((p) => ({ slide: i, ...p })))
+  const bySrc = new Map<string, string | undefined>()
+  const found: QrHit[] = []
+  qrScan.value = { scanning: true, progress: `Scanning 0 / ${todo.length} pictures…`, found }
+  for (const [k, p] of todo.entries()) {
+    if (deck.value !== target) {
+      qrScan.value = null
+      return
+    }
+    if (!bySrc.has(p.src)) bySrc.set(p.src, await readQrLink(p.src))
+    const url = bySrc.get(p.src)
+    if (url) found.push({ slide: p.slide, ref: p.ref, url })
+    qrScan.value = { scanning: true, progress: `Scanning ${k + 1} / ${todo.length} pictures…`, found }
+  }
+  qrScan.value = { scanning: false, progress: '', found }
+}
+function linkAllQr() {
+  const scan = qrScan.value
+  if (!deck.value || !scan?.found.length) return
+  snap('qr-links')
+  for (const f of scan.found) {
+    const s = deck.value.slides[f.slide]
+    const pic = s && slidePictures(s).find((p) => sameRef(p.ref, f.ref))
+    const patch = pic && !pic.link ? pictureLinkPatch(s, f.ref, f.url) : null
+    if (patch) deck.value.slides[f.slide] = { ...s, ...patch }
+  }
+  qrScan.value = null
+  void saveWholeDeck()
+}
+watch(deck, () => (qrScan.value = null))
 
 // ── table cells: one accessor pair for both hosts ──
 // A table lives either on the slide (`slide.table`, the Table layout) or on a
@@ -1312,6 +1501,7 @@ function elementItems(index: number): CtxEntry[] {
       { label: 'Copy Image', action: () => copyImageAt(index) },
       { label: 'Paste Image', action: () => pasteImageAt(index) },
       { label: 'Add Link (from Clipboard)', action: () => addLinkFromClipboardAt(index) },
+      { label: 'Link from QR Code', action: () => void linkFromQr({ kind: 'box', el: index }) },
       { label: 'Download Image', action: () => downloadImageAt(index) },
       { divider: true },
       { label: 'Fit: Cover', check: (b.fit ?? 'cover') === 'cover', action: () => patchElementAt(index, { fit: 'cover' }) },
@@ -1368,6 +1558,7 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
     items.push(
       { divider: true },
       { label: 'Add Link (from Clipboard)', action: () => addFieldLink(t) },
+      { label: 'Link from QR Code', action: () => void linkFromQr(fieldRef(t)) },
     )
     if (fieldImageLink(s, t)) items.push({ label: 'Remove Link', action: () => setFieldLink(t, undefined) })
   }
@@ -1911,6 +2102,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   } else if (e.field === 'table') {
     patchTableCell({ field: 'table', index: e.index, el: e.el }, { image: url, text: undefined })
   }
+  if (e.field === 'image' || e.field === 'gallery' || e.field === 'table') void offerQrLink(current.value, fieldRef({ ...e, field: e.field }))
 }
 </script>
 
@@ -2021,18 +2213,25 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       @jump="jumpToSlide"
       @close="reviewOpen = false"
       @delete-asset="onDeleteAsset"
+      :qr-scan="qrScan"
+      @scan-qr="scanDeckForQr"
+      @link-qr="linkAllQr"
     />
 
     <!-- edit-mode speaker-notes strip -->
-    <div v-if="deck && editMode" class="notes-bar">
+    <div v-if="deck && editMode" class="notes-bar" :style="{ height: notesHeight + 'px' }">
+      <!-- Drag the top edge to make the notes taller or shorter. -->
+      <div class="notes-grip" title="Drag to resize the notes" @pointerdown="onNotesGripDown" @dblclick="setNotesHeight(NOTES_DEFAULT)" />
       <span class="notes-label">Notes</span>
-      <EditableText
-        class="notes-input"
-        multiline
-        :model-value="deck.slides[current]?.notes"
-        placeholder="Speaker notes for this slide (shown in Presenter view)…"
-        @update:model-value="patchSlide({ notes: $event })"
-      />
+      <div ref="notesScroll" class="notes-scroll" :style="{ fontSize: notesFont + 'px' }">
+        <EditableText
+          class="notes-input"
+          multiline
+          :model-value="deck.slides[current]?.notes"
+          placeholder="Speaker notes for this slide (shown in Presenter view)…"
+          @update:model-value="patchSlide({ notes: $event })"
+        />
+      </div>
     </div>
 
     <!-- present-mode chrome (fades out when idle) -->
@@ -2174,6 +2373,11 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
     <!-- Chrome downgrades a remembered handle's readwrite grant to "prompt" on a
          new session. Re-granting needs a user gesture, but only shows a small
          allow bubble — never a file/folder picker. -->
+    <div v-if="qrOffer" class="toast reconnect">
+      <span>This picture's QR code links to {{ qrOffer.url.length > 60 ? qrOffer.url.slice(0, 57) + '…' : qrOffer.url }}</span>
+      <button class="toast-btn" @click="acceptQrOffer">Add link</button>
+      <button class="toast-x" title="Keep the picture without a link" @click="qrOffer = null">✕</button>
+    </div>
     <div v-if="recorded" class="toast reconnect">
       <span>Recording ready — {{ recordedLabel }}</span>
       <button class="toast-btn" @click="onSaveRecording">Save MP4</button>
@@ -2359,16 +2563,35 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   }
 }
 .notes-bar {
+  position: relative;
   flex: none;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 12px;
   padding: 8px 16px;
-  max-height: 92px;
-  overflow-y: auto;
+  box-sizing: border-box;
   background: #101216;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-family: 'JetBrains Mono', monospace;
+}
+/* The resize handle: a strip along the top edge, highlighted on hover. */
+.notes-grip {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 2;
+}
+.notes-grip:hover,
+.notes-bar.resizing .notes-grip {
+  background: linear-gradient(transparent 3px, rgba(127, 199, 255, 0.55) 3px, rgba(127, 199, 255, 0.55) 5px, transparent 5px);
+}
+.notes-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
 }
 .notes-label {
   flex: none;
@@ -2379,8 +2602,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
   padding-top: 4px;
 }
 .notes-input {
-  flex: 1;
-  font-size: 13px;
+  font-size: inherit;
   line-height: 1.5;
   color: #e6ecf2;
   min-height: 20px;

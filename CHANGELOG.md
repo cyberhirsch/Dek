@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Editor
+
+**Resizable speaker notes**
+The notes strip under the slide can now be dragged taller or shorter by its top edge (double-click the edge for the default height); the height is remembered per browser, and the Review panel stays clear of it. The notes text sizes itself to the strip — the largest size from 11 to 28 px at which everything fits, refitted as you type, resize or change slides — so a tall strip shows long notes large and readable, and only notes too long even at 11 px scroll.
+
+### Images
+
+**Pictures with a QR code get its link**
+A picture that holds a QR code — a poster, a flyer, a screenshot of someone's slide — can now carry the code's link, so it's clickable while presenting and in exports; the picture itself stays as it is. Three ways in: when you add a picture that holds a QR code with a web link, Dek offers to attach it (one click, never silently); right-click any picture → **Link from QR Code**; and Review → Assets → **Find QR codes in pictures** scans every unlinked picture in the deck and links them all at once. Works for the single layout image, gallery and table-cell pictures, and canvas boxes; speaker portraits have nowhere to keep a link. Only web links count — a code holding text or Wi-Fi details is ignored. Chrome's own QR reader doesn't exist on Windows, so the decoder (jsQR, Apache-2.0) is loaded only when a picture is scanned. `+10` tests.
+
 ### Presenting
 
 **Fixed: narrate mode stalled after Vimeo videos**
