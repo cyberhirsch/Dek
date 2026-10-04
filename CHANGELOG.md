@@ -6,6 +6,11 @@
 
 ### Editor
 
+**Open Link from the right-click menu**
+A canvas box with a link — or a QR code, whose address is its link — now has **Open Link** and **Copy Link** on its right-click menu, so a code can be checked without a phone. Linked layout pictures (single image, gallery, table cells) get **Open Link** too. Links open in a new tab, never the one holding the deck.
+
+### Editor
+
 **Resizable speaker notes**
 The notes strip under the slide can now be dragged taller or shorter by its top edge (double-click the edge for the default height); the height is remembered per browser, and the Review panel stays clear of it. The notes text sizes itself to the strip — the largest size from 11 to 28 px at which everything fits, refitted as you type, resize or change slides — so a tall strip shows long notes large and readable, and only notes too long even at 11 px scroll.
 

@@ -14,6 +14,7 @@ import { DROP_FAILED_EVENT } from './render/dropImage'
 import { moveSlides } from './core/grouping'
 import { pictureLinkPatch, slidePictures, type PictureRef } from './core/pictureLinks'
 import { readQrLink } from './render/qrRead'
+import { safeLink } from './render/qr'
 import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
@@ -1267,6 +1268,11 @@ function closeCtx() {
 // (the single `image`, or a `portraits` / `gallery` slot by index).
 type ImageField = { field: 'image' | 'portraits' | 'gallery' | 'table'; index?: number; el?: number }
 
+/** Open a link from a context menu in a new tab (never this one: it holds the deck). */
+function openLink(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 // ── QR codes in pictures → links ──
 // A picture holding a QR code (a poster, a screenshot of a slide) gets the
 // code's link attached, so it's clickable while presenting. The picture itself
@@ -1494,6 +1500,15 @@ function elementItems(index: number): CtxEntry[] {
     { label: 'Send Backward', hint: 'Ctrl+[', action: () => reorderSelectedElements(-1) },
     { label: 'Send to Back', action: () => reorderSelectedTo('back') },
   ]
+  // A box's link (or the address its QR code shows): open it to check it.
+  const boxLink = el?.type === 'box' ? safeLink((el as BoxElement).link ?? (el as BoxElement).qr) : undefined
+  if (boxLink) {
+    items.push(
+      { divider: true },
+      { label: 'Open Link', action: () => openLink(boxLink) },
+      { label: 'Copy Link', action: () => void navigator.clipboard.writeText(boxLink).catch(() => {}) },
+    )
+  }
   if (el?.type === 'box' && (el as BoxElement).src) {
     const b = el as BoxElement
     items.push(
@@ -1560,6 +1575,8 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
       { label: 'Add Link (from Clipboard)', action: () => addFieldLink(t) },
       { label: 'Link from QR Code', action: () => void linkFromQr(fieldRef(t)) },
     )
+    const link = safeLink(fieldImageLink(s, t))
+    if (link) items.push({ label: 'Open Link', action: () => openLink(link) })
     if (fieldImageLink(s, t)) items.push({ label: 'Remove Link', action: () => setFieldLink(t, undefined) })
   }
   // A gallery picture's fit overrides the gallery's own; choosing the value the
