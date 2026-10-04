@@ -16,6 +16,8 @@ type Provider = 'youtube' | 'vimeo'
 /** Last known state per player iframe. Missing = not heard from yet; players
  *  are started with autoplay, so that reads as playing. */
 const paused = new WeakMap<HTMLIFrameElement, boolean>()
+/** Players that have reported actually playing at least once. */
+const started = new WeakSet<HTMLIFrameElement>()
 /** Narrate mode waiting for a player to finish (playToEnd). */
 const endWaiters = new WeakMap<HTMLIFrameElement, Array<() => void>>()
 function notifyEnded(frame: HTMLIFrameElement) {
@@ -41,6 +43,7 @@ export function listenToPlayer(frame: HTMLIFrameElement) {
     post(frame, { method: 'addEventListener', value: 'play' })
     post(frame, { method: 'addEventListener', value: 'pause' })
     post(frame, { method: 'addEventListener', value: 'ended' })
+    post(frame, { method: 'addEventListener', value: 'finish' })
   }
 }
 
@@ -58,13 +61,23 @@ function onPlayerMessage(e: MessageEvent) {
   if (!frame || !data) return
   // YouTube: 1 playing, 2 paused, 0 ended.
   const state = data.info?.playerState
-  if (state === 1) paused.set(frame, false)
+  if (state === 1) {
+    paused.set(frame, false)
+    started.add(frame)
+  }
   else if (state === 2 || state === 0) paused.set(frame, true)
   if (state === 0) notifyEnded(frame)
-  // Vimeo
-  if (data.event === 'play') paused.set(frame, false)
-  if (data.event === 'pause' || data.event === 'ended') paused.set(frame, true)
-  if (data.event === 'ended') notifyEnded(frame)
+  // Vimeo ignores event requests sent before its player is ready, and the
+  // iframe's `load` comes earlier than that: ask again once it says so.
+  if (data.event === 'ready' && providerOf(frame) === 'vimeo') listenToPlayer(frame)
+  if (data.event === 'play') {
+    paused.set(frame, false)
+    started.add(frame)
+  }
+  // Its postMessage API calls the end `finish`; newer docs say `ended`.
+  const ended = data.event === 'ended' || data.event === 'finish'
+  if (data.event === 'pause' || ended) paused.set(frame, true)
+  if (ended) notifyEnded(frame)
 }
 if (typeof window !== 'undefined') window.addEventListener('message', onPlayerMessage)
 
@@ -111,36 +124,48 @@ async function playerIn(root: HTMLElement): Promise<HTMLVideoElement | HTMLIFram
   return null
 }
 
-/**
- * Narrate mode: start the slide's video and wait until it has played to its
- * end (or its `end=` segment). False when the slide has no video Dek can
- * play and follow. Resolves early when `signal` aborts.
- */
 /** Whether the slide inside `root` has a video Dek can play and follow. */
 export function slideHasVideo(root: HTMLElement): boolean {
   return !!root.querySelector('[data-dek-play]:not(:disabled), video, iframe[data-dek-video]')
 }
 
+/** A video that hasn't started this long after Dek pressed play (autoplay
+ *  blocked by the browser, a dead link) is skipped, so narration never hangs. */
+const START_TIMEOUT = 15_000
+
+/**
+ * Narrate mode: start the slide's video and wait until it has played to its
+ * end (or its `end=` segment). False when the slide has no video. A player Dek
+ * can't follow (neither YouTube, Vimeo nor a file) isn't waited for. Resolves
+ * early when `signal` aborts.
+ */
 export async function playToEnd(root: HTMLElement, signal: AbortSignal): Promise<boolean> {
   if (!slideHasVideo(root)) return false
   const play = root.querySelector<HTMLButtonElement>('[data-dek-play]:not(:disabled)')
   if (play) play.click()
   const player = await playerIn(root)
   if (!player || signal.aborted) return !!player
+  if (player instanceof HTMLIFrameElement && !providerOf(player)) return true
   await new Promise<void>((resolve) => {
+    let watchdog: ReturnType<typeof setTimeout> | undefined
     const finish = () => {
+      clearTimeout(watchdog)
       signal.removeEventListener('abort', finish)
       resolve()
     }
     signal.addEventListener('abort', finish)
     if (player instanceof HTMLVideoElement) {
       if (player.ended) return finish()
+      let playing = false
+      player.addEventListener('playing', () => (playing = true), { once: true })
       player.addEventListener('ended', finish, { once: true })
       player.addEventListener('error', finish, { once: true })
       if (player.paused) void player.play().catch(() => {})
+      watchdog = setTimeout(() => !playing && finish(), START_TIMEOUT)
     } else {
       endWaiters.set(player, [...(endWaiters.get(player) ?? []), finish])
       if (paused.get(player)) toggleFrame(player)
+      watchdog = setTimeout(() => !started.has(player) && finish(), START_TIMEOUT)
     }
   })
   return true

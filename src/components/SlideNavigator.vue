@@ -16,8 +16,9 @@ const nav = ref<HTMLElement | null>(null)
 const emit = defineEmits<{
   'update:current': [i: number]
   select: [e: { index: number; shift: boolean; meta: boolean }]
-  reorder: [e: { indices: number[]; before: number }]
-  'join-group': [e: { from: number; name: string }]
+  /** Move slides before `before`; `chapter` when a whole group is dragged by
+   *  its heading (core/grouping.ts settles the group labels). */
+  reorder: [e: { indices: number[]; before: number; chapter?: boolean }]
   ungroup: [name: string]
   rename: [e: { indices: number[]; name: string }]
   add: [id: LayoutId]
@@ -179,9 +180,10 @@ function onDrop() {
     const header = entries.value.find((x) => x.kind === 'header' && x.runId === dropHeader.value) as
       | (Entry & { kind: 'header' })
       | undefined
-    if (header) emit('join-group', { from: dragFrom.value, name: header.name })
+    // Onto a heading: the dragged slides join that group, at its end.
+    if (header) emit('reorder', { indices: dragSet.value, before: header.indices[header.indices.length - 1] + 1 })
   } else if (dropBefore.value != null) {
-    emit('reorder', { indices: dragSet.value, before: dropBefore.value })
+    emit('reorder', { indices: dragSet.value, before: dropBefore.value, chapter: draggingGroup.value })
   }
   cleanupDrag()
 }

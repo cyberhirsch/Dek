@@ -266,6 +266,10 @@ A passage may open with direction tags for the local voice, e.g.
 `> [calm] [breath] Hand it in before class starts.`: `[calm]`, `[happy]`,
 `[breath]`. Only at the start; others (including `[slower]`, dropped) are ignored.
 
+**Sharing a narrated deck:** Export → *Download HTML (with Narration)* makes
+one file for students: Enter plays it with the voiced passages (MP3), noting
+that the voice is AI-generated; private notes are left out.
+
 **Video slides:** the first `>` passage is said *before* the video (credit,
 what to watch for), the video plays to its end, and every later passage is
 said *after* it (the discussion). One passage: speak, then the video.

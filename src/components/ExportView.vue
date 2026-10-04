@@ -5,6 +5,9 @@ import { themeVars } from '../render/theme'
 import { deckToPptx } from '../export/pptx'
 import { qrPngDataUrl } from '../render/qr'
 import SlideView from './SlideView.vue'
+import { EXPORT_NARRATE_CSS, EXPORT_NARRATE_JS } from '../export/narrateRuntime'
+import { lineId, slideBeats, stripVoiceTags } from '../core/narration'
+import { readVoiceFile } from '../api'
 
 const props = defineProps<{ deck: Deck }>()
 const emit = defineEmits<{ close: [] }>()
@@ -57,7 +60,8 @@ const EXPORT_PRES_JS = `
   var cur=0, ovEl=null, ovOpen=false, presWin=null, presOpen=false, t0=null, tick=null;
   function clampi(i){ return Math.max(0,Math.min(pages.length-1,i)); }
   function fit(){ var s=Math.min(window.innerWidth/1280, window.innerHeight/720); pages.forEach(function(p){ p.style.transform='translate(-50%,-50%) scale('+s+')'; }); }
-  function render(){ pages.forEach(function(p,i){ p.classList.toggle('active', i===cur); }); if(ovOpen) markOv(); if(presOpen) fillPres(); }
+  var changeFns=[];
+  function render(){ pages.forEach(function(p,i){ p.classList.toggle('active', i===cur); }); if(ovOpen) markOv(); if(presOpen) fillPres(); changeFns.forEach(function(f){ f(cur); }); }
   function go(d){ cur=clampi(cur+d); render(); }
   function jump(i){ cur=clampi(i); render(); }
   function fs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} }
@@ -89,6 +93,8 @@ const EXPORT_PRES_JS = `
   window.addEventListener('wheel',function(e){ if(ovOpen||presOpen)return; go(e.deltaY>0?1:-1); },{passive:true});
   window.addEventListener('beforeunload',function(){ if(presWin&&!presWin.closed)presWin.close(); });
   show.addEventListener('click',function(){ if(!ovOpen&&!presOpen)go(1); });
+  // For add-ons such as the narration player (export/narrateRuntime.ts).
+  window.__dek={ cur:function(){ return cur; }, go:go, jump:jump, count:pages.length, onChange:function(f){ changeFns.push(f); } };
   fit(); render();
 })();
 `
@@ -204,7 +210,7 @@ async function inlineMedia(root: HTMLElement): Promise<string> {
 
 /** Assemble the standalone presentation HTML document around already-prepared
  *  slide markup (media either inlined as data URLs or rewritten to asset paths). */
-function buildHtmlDoc(slidesHtml: string, withNotes = true): string {
+function buildHtmlDoc(slidesHtml: string, withNotes = true, narration?: NarrationPayload): string {
   const css = collectCss()
   const fontLink =
     '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">'
@@ -226,12 +232,14 @@ ${css}
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 .print-page{position:relative;width:1280px;height:720px;flex:none;}
 ${EXPORT_PRES_CSS}
+${narration ? EXPORT_NARRATE_CSS : ''}
 </style></head>
 <body>
 <div class="dek-show" style="${styleVars}">${slidesHtml}</div>
-<div class="dek-hud">← → navigate · F fullscreen · O overview${withNotes ? ' · P presenter' : ''}</div>
+<div class="dek-hud">← → navigate · F fullscreen · O overview${withNotes ? ' · P presenter' : ''}${narration ? ' · Enter narration' : ''}</div>
 <script>window.__DEK_NOTES=${notesJson};window.__DEK_PRESENTER=${withNotes};<\/script>
 <script>${EXPORT_PRES_JS}<\/script>
+${narration ? `<script>window.__DEK_NARRATION=${JSON.stringify(narration).replace(/</g, '\\u003c')};<\/script><script>${EXPORT_NARRATE_JS}<\/script>` : ''}
 </body></html>`
 }
 
@@ -246,12 +254,46 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(a.href)
 }
 
-async function downloadHtml(withNotes = true) {
+/** Per slide, its spoken passages: an MP3 of the local voice where one was
+ *  generated (voice/<id>.wav, re-encoded small), else the text for the
+ *  viewer's browser voice. Direction tags are stripped from the text; private
+ *  notes never get in — only the `>` passages. */
+type NarrationPayload = { src?: string; text: string }[][]
+const packing = ref('')
+async function narrationPayload(): Promise<NarrationPayload> {
+  const { packVoice } = await import('../render/audioPack')
+  const packed = new Map<string, string | null>()
+  const total = props.deck.slides.reduce((n, s) => n + slideBeats(s).filter((b) => b.text).length, 0)
+  let done = 0
+  let voiced = 0
+  const out: NarrationPayload = []
+  for (const slide of props.deck.slides) {
+    const beats: { src?: string; text: string }[] = []
+    for (const b of slideBeats(slide)) {
+      if (!b.text) continue
+      const id = await lineId(b.text)
+      if (!packed.has(id)) {
+        const wav = await readVoiceFile(`${id}.wav`).catch(() => null)
+        packed.set(id, wav ? await packVoice(wav).catch(() => null) : null)
+      }
+      const src = packed.get(id)
+      if (src) voiced++
+      beats.push({ text: stripVoiceTags(b.text), ...(src ? { src } : {}) })
+      packing.value = `Packing narration ${++done} / ${total}…`
+    }
+    out.push(beats)
+  }
+  packing.value = total ? `Narration: ${voiced} of ${total} passages in the local voice, the rest by the browser voice.` : ''
+  return out
+}
+
+async function downloadHtml(withNotes = true, withNarration = false) {
   await renderAll()
   await nextTick()
   const slidesHtml = stack.value ? await inlineMedia(stack.value) : ''
-  const html = buildHtmlDoc(slidesHtml, withNotes)
-  const suffix = withNotes ? '' : '_no-notes'
+  const narration = withNarration ? await narrationPayload() : undefined
+  const html = buildHtmlDoc(slidesHtml, withNotes, narration)
+  const suffix = withNarration ? '_narrated' : withNotes ? '' : '_no-notes'
   triggerDownload(new Blob([html], { type: 'text/html' }), `${deckSlug()}${suffix}.html`)
 }
 
@@ -374,12 +416,14 @@ onUnmounted(() => {
       <div class="export-status">
         <span>Export — {{ rendered }} / {{ deck.slides.length }} slides</span>
         <span class="meter"><span :style="{ width: progress + '%' }" /></span>
+        <span v-if="packing" class="packing">{{ packing }}</span>
       </div>
       <div class="actions">
         <button @click="printPdf">⎙ Print / Save as PDF</button>
         <button @click="printHandout">⎙ Print Handout (notes)</button>
         <button @click="downloadHtml(true)">⤓ Download HTML Presentation</button>
         <button @click="downloadHtml(false)">⤓ Download HTML (without Speaker Notes)</button>
+        <button @click="downloadHtml(false, true)">⤓ Download HTML (with Narration)</button>
         <button @click="downloadZip">⤓ Download ZIP (HTML + assets)</button>
         <button @click="downloadPptx">⤓ Download PPTX</button>
         <button class="close" @click="emit('close')">Close</button>
@@ -439,6 +483,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.packing {
+  color: rgba(230, 236, 242, 0.6);
+  font-size: 11px;
 }
 .meter {
   width: 150px;

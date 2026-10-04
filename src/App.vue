@@ -11,6 +11,7 @@ import { splitSlide, type SlideSplitTarget } from './core/split'
 import { fileToOptimizedDataUrl } from './core/image'
 import { DEFAULT_THEME, themePreset, type ThemeId } from './tokens'
 import { DROP_FAILED_EVENT } from './render/dropImage'
+import { moveSlides } from './core/grouping'
 import { startRecording, saveVideo, type Recording } from './render/recorder'
 import { cleanDeckName } from './storage/assets'
 import { browserVoices, voiceSettings } from './render/voice'
@@ -1748,12 +1749,13 @@ function insertSlideAt(index: number) {
   void saveWholeDeck()
 }
 /** Move a single slide from `from` to `to`, keeping the rest in order. */
+/** Move to Top / Bottom: same group rule as dragging (core/grouping.ts). */
 function moveSlideTo(from: number, to: number) {
   if (!deck.value || from === to) return
   snap('reorder')
-  const [s] = deck.value.slides.splice(from, 1)
-  deck.value.slides.splice(to, 0, s)
-  focusSlide(to)
+  const { slides, at } = moveSlides(deck.value.slides, [from], to === 0 ? 0 : deck.value.slides.length)
+  deck.value.slides = slides
+  focusSlide(at)
   void saveWholeDeck()
 }
 
@@ -1823,19 +1825,17 @@ async function pasteSlides(after: number, incoming?: Slide[]) {
 }
 
 /** Block move: relocate one or more slides (preserving their order) before `before`. */
-function reorder(e: { indices: number[]; before: number }) {
+/** Block move from the slide list. Loose slides take the group of where they
+ *  land; a chapter dragged by its heading keeps its own (core/grouping.ts). */
+function reorder(e: { indices: number[]; before: number; chapter?: boolean }) {
   if (!deck.value) return
   snap('reorder')
-  const arr = deck.value.slides
-  const sorted = [...new Set(e.indices)].sort((a, b) => a - b)
-  const block = sorted.map((i) => arr[i])
-  const remaining = arr.filter((_, i) => !sorted.includes(i))
-  const insertAt = Math.max(0, Math.min(remaining.length, e.before - sorted.filter((i) => i < e.before).length))
-  remaining.splice(insertAt, 0, ...block)
-  deck.value.slides = remaining
-  current.value = insertAt
-  selected.value = block.map((_, k) => insertAt + k)
-  anchor = insertAt
+  const count = new Set(e.indices).size
+  const { slides, at } = moveSlides(deck.value.slides, e.indices, e.before, e.chapter)
+  deck.value.slides = slides
+  current.value = at
+  selected.value = Array.from({ length: count }, (_, k) => at + k)
+  anchor = at
   void saveWholeDeck()
 }
 
@@ -1877,24 +1877,6 @@ function autoGroup() {
     if (name) s.group = name
     else delete s.group
   }
-  void saveWholeDeck()
-}
-function joinGroup(e: { from: number; name: string }) {
-  if (!deck.value) return
-  snap('join-group')
-  const arr = deck.value.slides
-  let runStart = arr.findIndex((s) => s.group === e.name)
-  if (runStart < 0) return
-  let runEnd = runStart
-  while (runEnd + 1 < arr.length && arr[runEnd + 1].group === e.name) runEnd++
-  const [item] = arr.splice(e.from, 1)
-  item.group = e.name
-  let insertAt = runEnd + 1
-  if (e.from <= runEnd) insertAt--
-  arr.splice(insertAt, 0, item)
-  current.value = insertAt
-  selected.value = [insertAt]
-  anchor = insertAt
   void saveWholeDeck()
 }
 function ungroup(name: string) {
@@ -1982,7 +1964,6 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
         @update:current="current = $event"
         @select="onSelect"
         @reorder="reorder"
-        @join-group="joinGroup"
         @ungroup="ungroup"
         @rename="renameGroup"
         @add="addSlide"

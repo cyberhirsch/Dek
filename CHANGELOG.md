@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+### Presenting
+
+**Fixed: narrate mode stalled after Vimeo videos**
+Dek asked Vimeo's player to report play and end as soon as its frame loaded — before the player was ready, so Vimeo ignored the request, never reported the end, and narration waited on the slide forever. Dek now asks again when Vimeo says it's ready, and also understands Vimeo's name for the end (`finish`). Two safety nets: a video that hasn't started 15 seconds after Dek pressed play (autoplay blocked by the browser, a dead link) is skipped, and a link that's neither YouTube, Vimeo nor a video file isn't waited for. Checked with real YouTube and Vimeo videos: intro, film to its end (or its `end=` time), the passages after it, next slide.
+
+### Slides
+
+**A dragged slide joins the group it lands in**
+A slide's group is a label on the slide, so dragging one into another group used to keep its old label: the target group split around it and the old group's heading appeared a second time, as if the group had been copied along. Now a moved slide takes the group of the slide directly above where it lands — inside a group it joins it, at the border between two groups it joins the one above, below an ungrouped slide or at the very top it becomes ungrouped. A multi-selection moves and joins as one block; dropping onto a group's heading adds the slides at the end of that group. A whole chapter dragged by its heading keeps its name, and a drop aimed inside another group lands after it instead of splitting it. *Move to Top* / *Move to Bottom* follow the same rule. `+7` tests.
+
+### Export
+
+**HTML with Narration**
+A third HTML export, **Download HTML (with Narration)**: the audience version (no speaker notes) that can present itself. In the file, **Enter** or the **▷ Play narration** button plays each slide's spoken passages and moves on, stopping after the last slide; paging by hand continues from there. Passages voiced with the local voice are embedded as MP3 — re-encoded from the generated WAVs at 48 kbps mono, about an eighth of their size (the LAME encoder, `@breezystack/lamejs`, LGPL, is loaded only for this export). Passages without audio are read by the viewer's browser voice. Only the `>` passages go in, with direction tags removed; private notes never do. A small note beside the button says the narration voice is AI-generated. Embedded videos can't play in an exported file, so a video slide's passages are spoken without the film. `+3` tests.
+
 ### Dek Helper
 
 **Video slides: intro, film, then discussion**
