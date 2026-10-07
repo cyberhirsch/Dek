@@ -138,11 +138,15 @@ export function makeLocalVoice(
   }
 }
 
-export const localVoice: VoiceEngine = makeLocalVoice(
-  async (name) => (await import('../api')).readVoiceFile(name),
-  playBlob,
-  browserVoice,
-)
+/** Where voice files come from: the deck's folder, normally. The audience
+ *  window (opened by the presenter view) has no access to that folder and
+ *  asks the presenter tab for each file instead (setVoiceFileReader). */
+let voiceFileReader = async (name: string): Promise<Blob | null> => (await import('../api')).readVoiceFile(name)
+export function setVoiceFileReader(read: (name: string) => Promise<Blob | null>) {
+  voiceFileReader = read
+}
+
+export const localVoice: VoiceEngine = makeLocalVoice((name) => voiceFileReader(name), playBlob, browserVoice)
 
 /** The engine the ⚙ menu has chosen. */
 export function currentVoice(): VoiceEngine {

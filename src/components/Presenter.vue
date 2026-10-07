@@ -7,11 +7,13 @@ import SlideThumb from './SlideThumb.vue'
 const props = defineProps<{
   deck: Deck
   current: number
-  /** In the popup: Space and a remote's ■ (`.`/`b`) are handed to the audience
-   *  window, which plays/pauses the slide's video or else advances. */
+  /** Build rows showing on the current slide (shared with the audience window). */
+  revealed?: number
+  /** Space, a remote's ■ (`.`/`b`) and Enter are handed to the audience
+   *  window, which plays/pauses the slide's video, narrates, or advances. */
   relayMedia?: boolean
 }>()
-const emit = defineEmits<{ 'update:current': [i: number]; close: []; media: [key: string] }>()
+const emit = defineEmits<{ step: [dir: 1 | -1]; close: []; media: [key: string] }>()
 // Enter: narrate mode, which runs in the audience window.
 const MEDIA_KEYS = new Set([' ', '.', 'b', 'B', 'MediaPlayPause', 'Enter'])
 
@@ -21,9 +23,9 @@ const next = computed(() => props.deck.slides[props.current + 1])
 // clicks the audience screen still owes before the next slide.
 const stepCount = computed(() => (slide.value?.steps ? parseContent(slide.value.content).length : 0))
 
-function go(d: number) {
-  const i = Math.max(0, Math.min(props.deck.slides.length - 1, props.current + d))
-  emit('update:current', i)
+/** One step: the next build row, or the next slide once all rows are out. */
+function go(d: 1 | -1) {
+  emit('step', d)
 }
 
 // timer
@@ -132,7 +134,7 @@ onUnmounted(() => {
       <div class="main">
         <div class="label">
           Current · {{ current + 1 }} / {{ deck.slides.length }}
-          <span v-if="stepCount" class="builds">· {{ stepCount }} build{{ stepCount === 1 ? '' : 's' }}</span>
+          <span v-if="stepCount" class="builds">· build {{ revealed ?? 0 }} / {{ stepCount }}</span>
         </div>
         <SlideThumb :slide="slide" :config="deck.config" :index="current" :total="deck.slides.length" :width="mainThumbWidth" />
         <div class="nav">

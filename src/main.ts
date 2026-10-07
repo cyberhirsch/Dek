@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import PresenterWindow from './components/PresenterWindow.vue'
+import AudienceWindow from './components/AudienceWindow.vue'
 import './styles/base.css'
 
 // Each deploy emits freshly hashed chunks and deletes the previous ones. A tab
@@ -38,7 +38,7 @@ function guardStrayDrop(e: DragEvent) {
 window.addEventListener('dragover', guardStrayDrop)
 window.addEventListener('drop', guardStrayDrop)
 
-// `?view=presenter` loads the standalone presenter popup (a second-monitor view
-// synced to the main window) instead of the full editor app.
-const isPresenter = new URLSearchParams(location.search).get('view') === 'presenter'
-createApp(isPresenter ? PresenterWindow : App).mount('#app')
+// `?view=audience` loads the audience window that the presenter view opens
+// (slides only, for the projector) instead of the full editor app.
+const isAudience = new URLSearchParams(location.search).get('view') === 'audience'
+createApp(isAudience ? AudienceWindow : App).mount('#app')

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Presenting
+
+**Presenter view stays in your tab; the slides pop out**
+**P** now keeps the presenter view — current and next slide, notes, timer — in the tab you're working in, and opens the slides in a new **audience window** to drag onto the projector (click it or press **F** there for fullscreen). Before, the slides stayed in the tab and the presenter view popped out. Everything that plays on the slides — videos, narration, the pen — lives in the audience window; Space, the remote's ■ and Enter pressed in the presenter view are passed to it, and narration in your own voice still finds the deck's voice files. Closing either window ends the presenter view.
+
+**Fixed: build slides showed only their heading when driven from the presenter view**
+The presenter view turned pages by sending a slide number, and the slides window then showed that slide with all its build rows hidden — so on `steps: true` slides the audience saw just the heading. The two windows now share the position — slide *and* rows showing — and → in either reveals the next row everywhere; the presenter view shows "build 2 / 5". `+3` tests.
+
 ### Editor
 
 **Open Link from the right-click menu**

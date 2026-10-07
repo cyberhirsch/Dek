@@ -254,7 +254,7 @@ src/
     SlideView.vue    layout dispatcher (renders each layout)
     CanvasElements.vue / BoxText.vue   freeform canvas + auto-shrink text
     TopBar.vue, SlideNavigator.vue, SlideActions.vue, SourcePane.vue   editor chrome
-    Overview.vue, Presenter.vue, PresenterWindow.vue, ExportView.vue   present / export
+    Overview.vue, Presenter.vue, AudienceWindow.vue, ExportView.vue   present / export
     DeckMenu, ColorPicker, EditableText(List), FramedImage, MermaidDiagram, SlideThumb, ReviewPanel
   styles/
     base.css         design tokens / app chrome

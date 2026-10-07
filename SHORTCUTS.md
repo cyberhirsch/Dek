@@ -24,7 +24,7 @@
 | `F` | Toggle fullscreen (presenting starts in fullscreen) |
 | `Esc` | Back to the editor (leaves fullscreen too) |
 | `O` | Open slide overview |
-| `P` / `S` | Open presenter view |
+| `P` / `S` | Presenter view in this tab; the slides open in a new window for the projector |
 | `Enter` | Narrate mode on/off: Dek presents by itself, speaking the notes from each `>` on |
 | `D` | Draw on the slide with the pointer; `D` again clears the ink and stops drawing |
 
@@ -49,7 +49,7 @@
 |---|---|
 | `→` / `Space` | Next slide |
 | `←` | Previous slide |
-| `Escape` / `P` / `S` | Close presenter view |
+| `Escape` / `P` / `S` | Close presenter view (and the audience window) |
 
 ---
 

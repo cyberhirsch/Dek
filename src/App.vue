@@ -45,7 +45,8 @@ import {
 import { deckKey, readSlidePos, writeSlidePos } from './storage/position'
 import { dropRecent, pushRecent, readRecent, writeRecent, type RecentDeck } from './storage/recent'
 import { useUndo } from './composables/useUndo'
-import { usePresenterSync } from './composables/usePresenterSync'
+import { useAudienceSync } from './composables/useAudienceSync'
+import { stepMove } from './core/steps'
 import { useImport } from './composables/useImport'
 import { useCanvasSelection } from './composables/useCanvasSelection'
 import DeckView from './components/Deck.vue'
@@ -121,15 +122,24 @@ function trackClick(e: PointerEvent) {
 
 // present-mode views
 const overviewOpen = ref(false)
-const presenterOpen = ref(false) // in-app overlay fallback when a popup is blocked
+const presenterOpen = ref(false) // this tab shows the presenter view; slides are in the audience window
+// Build rows showing on the current slide, shared with the audience window.
+const revealed = ref(0)
 const exportOpen = ref(false)
 const reviewOpen = ref(false)
 
-// Presenter popup (a separate window for a second monitor) — see usePresenterSync.
-const { openPresenter: openPresenterWindow } = usePresenterSync({ deck, current, editMode, presenterOpen })
+// Presenter view in this tab, slides in a separate audience window — see useAudienceSync.
+const { openPresenter: openPresenterWindow, sendKey: sendAudienceKey } = useAudienceSync({ deck, current, revealed, presenterOpen, error })
 /** The presenter popup can knock the audience window out of fullscreen
  *  (Chrome leaves fullscreen when a window opens); that must not end the
  *  presentation the popup is there to run. */
+/** → / ← in the presenter view: the next build row or slide, as on the audience screen. */
+function onPresenterStep(dir: 1 | -1) {
+  if (!deck.value) return
+  const pos = stepMove(deck.value.slides, { index: current.value, revealed: revealed.value }, dir)
+  current.value = pos.index
+  revealed.value = pos.revealed
+}
 function openPresenter() {
   if (document.fullscreenElement) {
     keepPresenting = true
@@ -2194,6 +2204,7 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
           :selected-el="selectedEls"
           :pending-image="pendingImage"
           v-model:drawing="drawing"
+          v-model:revealed="revealed"
           v-model:narrating="narrating"
           @narration-end="onNarrationEnd"
           :ink-color="inkColor"
@@ -2371,7 +2382,10 @@ async function onUpload(e: { field: 'image' | 'poster' | 'portraits' | 'gallery'
       v-if="deck && presenterOpen"
       :deck="deck"
       :current="current"
-      @update:current="current = $event"
+      :revealed="revealed"
+      relay-media
+      @step="onPresenterStep"
+      @media="sendAudienceKey"
       @close="presenterOpen = false"
     />
     <ExportView v-if="deck && exportOpen" :deck="deck" @close="exportOpen = false" />

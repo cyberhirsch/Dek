@@ -25,11 +25,15 @@ const props = defineProps<{
   inkColor?: string
   /** Narrate mode (Enter): Dek presents by itself, speaking the notes' `>` lines. */
   narrating?: boolean
+  /** Build rows showing on the current slide, when another window shares the
+   *  position (presenter view + audience window). Unset: Deck keeps its own. */
+  revealed?: number
 }>()
 const emit = defineEmits<{
   'update:modelValue': [n: number]
   'update:drawing': [on: boolean]
   'update:narrating': [on: boolean]
+  'update:revealed': [n: number]
   /** Narration ran off the end of the deck. */
   'narration-end': []
   patch: [p: Partial<Slide>]
@@ -71,7 +75,7 @@ let pendingIndex = props.modelValue
 // counts how many are shown on the current slide; it resets on every slide
 // change. `revealIntent` decides whether we land on a slide fully-revealed
 // (arriving by going *back*) or collapsed (going forward / jumping).
-const revealed = ref(0)
+const revealed = ref(props.revealed ?? 0)
 let revealIntent: 'start' | 'end' = 'start'
 function stepRows(index: number): number {
   const s = props.deck.slides[index]
@@ -112,6 +116,18 @@ watch(
     }
   },
 )
+
+// A shared position arrives as slide + rows together: apply the rows after the
+// slide watcher above has reset them, and report every change back.
+watch(
+  () => [props.modelValue, props.revealed] as const,
+  ([, r]) => {
+    if (r != null) revealed.value = r
+  },
+)
+watch(revealed, (n) => {
+  if (n !== props.revealed) emit('update:revealed', n)
+})
 
 // ── narrate mode ──
 // Enter starts and stops it. On each slide Dek says the notes' `>` lines
