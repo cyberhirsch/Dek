@@ -13,6 +13,7 @@ export type LayoutId =
   | 'gallery'
   | 'diagram'
   | 'table'
+  | 'poll'
   | 'freeform'
 
 export const LAYOUT_IDS: LayoutId[] = [
@@ -28,8 +29,18 @@ export const LAYOUT_IDS: LayoutId[] = [
   'gallery',
   'diagram',
   'table',
+  'poll',
   'freeform',
 ]
+
+/** A live poll (`layout: poll`): the question is the slide's `title`. */
+export interface PollSpec {
+  /** `choice`: tap one of `options` · `words`: type a word or short phrase ·
+   *  `scale`: rate 1–5. */
+  kind: 'choice' | 'words' | 'scale'
+  /** The answers for `choice`. */
+  options?: string[]
+}
 
 /** Old layout names → current ones, applied on read so older decks still load. */
 export const LAYOUT_ALIASES: Record<string, LayoutId> = {
@@ -295,6 +306,8 @@ export interface Slide {
   focus?: Focus
   /** table: the grid itself — the same object a `table` canvas element carries. */
   table?: TableData
+  /** poll: how the audience answers the question in `title` (live voting). */
+  poll?: PollSpec
   // diagram: Mermaid source
   code?: string
   // freeform

@@ -7,6 +7,7 @@ import { themeVars as buildThemeVars } from '../render/theme'
 import { parseContent } from '../render/inline'
 import { playToEnd, slideHasVideo, toggleVideoIn } from '../render/videoControl'
 import { slideBeats } from '../core/narration'
+import { presentSlide } from '../live/liveState'
 import { currentVoice } from '../render/voice'
 import SlideView from './SlideView.vue'
 import type { CanvasTool } from '../core/types'
@@ -128,6 +129,21 @@ watch(
 watch(revealed, (n) => {
   if (n !== props.revealed) emit('update:revealed', n)
 })
+
+// ── live voting ──
+// A poll slide opens its poll on Dek Live while it's on screen and closes it
+// when you move on. Only the window actually presenting does this (not the
+// editor, not a presenter tab whose slides run in the audience window).
+const livePresenting = computed(() => !props.editable && props.navEnabled !== false)
+watch(
+  () => {
+    const s = livePresenting.value ? props.deck.slides[renderIndex.value] : undefined
+    return s?.layout === 'poll' ? JSON.stringify([renderIndex.value, s.title, s.poll]) : ''
+  },
+  () => presentSlide(props.deck.config.deck ?? 'Untitled', renderIndex.value, livePresenting.value ? props.deck.slides[renderIndex.value] : undefined),
+  { immediate: true },
+)
+onUnmounted(() => presentSlide('', -1, undefined))
 
 // ── narrate mode ──
 // Enter starts and stops it. On each slide Dek says the notes' `>` lines

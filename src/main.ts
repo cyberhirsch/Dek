@@ -1,6 +1,4 @@
 import { createApp } from 'vue'
-import App from './App.vue'
-import AudienceWindow from './components/AudienceWindow.vue'
 import './styles/base.css'
 
 // Each deploy emits freshly hashed chunks and deletes the previous ones. A tab
@@ -40,5 +38,12 @@ window.addEventListener('drop', guardStrayDrop)
 
 // `?view=audience` loads the audience window that the presenter view opens
 // (slides only, for the projector) instead of the full editor app.
-const isAudience = new URLSearchParams(location.search).get('view') === 'audience'
-createApp(isAudience ? AudienceWindow : App).mount('#app')
+// `?join=<session>` is the phone page for voting in a live poll.
+// Each page loads only its own code: a phone voting never downloads the editor.
+const params = new URLSearchParams(location.search)
+const root = params.has('join')
+  ? import('./components/JoinWindow.vue')
+  : params.get('view') === 'audience'
+    ? import('./components/AudienceWindow.vue')
+    : import('./App.vue')
+void root.then((m) => createApp(m.default).mount('#app'))

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Live polls
+
+**Audience polls with phone voting** — new `poll` layout
+A poll slide asks a question; while presenting, the audience scans its QR code and answers on their phones — no login, no app — and the result builds up on the slide: bars for a choice or a 1–5 scale, a word cloud for words. Reaching the slide opens the poll, leaving it closes it. Set the answer type in the top bar (*choice* / *words* / *1–5*); a choice poll's answers are edited right on the slide, one per line.
+
+Voting runs on **Dek Live**, its own small server on the Pi (`services/dek-live`, PocketBase behind `dek.sebhirsch.com`), separate from every other database there. There are no accounts: a session is a presentation on a date — the same deck on the same day is the same session, so a reload carries on and that day's QR code stays valid — and the browser that starts it holds a secret key that alone opens and closes its polls and reads its votes. Every answer is kept, with its question, date and deck name; a question can't change once asked, and nothing can be deleted from outside. Votes are anonymous, one per phone per poll. The phone page loads only its own few kilobytes, not the editor. Only the window actually presenting runs the poll (with the presenter view open, that's the audience window). `+14` tests, and the voting server was checked end to end with real requests against a throwaway copy.
+
 ### Presenting
 
 **Presenter view stays in your tab; the slides pop out**

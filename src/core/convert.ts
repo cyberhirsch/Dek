@@ -34,6 +34,7 @@ const LAYOUT_FIELDS: Record<LayoutId, Partial<Record<Slot, string>>> = {
   gallery: { heading: 'title', gallery: 'items' },
   diagram: { heading: 'title', diagram: 'code' },
   table: { heading: 'title', table: 'table' },
+  poll: { heading: 'title' },
   freeform: {},
 }
 

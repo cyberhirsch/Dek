@@ -229,6 +229,7 @@ Full field lists, defaults, and examples: **[references/layouts.md](references/l
 | `gallery` | Image grid, comparisons | `title`, `items[]`, `columns` |
 | `diagram` | Mermaid chart | `title`, `code` |
 | `table` | Grid of text/number/image cells — or the same rows as a pie or word cloud | `title`, `table` (`rows`, `header`, `view`) |
+| `poll` | Live audience poll: QR code to vote by phone, results build up on the slide | `title` (the question), `poll` (`kind`, `options`) |
 | `freeform` | Blank canvas | `elements[]` |
 
 Every slide also accepts `notes:` (speaker notes) and `group:` (a sidebar

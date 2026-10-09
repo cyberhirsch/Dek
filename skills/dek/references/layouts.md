@@ -10,7 +10,7 @@ Universal on every slide: `layout`, `notes`, `group`, `stash`, `elements`.
 - [cover](#cover) · [section](#section) · [statement](#statement) · [speaker](#speaker)
 - [text](#text) · [text-image](#text-image)
 - [image-full](#image-full) · [image-caption](#image-caption) · [Image options](#image-options)
-- [video-embed](#video-embed) · [gallery](#gallery) · [diagram](#diagram) · [table](#table) · [freeform](#freeform)
+- [video-embed](#video-embed) · [gallery](#gallery) · [diagram](#diagram) · [table](#table) · [poll](#poll) · [freeform](#freeform)
 - [Deck config](#deck-config) · [Legacy aliases](#legacy-aliases)
 
 ---
@@ -507,6 +507,44 @@ views, header and all.
 `tableCells` list with `covered: true` placeholders, `tableColWidths`,
 `tableRowHeights`, `tableFont`, `tableSize`. Dek converts them on load and
 writes the form above on the next save. Never write the old fields.
+
+---
+
+## poll
+
+A live poll: while presenting, the audience scans the slide's QR code, answers
+on their phones (no login, no app), and the result builds up on the slide —
+bars for a choice or a 1–5 scale, a word cloud for words. The voting runs on
+Dek Live (`services/dek-live`, at dek.sebhirsch.com).
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | string | Required. The question. |
+| `poll.kind` | `choice` \| `words` \| `scale` | Required. Tap an answer · type a word or short phrase · rate 1–5. |
+| `poll.options` | string[] | The answers for `choice` (at least two). |
+
+```yaml
+layout: poll
+title: Which outliner would you rather inherit?
+poll:
+  kind: choice
+  options: [As imported, After the audit]
+```
+
+How it behaves:
+
+- **Live only while presenting.** Reaching the slide opens the poll; leaving it
+  closes it. In the editor and in exports the slide shows the question and its
+  answers, without a QR code.
+- **A session is the deck on a date.** The same deck presented on the same day
+  is one session: a reload carries on and that day's QR code stays valid.
+  Another day is a new session; votes never mix.
+- **Every answer is kept**, with its question, the date and the deck's name.
+  Asking again — same slide, same question, same day — reuses the poll.
+  Changing the question makes it a new poll (the old answers stay with the old
+  question). So word the question finally before class.
+- **Anonymous.** One vote per phone per poll; no names, no addresses.
+- Write `title` as the full question students read on their phones.
 
 ---
 

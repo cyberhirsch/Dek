@@ -25,6 +25,7 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
   gallery: 'Gallery',
   diagram: 'Diagram',
   table: 'Table',
+  poll: 'Poll',
   freeform: 'Freeform',
 }
 

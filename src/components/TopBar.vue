@@ -92,6 +92,7 @@ const LAYOUT_LABELS: Record<LayoutId, string> = {
   gallery: 'Gallery',
   diagram: 'Diagram',
   table: 'Table',
+  poll: 'Poll',
   freeform: 'Freeform',
 }
 
@@ -514,6 +515,16 @@ const themeSwatches = computed(() => {
         <div class="seg">
           <button title="16:9 frame with a caption below" :class="{ on: (slide.videoFit ?? 'framed') === 'framed' }" @click="emit('patch', { videoFit: 'framed' })">framed</button>
           <button title="Edge-to-edge 16:9, no caption" :class="{ on: slide.videoFit === 'full' }" @click="emit('patch', { videoFit: 'full' })">fullscreen</button>
+        </div>
+      </template>
+
+      <template v-if="slide?.layout === 'poll'">
+        <span class="div" />
+        <label class="lbl">Answer</label>
+        <div class="seg">
+          <button title="Tap one of the answers" :class="{ on: (slide.poll?.kind ?? 'choice') === 'choice' }" @click="emit('patch', { poll: { ...slide.poll, kind: 'choice', options: slide.poll?.options?.length ? slide.poll.options : ['Yes', 'No'] } })">choice</button>
+          <button title="Type a word or short phrase — shown as a word cloud" :class="{ on: slide.poll?.kind === 'words' }" @click="emit('patch', { poll: { ...slide.poll, kind: 'words' } })">words</button>
+          <button title="Rate from 1 to 5" :class="{ on: slide.poll?.kind === 'scale' }" @click="emit('patch', { poll: { ...slide.poll, kind: 'scale' } })">1–5</button>
         </div>
       </template>
 

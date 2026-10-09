@@ -1,4 +1,4 @@
-import type { Deck, GalleryItem, LayoutId, Slide } from './types'
+import type { Deck, GalleryItem, LayoutId, PollSpec, Slide } from './types'
 import { LAYOUT_IDS } from './types'
 import { tableImages } from './table'
 import { GALLERY_MAX_CROP, GALLERY_MIN_AREA, galleryDisplay } from './gallery'
@@ -39,6 +39,7 @@ export interface DeckAnalysis {
 
 type Field =
   | 'title'
+  | 'poll'
   | 'subtitle'
   | 'byline'
   | 'text'
@@ -81,6 +82,7 @@ const RULES: Record<LayoutId, LayoutRule> = {
   gallery: { required: ['items'], image: ['items'], list: 'gallery' },
   diagram: { required: ['code'] },
   table: { required: ['table'], list: 'table' },
+  poll: { required: ['title', 'poll'] },
   freeform: {},
 }
 
@@ -101,6 +103,7 @@ const KNOWN_FIELDS: Record<LayoutId, string[]> = {
   gallery: ['title', 'items', 'columns', 'labelPos', 'imageFit'],
   diagram: ['title', 'code'],
   table: ['title', 'table'],
+  poll: ['title', 'poll'],
   freeform: ['body', 'elements'],
 }
 
@@ -164,6 +167,13 @@ function validateSlide(slide: Slide, index: number, issues: DeckIssue[]) {
 
   if (slide.imageFit != null && slide.imageFit !== 'cover' && slide.imageFit !== 'contain') {
     issue(issues, n, 'warning', 'schema', 'imageFit must be cover or contain.', 'imageFit')
+  }
+  if (slide.layout === 'poll' && slide.poll) {
+    const p = slide.poll as Partial<PollSpec>
+    if (!['choice', 'words', 'scale'].includes(p.kind as string))
+      issue(issues, n, 'warning', 'schema', 'poll.kind must be choice, words or scale.', 'poll')
+    else if (p.kind === 'choice' && (!Array.isArray(p.options) || p.options.filter((o: unknown) => String(o).trim()).length < 2))
+      issue(issues, n, 'warning', 'schema', 'A choice poll needs at least two options.', 'poll')
   }
 
   if (!isValidFocus(slide.focus)) {

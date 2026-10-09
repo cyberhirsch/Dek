@@ -426,3 +426,23 @@ describe('analyzeDeck', () => {
     expect(a.assets.filter((x) => x.kind === 'orphan')).toEqual([])
   })
 })
+
+describe('poll slides', () => {
+  const check = (slide: object) =>
+    analyzeDeck({ config: {}, slides: [{ layout: 'poll', ...slide }] } as unknown as Deck).issues.map((i) => i.message)
+
+  it('accepts a well-formed poll', () => {
+    expect(check({ title: 'Which?', poll: { kind: 'choice', options: ['A', 'B'] } })).toEqual([])
+    expect(check({ title: 'One word?', poll: { kind: 'words' } })).toEqual([])
+  })
+
+  it('needs a question and a poll', () => {
+    expect(check({ poll: { kind: 'words' } })).toContain('Missing title.')
+    expect(check({ title: 'Which?' })).toContain('Missing poll.')
+  })
+
+  it('flags an unknown kind and a choice poll with fewer than two answers', () => {
+    expect(check({ title: 'Q', poll: { kind: 'vote' } })).toContain('poll.kind must be choice, words or scale.')
+    expect(check({ title: 'Q', poll: { kind: 'choice', options: ['Only'] } })).toContain('A choice poll needs at least two options.')
+  })
+})

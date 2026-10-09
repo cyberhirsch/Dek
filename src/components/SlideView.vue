@@ -15,6 +15,7 @@ import FittedText from './FittedText.vue'
 import FittedTextList from './FittedTextList.vue'
 import MermaidDiagram from './MermaidDiagram.vue'
 import TableGrid from './TableGrid.vue'
+import PollView from './PollView.vue'
 import CanvasElements from './CanvasElements.vue'
 import type { CanvasTool } from '../core/types'
 import '../styles/slide.css'
@@ -495,6 +496,9 @@ watch(
         @cell-ctx="(e, i, cells) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1, kind: 'cells', imageField: 'table', imageIndex: i, cells })"
       />
     </div>
+
+    <!-- poll — live voting (PollView; the live part is live/liveState.ts) -->
+    <PollView v-else-if="slide.layout === 'poll'" :slide="slide" :index="index" :editable="editable" @patch="patch" />
 
     <!-- freeform — a bare canvas; content lives in the elements overlay below -->
     <div v-else class="dek-pad l-freeform">
