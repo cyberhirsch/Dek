@@ -1,0 +1,39 @@
+# Dek Live — voting during lectures. Its own PocketBase, apart from every
+# other database on the Pi, reachable at https://dek.sebhirsch.com through its
+# own Cloudflare tunnel. Deploy steps: README.md in this folder.
+services:
+  dek-live-pb:
+    # Same image as the Pi's other PocketBase (0.39 at the time of writing).
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: dek-live-pb
+    restart: unless-stopped
+    command:
+      - serve
+      - --http=0.0.0.0:8090
+      - --dir=/pb_data
+      - --hooksDir=/pb_hooks
+      - --migrationsDir=/pb_migrations
+      # Only Dek's own pages may call it from a browser.
+      - --origins=https://cyberhirsch.github.io,http://localhost:5173
+    ports:
+      # LAN access to the admin UI (http://<pi>:8092/_/); UFW keeps it off the internet.
+      - "8092:8090"
+    volumes:
+      - ./pb_data:/pb_data
+      - ./pb_hooks:/pb_hooks
+      - ./pb_migrations:/pb_migrations
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dek-live-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: dek-live-tunnel
+    restart: unless-stopped
+    # The tunnel key lives in .env next to this file (see .env.example), never in git.
+    env_file: .env
+    command: tunnel run
+    depends_on:
+      - dek-live-pb

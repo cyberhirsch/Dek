@@ -1,0 +1,3 @@
+# The tunnel key and the live database stay on the Pi.
+.env
+pb_data/
