@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, TableData, TableView, CanvasTool, ElementPatch } from '../core/types'
+import type { Deck, LayoutId, Slide, SlideElement, BoxElement, ArrowElement, TableElement, TableData, TableView, CanvasTool, ElementPatch, WidgetElement } from '../core/types'
+import { formatTimer, parseTimerInput, timerDuration } from '../core/timer'
 import { LAYOUT_IDS } from '../core/types'
 import { TYPE_SCALE } from '../core/defaults'
 import { TABLE_CELL_SIZE, emptyTable, resizeTable, resizeWouldDropContent, tableShape } from '../core/table'
@@ -41,7 +42,7 @@ const emit = defineEmits<{
   import: [file: File]
   theme: [id: ThemeId]
   'update:tool': [t: CanvasTool]
-  insert: [what: 'video' | 'diagram' | 'table']
+  insert: [what: 'video' | 'diagram' | 'table' | 'timer']
   'update-element': [p: ElementPatch]
   'toggle-source': []
   /** Insert a new image as a box on the canvas. */
@@ -170,6 +171,12 @@ const FONTS = computed(() => [
 const box = computed(() => (props.selectedElement?.type === 'box' ? (props.selectedElement as BoxElement) : null))
 const arrow = computed(() => (props.selectedElement?.type === 'arrow' ? (props.selectedElement as ArrowElement) : null))
 const tableEl = computed(() => (props.selectedElement?.type === 'table' ? (props.selectedElement as TableElement) : null))
+const widgetEl = computed(() => (props.selectedElement?.type === 'widget' ? (props.selectedElement as WidgetElement) : null))
+/** Timer length typed as "5:30", "10" (minutes) or "2m30s"; anything unreadable is ignored. */
+function setTimerDuration(text: string) {
+  const s = parseTimerInput(text)
+  if (s) emit('update-element', { duration: timerDuration(s) })
+}
 
 // ── table controls: ONE set, for the Table layout or a selected canvas table ──
 /** The table the controls act on — a selected canvas table wins, else the
@@ -344,7 +351,7 @@ const themeSwatches = computed(() => {
           <!-- Icon-only, sized to the canvas tool buttons it sits beside. The
                word and the caret were carrying no information the menu itself
                doesn't — the tooltip names the contents instead. -->
-          <button ref="insertBtn" class="ins" :class="{ on: insertOpen }" title="Insert a Video, Diagram or Table slide" @click="toggleInsert">
+          <button ref="insertBtn" class="ins" :class="{ on: insertOpen }" title="Insert a Video, Diagram or Table slide, or a Timer on this slide" @click="toggleInsert">
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
               <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
             </svg>
@@ -359,6 +366,7 @@ const themeSwatches = computed(() => {
               <button @click="((insertOpen = false), emit('insert', 'video'))">▶ Video</button>
               <button @click="((insertOpen = false), emit('insert', 'diagram'))">◇ Diagram</button>
               <button @click="((insertOpen = false), emit('insert', 'table'))">▦ Table</button>
+              <button title="A countdown on this slide — click it while presenting to start" @click="((insertOpen = false), emit('insert', 'timer'))">◷ Timer</button>
             </div>
           </Teleport>
         </div>
@@ -463,6 +471,23 @@ const themeSwatches = computed(() => {
       </template>
 
       <!-- any selected element: z-order -->
+      <!-- selected timer: its length and whether it starts by itself -->
+      <template v-if="widgetEl?.widget === 'timer'">
+        <span class="div" />
+        <label class="lbl">Timer</label>
+        <input
+          class="timer-input"
+          :value="formatTimer(timerDuration(widgetEl.duration))"
+          title="Length: 5:30, 10 (minutes) or 2m30s"
+          @change="setTimerDuration(($event.target as HTMLInputElement).value)"
+          @keydown.enter="($event.target as HTMLInputElement).blur()"
+        />
+        <div class="seg">
+          <button title="Wait for a click while presenting" :class="{ on: !widgetEl.autostart }" @click="emit('update-element', { autostart: false })">on click</button>
+          <button title="Start as soon as the slide appears" :class="{ on: !!widgetEl.autostart }" @click="emit('update-element', { autostart: true })">auto</button>
+        </div>
+      </template>
+
       <template v-if="selectedElement">
         <span class="div" />
         <div class="seg style-seg">
@@ -925,4 +950,15 @@ const themeSwatches = computed(() => {
   display: none;
 }
 .sel.font { padding: 4px 6px; }
+.timer-input {
+  width: 64px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+}
 </style>

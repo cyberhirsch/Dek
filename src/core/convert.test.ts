@@ -219,3 +219,18 @@ describe('convertLayout — table pooling', () => {
     expect(convertLayout(ff, 'table').table).toEqual({ rows: [['a', 'b']] })
   })
 })
+
+describe('convertLayout — widgets', () => {
+  const timer = { type: 'widget', widget: 'timer', duration: 120, x: 900, y: 520, w: 280, h: 140, rotation: 0 } as never
+
+  it('keeps a timer visible when a freeform slide becomes a layout', () => {
+    const out = convertLayout({ layout: 'freeform', elements: [timer] } as Slide, 'text')
+    expect(out.elements).toEqual([timer])
+    expect(out.stash?.elements).toBeUndefined()
+  })
+
+  it('keeps a timer laid over a layout through a layout switch', () => {
+    const out = convertLayout({ layout: 'text', title: 'Sprint', content: '- Go', elements: [timer] } as Slide, 'statement')
+    expect(out.elements).toEqual([timer])
+  })
+})

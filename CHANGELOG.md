@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Widgets
+
+**Widgets, starting with a timer**
+A new kind of canvas element: small live tools placed on a slide. The first is a **timer** — **+** → **Timer** in the editor puts a countdown on the current slide (bottom right, 5:00), and the top bar sets its length (`5:30`, `10` for minutes, `2m30s`) and whether it waits for a click or starts by itself when the slide appears. While presenting, a click starts and pauses it; the last stretch (10 %, between 5 s and a minute) turns the secondary accent with its progress bar; at zero it pulses "Time's up", and the next click resets it (a small ↺ does too). Digits scale with the box. Unlike a new box, a widget goes *on top of* a layout slide without turning it into freeform, and stays visible when the slide's layout changes. PowerPoint gets its start time as text; in a standalone HTML export it shows its start time and doesn't count. `+7` tests.
+
 ### Live polls
 
 **Same deck name, same day: the next free session**

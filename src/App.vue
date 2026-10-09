@@ -1254,11 +1254,24 @@ function deleteSelectedElement() {
   patchSlide({ elements: s.elements.filter((_, i) => !sel.has(i)) })
   selectedEls.value = []
 }
-function onInsert(what: 'video' | 'diagram' | 'table') {
+function onInsert(what: 'video' | 'diagram' | 'table' | 'timer') {
   if (!deck.value) return
+  if (what === 'timer') return insertTimer()
   if (what === 'video') addSlide('video-embed')
   else if (what === 'diagram') addSlide('diagram')
   else addSlide('table')
+}
+/** A timer goes on top of the current slide as a canvas element. Unlike a new
+ *  box it doesn't turn a layout slide into freeform: the slide keeps its
+ *  layout and the timer sits over it, bottom right, ready to move. */
+function insertTimer() {
+  if (!deck.value) return
+  const s = deck.value.slides[current.value]
+  const timer: SlideElement = { type: 'widget', widget: 'timer', duration: 300, x: 930, y: 520, w: 280, h: 140, rotation: 0 }
+  const elements = [...(s.elements ?? []), timer]
+  patchSlide({ elements })
+  selectedEls.value = [elements.length - 1]
+  activeTool.value = 'select'
 }
 function toggleSelectedBullets() {
   bulletFormatCommand.value += 1

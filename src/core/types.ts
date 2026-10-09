@@ -128,7 +128,7 @@ export type TableView = 'table' | 'pie' | 'cloud'
 // space (top-left origin) so they scale with the slide. The moment a slide is
 // edited freely (an element added or moved), its `layout` flips to `freeform`.
 
-export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram' | 'table'
+export type ElementType = 'box' | 'arrow' | 'image' | 'video' | 'diagram' | 'table' | 'widget'
 
 /** The active canvas tool. 'text', 'rect' and 'image' all create a `box`. */
 export type CanvasTool = 'select' | 'text' | 'rect' | 'arrow' | 'image'
@@ -235,7 +235,26 @@ export interface TableElement extends ElementBase {
   table: TableData
 }
 
-export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement | TableElement
+/** The kinds of widget. More will follow; a deck naming one this version of
+ *  Dek doesn't know keeps it and shows a placeholder. */
+export type WidgetKind = 'timer'
+
+/**
+ * A widget: a small live tool placed on a slide like any canvas element —
+ * resizable, and allowed on top of a regular layout without turning the slide
+ * into freeform. It does its job while presenting (a timer counts down);
+ * in the editor it shows how it will start.
+ */
+export interface WidgetElement extends ElementBase {
+  type: 'widget'
+  widget: WidgetKind
+  /** timer: length in seconds (default 300). */
+  duration?: number
+  /** timer: start counting as soon as the slide appears (default: wait for a click). */
+  autostart?: boolean
+}
+
+export type SlideElement = BoxElement | ArrowElement | ImageElement | VideoElement | DiagramElement | TableElement | WidgetElement
 
 /** A partial patch of an element's style fields (everything except `type`). */
 export type ElementPatch = Partial<
@@ -244,7 +263,8 @@ export type ElementPatch = Partial<
     Omit<ImageElement, 'type'> &
     Omit<VideoElement, 'type'> &
     Omit<DiagramElement, 'type'> &
-    Omit<TableElement, 'type'>
+    Omit<TableElement, 'type'> &
+    Omit<WidgetElement, 'type'>
 >
 
 /**

@@ -166,8 +166,13 @@ export function convertLayout(slide: Slide, to: LayoutId, opts?: BakeOptions): S
   let leftover: SlideElement[] = Array.isArray(pool.elements) ? (pool.elements as SlideElement[]) : []
   delete pool.elements
 
+  // Widgets (a timer) aren't layout content: they stay visible on the slide
+  // whatever layout it becomes, instead of being parked out of sight.
+  let widgets: SlideElement[] = []
   if (slide.layout === 'freeform') {
-    const ub = unbake(slide.elements ?? [])
+    const all = slide.elements ?? []
+    widgets = all.filter((e) => e.type === 'widget')
+    const ub = unbake(all.filter((e) => e.type !== 'widget'))
     Object.assign(pool, ub.fields)
     leftover = leftover.concat(ub.leftover)
   } else {
@@ -211,8 +216,8 @@ export function convertLayout(slide: Slide, to: LayoutId, opts?: BakeOptions): S
   if (leftover.length) stash.elements = leftover
   if (Object.keys(stash).length) base.stash = stash
 
-  // Overlay elements stay on the slide, in place.
-  if (overlay.length) base.elements = [...overlay]
+  // Overlay elements stay on the slide, in place — and so do widgets.
+  if (overlay.length || widgets.length) base.elements = [...overlay, ...widgets]
 
   return base
 }

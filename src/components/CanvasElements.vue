@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, TableElement, TableData, CanvasTool } from '../core/types'
+import type { SlideElement, BoxElement, ArrowElement, ImageElement, VideoElement, DiagramElement, TableElement, TableData, CanvasTool, WidgetElement } from '../core/types'
+import WidgetView from './widgets/WidgetView.vue'
 import { inlineMd, htmlToInline } from '../render/inline'
 import { newElementRect, newArrow, defaultSize } from '../core/bake'
 import { parseVideo, autoplaySrc } from '../render/video'
@@ -661,6 +662,7 @@ const asImage = (el: SlideElement) => el as ImageElement
 const asVideo = (el: SlideElement) => el as VideoElement
 const asDiagram = (el: SlideElement) => el as DiagramElement
 const asTable = (el: SlideElement) => el as TableElement
+const asWidget = (el: SlideElement) => el as WidgetElement
 
 defineExpose({ commitEdit })
 </script>
@@ -796,6 +798,9 @@ defineExpose({ commitEdit })
         @cell-file="(ci, f) => emit('upload', { field: 'table', file: f, index: ci, el: i })"
         @cell-ctx="(e, ci, cells) => emit('ctxmenu', { x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: i, kind: 'cells', imageField: 'table', imageIndex: ci, imageEl: i, cells })"
       />
+
+      <!-- widget (timer, …): live while presenting, a preview while editing -->
+      <WidgetView v-else-if="el.type === 'widget'" :el="asWidget(el)" :editable="editable" />
 
       <!-- selection chrome (transform handles only for a single selection) -->
       <template v-if="editable && single === i && editing == null">

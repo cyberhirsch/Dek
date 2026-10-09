@@ -22,7 +22,7 @@ Note that a semantic slide *also* accepts `elements` — you can annotate a
 
 ## The element model
 
-Five types — `box`, `arrow`, `video`, `diagram`, `table` — share a common frame:
+Six types — `box`, `arrow`, `video`, `diagram`, `table`, `widget` — share a common frame:
 
 ```yaml
 { type, x, y, w, h, rotation }
@@ -140,6 +140,29 @@ elements:
 
 Older decks may hold the previous element shape — `rows`/`cols` as counts beside
 a flat `cells` list. Dek converts it on load; don't write it.
+
+### widget
+
+A small live tool on the slide. Unlike other elements, a widget may sit on top
+of **any** layout without turning the slide into freeform, and it stays on the
+slide when the layout changes. The first kind is the timer:
+
+```yaml
+elements:
+  - { type: widget, widget: timer, duration: 300, autostart: false, x: 930, y: 520, w: 280, h: 140, rotation: 0 }
+```
+
+| Field | Notes |
+|---|---|
+| `widget` | `timer` |
+| `duration` | Seconds, 1 … 5999 (99:59). Default 300. |
+| `autostart` | `true`: counts down as soon as the slide appears. Default: waits for a click. |
+
+While presenting, a click starts and pauses it; the last stretch turns the
+secondary accent; at zero it pulses "Time's up" and the next click resets it.
+Re-entering the slide starts fresh. In PowerPoint it becomes its start time as
+text. Size the box for legibility from the back row: at least 240×120. In the
+editor: **+** → **Timer**, then set the length in the top bar (`5:30`, `10`, `2m30s`).
 
 ## Headings on the canvas must be italic and light
 
