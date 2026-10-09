@@ -86,8 +86,8 @@ async function livePoll(token: number, deck: string, index: number, question: st
       liveState.error = (e as Error).message.includes('Failed to fetch')
         ? 'Live voting is unreachable right now (no connection to dek.sebhirsch.com).'
         : (e as Error).message
-      // A session taken by another browser won't fix itself.
-      if (/another browser/.test(liveState.error)) return
+      // Twenty sessions for one deck name today won't fix itself.
+      if (/Rename the deck/.test(liveState.error)) return
       await sleep(RETRY_MS)
     }
   }

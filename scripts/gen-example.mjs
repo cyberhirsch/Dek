@@ -93,9 +93,10 @@ S(`layout: text
 title: Edit and Present
 group: Editing & Presenting
 content: |
-  - **Ctrl+E** toggles between editing and presenting
+  - **Ctrl+E** presents — fullscreen — and **Esc** comes back
   - Move with the arrow keys, space, or just **scroll**
   - **F** fullscreen · **O** overview · **P** presenter view
+  - **D** draws on the slide — press it again to wipe the ink
   - Click straight onto a heading or bullet to rewrite it`)
 
 // 6 — source pane (screenshot)
@@ -256,13 +257,40 @@ shot(
   'Presenter View on a Second Screen',
   'presenter.png',
   [
-    'Press **P** for a **separate window** — drag it to another monitor',
-    "See the current slide, what's **next**, your notes, and a timer",
-    'Advancing in either window moves both',
-    'Drag the divider to give notes more room',
+    'Press **P**: this tab becomes your **presenter view**, the slides open in a **new window**',
+    'Drag that window to the projector — click it or press **F** for fullscreen',
+    "See the current slide, what's **next**, your notes, a timer, and build steps",
+    'Arrows in **either** window move both',
   ],
   'Present & Share',
 )
+
+// — live poll: a real one; present the tour and scan the code
+S(`# A live poll — present this slide and scan the code with your phone.
+layout: poll
+title: Which part of Dek will you try first?
+group: Present & Share
+poll:
+  kind: choice
+  options: [Live polls, Narration, The canvas, Tables and charts]
+notes: |
+  Present this slide: the poll opens, the QR code appears, and every phone
+  that scans it can vote. Leaving the slide closes the poll.
+  > Grab your phone and scan the code. Which part of Dek will you try first?`)
+
+// — narration + recording
+S(`layout: text
+title: Let Dek Present Itself
+group: Present & Share
+content: |
+  - Notes lines starting with **>** are what you'd say out loud
+  - Press **Enter** while presenting: Dek speaks them and moves on by itself
+  - **●** records the whole thing as an MP4
+  - Export **HTML with Narration** to share a deck that presents itself
+notes: |
+  Only what follows a > is spoken; the rest of the notes stay private.
+  > Press Enter while presenting, and Dek reads lines like this one aloud, then turns the page by itself.
+  > Record it with the dot button, or export it as HTML with narration for anyone who missed the lecture.`)
 
 // 17 — files (screenshot)
 shot(
@@ -299,7 +327,7 @@ cite: "now make it yours"`)
 const LAYOUT_NAMES = {
   cover: 'Cover', section: 'Section', statement: 'Statement', speaker: 'Speaker', text: 'Text',
   'text-image': 'Text + Image', 'image-full': 'Image – Full', 'image-caption': 'Image + Caption',
-  'video-embed': 'Video', gallery: 'Gallery', diagram: 'Diagram', table: 'Table', freeform: 'Freeform',
+  'video-embed': 'Video', gallery: 'Gallery', diagram: 'Diagram', table: 'Table', poll: 'Poll', freeform: 'Freeform',
 }
 const count = (keyOf) => {
   const m = new Map()

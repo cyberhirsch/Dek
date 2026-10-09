@@ -6,6 +6,12 @@
 
 ### Live polls
 
+**Same deck name, same day: the next free session**
+Everyone presenting the shipped tour on the same day — or two people whose decks share a name — would have hit "already started in another browser" at the first poll. Now the next free session is taken (shown as "#2", "#3" …) and remembered, so a reload still resumes it; the presentation name stored with every answer stays the real one.
+
+**The tour shows the new presenting features**
+The guided tour (`deck.example.md`) gains a live poll you can try by presenting it ("Which part of Dek will you try first?"), a slide on narration and recording, and up-to-date notes on presenting: fullscreen and Esc, the **D** pen, and **P** keeping the presenter view in the tab while the slides open in a new window.
+
 **Audience polls with phone voting** — new `poll` layout
 A poll slide asks a question; while presenting, the audience scans its QR code and answers on their phones — no login, no app — and the result builds up on the slide: bars for a choice or a 1–5 scale, a word cloud for words. Reaching the slide opens the poll, leaving it closes it. Set the answer type in the top bar (*choice* / *words* / *1–5*); a choice poll's answers are edited right on the slide, one per line.
 

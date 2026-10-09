@@ -44,9 +44,10 @@ layout: text
 title: Edit and Present
 group: Editing & Presenting
 content: |
-  - **Ctrl+E** toggles between editing and presenting
+  - **Ctrl+E** presents — fullscreen — and **Esc** comes back
   - Move with the arrow keys, space, or just **scroll**
   - **F** fullscreen · **O** overview · **P** presenter view
+  - **D** draws on the slide — press it again to wipe the ink
   - Click straight onto a heading or bullet to rewrite it
 ---
 layout: freeform
@@ -154,7 +155,7 @@ table:
     - ["The Canvas", 4]
     - ["Media", 4]
     - ["Tables & Charts", 5]
-    - ["Present & Share", 5]
+    - ["Present & Share", 7]
 ---
 # Words and weights, shown as a cloud (view: cloud).
 layout: table
@@ -169,10 +170,11 @@ table:
     - ["Statement", 2]
     - ["Section", 5]
     - ["Freeform", 7]
-    - ["Text", 4]
+    - ["Text", 5]
     - ["Diagram", 1]
     - ["Video", 1]
     - ["Table", 3]
+    - ["Poll", 1]
 ---
 layout: section
 title: Present & Share
@@ -183,7 +185,32 @@ group: "Present & Share"
 elements:
   - { type: "box", x: 110, y: 54, w: 1060, h: 72, rotation: 0, content: "Presenter View on a Second Screen", font: "heading", italic: true, weight: 300, size: 44 }
   - { type: "box", x: 110, y: 172, w: 726, h: 468, rotation: 0, src: "Assets/tutorial/presenter.png", fit: "contain", fill: "#0c0e12", stroke: "#283041", strokeWidth: 1, radius: 10 }
-  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Press **P** for a **separate window** — drag it to another monitor\n- See the current slide, what's **next**, your notes, and a timer\n- Advancing in either window moves both\n- Drag the divider to give notes more room", font: "body", size: 21 }
+  - { type: "box", x: 868, y: 176, w: 302, h: 460, rotation: 0, content: "- Press **P**: this tab becomes your **presenter view**, the slides open in a **new window**\n- Drag that window to the projector — click it or press **F** for fullscreen\n- See the current slide, what's **next**, your notes, a timer, and build steps\n- Arrows in **either** window move both", font: "body", size: 21 }
+---
+# A live poll — present this slide and scan the code with your phone.
+layout: poll
+title: Which part of Dek will you try first?
+group: Present & Share
+poll:
+  kind: choice
+  options: [Live polls, Narration, The canvas, Tables and charts]
+notes: |
+  Present this slide: the poll opens, the QR code appears, and every phone
+  that scans it can vote. Leaving the slide closes the poll.
+  > Grab your phone and scan the code. Which part of Dek will you try first?
+---
+layout: text
+title: Let Dek Present Itself
+group: Present & Share
+content: |
+  - Notes lines starting with **>** are what you'd say out loud
+  - Press **Enter** while presenting: Dek speaks them and moves on by itself
+  - **●** records the whole thing as an MP4
+  - Export **HTML with Narration** to share a deck that presents itself
+notes: |
+  Only what follows a > is spoken; the rest of the notes stay private.
+  > Press Enter while presenting, and Dek reads lines like this one aloud, then turns the page by itself.
+  > Record it with the dot button, or export it as HTML with narration for anyone who missed the lecture.
 ---
 layout: freeform
 group: "Present & Share"

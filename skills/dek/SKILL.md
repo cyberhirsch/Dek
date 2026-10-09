@@ -317,7 +317,10 @@ While presenting (useful when the user asks, or for speaker notes): Present
 goes fullscreen, one Esc returns to the editor; `D` (or the pencil) draws on the
 slide in the theme's colours and `D` again wipes it; Space and a presenter
 remote's ■ play/pause a slide's video; a remote's ◀ ▶ send PageUp/PageDown.
-Full list: `SHORTCUTS.md` in the repo.
+`P` turns the tab into the presenter view (current/next slide, notes, timer,
+build steps) and opens the slides in a new window for the projector. A `poll`
+slide goes live while it's on screen (QR code, phone voting, results on the
+slide; see [poll](references/layouts.md#poll)). Full list: `SHORTCUTS.md`.
 
 ### Images
 

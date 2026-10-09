@@ -74,19 +74,28 @@ export interface LiveSession {
 const keyName = (id: string) => `dek:live-key:${id}`
 
 /**
- * The session for this presentation today: reused when this browser started
- * it (it kept the key), created otherwise. Fails when someone else — another
- * browser without the key — already started a session for the same deck today.
+ * The session for this presentation today. The id comes from date + deck name;
+ * if that session belongs to another browser — two people presenting decks
+ * with the same name, or everyone presenting the shipped tour on the same day
+ * — the next free variant is taken ("#2", "#3" …). The deck name stored with
+ * it stays the real one, so the data still groups by presentation. A browser
+ * that started a session keeps its key, so a reload resumes the same one.
  */
 export async function ensureSession(deck: string, day = today()): Promise<LiveSession> {
-  const id = await sessionIdFor(day, deck)
-  let key: string | null = null
-  try {
-    key = localStorage.getItem(keyName(id))
-  } catch {
-    /* private mode: a fresh key each time */
+  const MAX = 20
+  const ids: string[] = []
+  for (let n = 1; n <= MAX; n++) ids.push(await sessionIdFor(day, n === 1 ? deck : `${deck}#${n}`))
+  const stored = (id: string) => {
+    try {
+      return localStorage.getItem(keyName(id))
+    } catch {
+      return null // private mode: a fresh key each time
+    }
   }
-  if (key) {
+  // Resume a session this browser already holds (a reload mid-lecture).
+  for (const id of ids) {
+    const key = stored(id)
+    if (!key) continue
     try {
       await api('GET', `/api/collections/sessions/records/${id}`)
       return { id, key, deck, day }
@@ -94,21 +103,23 @@ export async function ensureSession(deck: string, day = today()): Promise<LiveSe
       if ((e as { status?: number }).status !== 404) throw e
     }
   }
-  key = randomToken(40)
-  try {
-    await api('POST', '/api/collections/sessions/records', { id, title: deck, deck, day }, key)
-  } catch (e) {
-    if ((e as { status?: number }).status === 400) {
-      throw new Error('This presentation already has a live session today, started in another browser. Open it there, or rename the deck.')
+  // Otherwise start the first variant nobody holds yet.
+  for (const [k, id] of ids.entries()) {
+    const key = randomToken(40)
+    try {
+      await api('POST', '/api/collections/sessions/records', { id, title: k ? `${deck} #${k + 1}` : deck, deck, day }, key)
+    } catch (e) {
+      if ((e as { status?: number }).status === 400) continue // taken: try the next
+      throw e
     }
-    throw e
+    try {
+      localStorage.setItem(keyName(id), key)
+    } catch {
+      /* not remembered: a reload starts the next variant */
+    }
+    return { id, key, deck, day }
   }
-  try {
-    localStorage.setItem(keyName(id), key)
-  } catch {
-    /* not remembered: a reload can't resume this session */
-  }
-  return { id, key, deck, day }
+  throw new Error(`Already ${MAX} live sessions today for a deck called "${deck}". Rename the deck to start another.`)
 }
 
 export interface LivePoll {
