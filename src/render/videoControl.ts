@@ -11,7 +11,8 @@
 //   player's postMessage API. Each player reports its own play/pause back, so
 //   the toggle stays right even after someone clicks the player's own button.
 //
-// A player marked `data-dek-subtitles="off"` has its subtitles switched off
+// A player marked `data-dek-subtitles="off"` (every one, unless the slide says
+// `subtitles: true`) has its subtitles switched off
 // once it's ready and again when playback starts (YouTube loads its captions
 // module only then), whatever the viewer's account or the uploader asks for.
 

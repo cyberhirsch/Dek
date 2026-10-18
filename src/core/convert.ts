@@ -115,7 +115,7 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
   if (vid) {
     fields.video = vid.video
     if (vid.poster) fields.poster = vid.poster
-    if (vid.subtitles === false) fields.subtitles = false
+    if (vid.subtitles === true) fields.subtitles = true
   }
   const dia = elements.find((e): e is DiagramElement => e.type === 'diagram')
   if (dia) fields.code = dia.code

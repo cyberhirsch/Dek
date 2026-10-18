@@ -236,10 +236,15 @@ describe('convertLayout — widgets', () => {
 })
 
 describe('convertLayout — video subtitles', () => {
-  it('keeps subtitles off through freeform and back', () => {
-    const src = { layout: 'video-embed', video: 'https://youtu.be/abcdefghijk', subtitles: false } as Slide
+  it('keeps player subtitles through freeform and back', () => {
+    const src = { layout: 'video-embed', video: 'https://youtu.be/abcdefghijk', subtitles: true } as Slide
     const free = convertLayout(src, 'freeform')
-    expect(free.elements?.[0]).toMatchObject({ type: 'video', subtitles: false })
-    expect(convertLayout(free, 'video-embed').subtitles).toBe(false)
+    expect(free.elements?.[0]).toMatchObject({ type: 'video', subtitles: true })
+    expect(convertLayout(free, 'video-embed').subtitles).toBe(true)
+  })
+
+  it('writes nothing for the default (hidden)', () => {
+    const free = convertLayout({ layout: 'video-embed', video: 'https://youtu.be/abcdefghijk' } as Slide, 'freeform')
+    expect(free.elements?.[0]).not.toHaveProperty('subtitles')
   })
 })

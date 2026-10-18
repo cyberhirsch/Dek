@@ -543,8 +543,8 @@ const themeSwatches = computed(() => {
         </div>
         <label class="lbl">Subtitles</label>
         <div class="seg">
-          <button title="As the player decides (your YouTube setting, the uploader)" :class="{ on: slide.subtitles !== false }" @click="emit('patch', { subtitles: undefined })">player</button>
-          <button title="Always hide the player's subtitles (YouTube, Vimeo)" :class="{ on: slide.subtitles === false }" @click="emit('patch', { subtitles: false })">off</button>
+          <button title="Hide the player's subtitles (YouTube, Vimeo) — the default" :class="{ on: slide.subtitles !== true }" @click="emit('patch', { subtitles: undefined })">off</button>
+          <button title="As the player decides (your YouTube setting, the uploader)" :class="{ on: slide.subtitles === true }" @click="emit('patch', { subtitles: true })">player</button>
         </div>
       </template>
 

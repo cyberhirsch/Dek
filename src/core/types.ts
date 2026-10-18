@@ -216,7 +216,7 @@ export interface VideoElement extends ElementBase {
   /** Video URL (YouTube / Vimeo / direct file). */
   video: string
   poster?: string
-  /** `false` hides the player's subtitles, as on a video-embed slide. */
+  /** `true` leaves subtitles to the player; hidden by default, as on a video-embed slide. */
   subtitles?: boolean
 }
 
@@ -304,9 +304,9 @@ export interface Slide {
    *  with room for a caption; `full` bleeds the video to the slide edges. The
    *  stage is itself 16:9, so both are 16:9 — `full` just has no margin. */
   videoFit?: 'framed' | 'full'
-  /** video-embed: `false` hides the player's subtitles (YouTube, Vimeo) even
-   *  when the viewer's account or the uploader turns them on. Left out, the
-   *  player decides. */
+  /** video-embed: Dek hides the player's subtitles (YouTube, Vimeo) by
+   *  default, even when the viewer's account or the uploader turns them on.
+   *  `true` leaves them to the player. */
   subtitles?: boolean
   side?: 'left' | 'right'
   /** text-image: aspect ratio of the image frame. */

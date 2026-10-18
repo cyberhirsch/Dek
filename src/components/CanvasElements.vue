@@ -772,7 +772,7 @@ defineExpose({ commitEdit })
       <!-- video -->
       <div v-else-if="el.type === 'video'" class="el-video">
         <template v-if="playing.has(i)">
-          <iframe v-if="!isFileVideo(asVideo(el))" :src="videoSrc(asVideo(el))" :data-dek-video="parseVideo(asVideo(el).video)?.provider" :data-dek-subtitles="asVideo(el).subtitles === false ? 'off' : undefined" @load="listenToPlayer($event.target as HTMLIFrameElement)" allow="autoplay; encrypted-media; fullscreen" allowfullscreen />
+          <iframe v-if="!isFileVideo(asVideo(el))" :src="videoSrc(asVideo(el))" :data-dek-video="parseVideo(asVideo(el).video)?.provider" :data-dek-subtitles="asVideo(el).subtitles === true ? undefined : 'off'" @load="listenToPlayer($event.target as HTMLIFrameElement)" allow="autoplay; encrypted-media; fullscreen" allowfullscreen />
           <video v-else :src="asVideo(el).video" controls autoplay />
         </template>
         <template v-else>

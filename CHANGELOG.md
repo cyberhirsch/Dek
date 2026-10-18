@@ -6,8 +6,8 @@
 
 ### Video subtitles off
 
-**Subtitles: player | off**
-A video slide's top bar now has a **Subtitles** switch. **off** (`subtitles: false` in the file) hides YouTube and Vimeo subtitles even when your YouTube account is set to always show captions or the uploader turned them on: Dek switches them off when the player is ready and again when playback starts. **player** (the default) leaves it to the player. A canvas video keeps the setting through freeform and back. Pressing C in a YouTube player still brings them back for that viewing.
+**Subtitles off by default — Subtitles: off | player**
+Every YouTube and Vimeo video now plays without subtitles, even when your YouTube account is set to always show captions or the uploader turned them on: Dek switches them off when the player is ready and again when playback starts. A video slide's top bar has a **Subtitles** switch: **player** (`subtitles: true` in the file) leaves them to the player, for a clip that needs them. A canvas video keeps the setting through freeform and back. Pressing C in a YouTube player still brings them back for that viewing.
 
 ### Widgets
 

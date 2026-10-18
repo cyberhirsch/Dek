@@ -119,7 +119,7 @@ function video(v: string, x: number, y: number, w: number, h: number, poster?: s
   return {
     type: 'video', x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), rotation: 0, video: v,
     ...(poster ? { poster } : {}),
-    ...(subtitles === false ? { subtitles: false } : {}),
+    ...(subtitles === true ? { subtitles: true } : {}),
   }
 }
 function diagram(code: string, x: number, y: number, w: number, h: number): DiagramElement {

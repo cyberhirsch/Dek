@@ -399,7 +399,7 @@ watch(
             v-if="pv.provider !== 'file'"
             :src="playSrc"
             :data-dek-video="pv.provider"
-            :data-dek-subtitles="slide.subtitles === false ? 'off' : undefined"
+            :data-dek-subtitles="slide.subtitles === true ? undefined : 'off'"
             allow="autoplay; encrypted-media; fullscreen"
             @load="listenToPlayer($event.target as HTMLIFrameElement)"
             allowfullscreen
