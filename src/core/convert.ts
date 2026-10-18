@@ -67,6 +67,7 @@ const MOD_SUPPORT: Record<string, LayoutId[]> = {
   labelPos: ['gallery'],
   poster: ['video-embed'],
   videoFit: ['video-embed'],
+  subtitles: ['video-embed'],
 }
 const MOD_FIELDS = Object.keys(MOD_SUPPORT)
 
@@ -114,6 +115,7 @@ function unbake(elements: SlideElement[]): { fields: Record<string, unknown>; le
   if (vid) {
     fields.video = vid.video
     if (vid.poster) fields.poster = vid.poster
+    if (vid.subtitles === false) fields.subtitles = false
   }
   const dia = elements.find((e): e is DiagramElement => e.type === 'diagram')
   if (dia) fields.code = dia.code

@@ -541,6 +541,11 @@ const themeSwatches = computed(() => {
           <button title="16:9 frame with a caption below" :class="{ on: (slide.videoFit ?? 'framed') === 'framed' }" @click="emit('patch', { videoFit: 'framed' })">framed</button>
           <button title="Edge-to-edge 16:9, no caption" :class="{ on: slide.videoFit === 'full' }" @click="emit('patch', { videoFit: 'full' })">fullscreen</button>
         </div>
+        <label class="lbl">Subtitles</label>
+        <div class="seg">
+          <button title="As the player decides (your YouTube setting, the uploader)" :class="{ on: slide.subtitles !== false }" @click="emit('patch', { subtitles: undefined })">player</button>
+          <button title="Always hide the player's subtitles (YouTube, Vimeo)" :class="{ on: slide.subtitles === false }" @click="emit('patch', { subtitles: false })">off</button>
+        </div>
       </template>
 
       <template v-if="slide?.layout === 'poll'">

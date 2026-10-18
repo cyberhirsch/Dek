@@ -115,8 +115,12 @@ function image(src: string, x: number, y: number, w: number, h: number, extra: P
   }
 }
 
-function video(v: string, x: number, y: number, w: number, h: number, poster?: string): VideoElement {
-  return { type: 'video', x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), rotation: 0, video: v, ...(poster ? { poster } : {}) }
+function video(v: string, x: number, y: number, w: number, h: number, poster?: string, subtitles?: boolean): VideoElement {
+  return {
+    type: 'video', x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), rotation: 0, video: v,
+    ...(poster ? { poster } : {}),
+    ...(subtitles === false ? { subtitles: false } : {}),
+  }
 }
 function diagram(code: string, x: number, y: number, w: number, h: number): DiagramElement {
   return { type: 'diagram', x, y, w, h, rotation: 0, code }
@@ -340,7 +344,7 @@ export function bakeToElements(slide: Slide, opts: BakeOptions = {}): SlideEleme
     case 'video-embed': {
       // .l-video-embed.full: edge-to-edge, no caption (nowhere to put one).
       if (slide.videoFit === 'full') {
-        els.push(video(slide.video ?? '', 0, 0, STAGE_W, STAGE_H, slide.poster || undefined))
+        els.push(video(slide.video ?? '', 0, 0, STAGE_W, STAGE_H, slide.poster || undefined, slide.subtitles))
         break
       }
       // .l-video-embed: 60px padding, 16:9 frame centred, caption +14 below
@@ -352,7 +356,7 @@ export function bakeToElements(slide: Slide, opts: BakeOptions = {}): SlideEleme
       const w = (h * 16) / 9
       const x = (STAGE_W - w) / 2
       const y = PADV + Math.max(0, (STAGE_H - PADV * 2 - h - capH) / 2)
-      els.push(video(slide.video ?? '', x, y, w, h, slide.poster || undefined))
+      els.push(video(slide.video ?? '', x, y, w, h, slide.poster || undefined, slide.subtitles))
       if (slide.caption) els.push(text(slide.caption, PAD_X, y + h + 14, INNER_W, 20 * BODY_LH, { size: 20, align: 'center', color: 'rgba(230,236,242,0.75)' }))
       break
     }

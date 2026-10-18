@@ -10,6 +10,10 @@
 // - a YouTube or Vimeo iframe (`[data-dek-video]`) — toggled through the
 //   player's postMessage API. Each player reports its own play/pause back, so
 //   the toggle stays right even after someone clicks the player's own button.
+//
+// A player marked `data-dek-subtitles="off"` has its subtitles switched off
+// once it's ready and again when playback starts (YouTube loads its captions
+// module only then), whatever the viewer's account or the uploader asks for.
 
 type Provider = 'youtube' | 'vimeo'
 
@@ -47,6 +51,17 @@ export function listenToPlayer(frame: HTMLIFrameElement) {
   }
 }
 
+/** Switch the player's subtitles off, if the slide asks for that. */
+function hideSubtitles(frame: HTMLIFrameElement) {
+  if (frame.dataset.dekSubtitles !== 'off') return
+  const p = providerOf(frame)
+  if (p === 'youtube') {
+    post(frame, { event: 'command', func: 'unloadModule', args: ['captions'] })
+    post(frame, { event: 'command', func: 'unloadModule', args: ['cc'] })
+  }
+  if (p === 'vimeo') post(frame, { method: 'disableTextTrack' })
+}
+
 function onPlayerMessage(e: MessageEvent) {
   if (!/^https:\/\/(www\.youtube\.com|www\.youtube-nocookie\.com|player\.vimeo\.com)$/.test(e.origin)) return
   let data: { event?: string; info?: { playerState?: number } }
@@ -62,15 +77,18 @@ function onPlayerMessage(e: MessageEvent) {
   // YouTube: 1 playing, 2 paused, 0 ended.
   const state = data.info?.playerState
   if (state === 1) {
+    if (!started.has(frame)) hideSubtitles(frame)
     paused.set(frame, false)
     started.add(frame)
   }
+  if (data.event === 'onReady' || data.event === 'ready') hideSubtitles(frame)
   else if (state === 2 || state === 0) paused.set(frame, true)
   if (state === 0) notifyEnded(frame)
   // Vimeo ignores event requests sent before its player is ready, and the
   // iframe's `load` comes earlier than that: ask again once it says so.
   if (data.event === 'ready' && providerOf(frame) === 'vimeo') listenToPlayer(frame)
   if (data.event === 'play') {
+    if (!started.has(frame)) hideSubtitles(frame)
     paused.set(frame, false)
     started.add(frame)
   }

@@ -234,3 +234,12 @@ describe('convertLayout — widgets', () => {
     expect(out.elements).toEqual([timer])
   })
 })
+
+describe('convertLayout — video subtitles', () => {
+  it('keeps subtitles off through freeform and back', () => {
+    const src = { layout: 'video-embed', video: 'https://youtu.be/abcdefghijk', subtitles: false } as Slide
+    const free = convertLayout(src, 'freeform')
+    expect(free.elements?.[0]).toMatchObject({ type: 'video', subtitles: false })
+    expect(convertLayout(free, 'video-embed').subtitles).toBe(false)
+  })
+})

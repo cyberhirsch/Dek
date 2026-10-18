@@ -243,6 +243,7 @@ Click-to-play video: YouTube, Vimeo, or a direct video file.
 |---|---|---|
 | `video` | string | Required. The URL — see below for which ones work. |
 | `videoFit` | `framed` \| `full` | `framed` (default): a bordered 16:9 frame with the caption under it. `full`: edge to edge, no border — and **no caption** (it stays in the file, hidden until you switch back). |
+| `subtitles` | `false` | Hides the player's subtitles (YouTube, Vimeo), even when the viewer's account or the uploader turns them on. Leave it out to let the player decide. |
 | `poster` | string | Still shown before play. Falls back to `image`, then to the YouTube thumbnail. |
 | `image` | string | Alternate poster source. |
 | `caption` | string | Optional. Rendered only when `framed`. |
