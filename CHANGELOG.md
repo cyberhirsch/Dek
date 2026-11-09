@@ -6,7 +6,7 @@
 
 ### Poll QR code in its box
 
-The poll slide's QR code filled the whole screen while presenting instead of its white box beside the results; it now sits in the box with its white margin.
+The poll slide's QR code filled the whole screen while presenting instead of its white box beside the results; it now fills 95 % of that box.
 
 ### Video subtitles off
 

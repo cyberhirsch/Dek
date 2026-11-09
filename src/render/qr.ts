@@ -90,8 +90,8 @@ export function matrixToPath(m: QrMatrix, quiet = QUIET_ZONE): QrPath {
 /** Encode `text` and return a ready-to-inline `<svg>`. `dark`/`light` are CSS
  *  colors; the light square is the quiet zone and must stay opaque, or a busy
  *  slide behind the code defeats the scanner. */
-export async function qrSvg(text: string, dark = '#000000', light = '#ffffff'): Promise<string> {
-  const { viewBox, d, size } = matrixToPath(await qrMatrix(text))
+export async function qrSvg(text: string, dark = '#000000', light = '#ffffff', quiet = QUIET_ZONE): Promise<string> {
+  const { viewBox, d, size } = matrixToPath(await qrMatrix(text), quiet)
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" shape-rendering="crispEdges" ` +
     `width="100%" height="100%" preserveAspectRatio="xMidYMid meet">` +

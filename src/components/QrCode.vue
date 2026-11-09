@@ -4,7 +4,8 @@
 import { ref, watch } from 'vue'
 import { qrSvg } from '../render/qr'
 
-const props = defineProps<{ text: string; dark?: string; light?: string }>()
+// `quiet`: margin in modules; 0 when the parent already draws a white margin.
+const props = defineProps<{ text: string; dark?: string; light?: string; quiet?: number }>()
 
 const svg = ref('')
 const failed = ref(false)
@@ -12,8 +13,8 @@ const failed = ref(false)
 let token = 0
 
 watch(
-  () => [props.text, props.dark, props.light] as const,
-  async ([text, dark, light]) => {
+  () => [props.text, props.dark, props.light, props.quiet] as const,
+  async ([text, dark, light, quiet]) => {
     const mine = ++token
     if (!text) {
       svg.value = ''
@@ -21,7 +22,7 @@ watch(
       return
     }
     try {
-      const out = await qrSvg(text, dark, light)
+      const out = await qrSvg(text, dark, light, quiet)
       if (mine === token) {
         svg.value = out
         failed.value = false

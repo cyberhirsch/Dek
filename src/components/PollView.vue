@@ -75,7 +75,7 @@ const status = computed(() => {
       </div>
       <div class="poll-join">
         <div class="poll-qr">
-          <QrCode v-if="!editable && session" :text="joinUrl(session.id)" />
+          <QrCode v-if="!editable && session" :text="joinUrl(session.id)" :quiet="0" />
           <div v-else class="poll-qr-empty">{{ editable ? 'QR code appears while presenting' : '' }}</div>
         </div>
         <div class="poll-scan">Scan to vote</div>
@@ -181,9 +181,9 @@ const status = computed(() => {
   border-radius: 12px;
   background: #fff;
 }
-/* inside the white padding, which is the code's quiet zone */
+/* The code fills 95 % of the white box; the 2.5 % edge is its only quiet zone. */
 .poll-qr :deep(.el-box-qr) {
-  inset: 12px;
+  inset: 2.5%;
 }
 .poll-qr-empty {
   width: 100%;
