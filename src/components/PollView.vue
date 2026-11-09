@@ -172,12 +172,18 @@ const status = computed(() => {
   font-family: var(--dek-font-body);
 }
 .poll-qr {
+  /* QrCode fills its positioned parent: without this it took the whole screen. */
+  position: relative;
   width: 240px;
   height: 240px;
   padding: 12px;
   box-sizing: border-box;
   border-radius: 12px;
   background: #fff;
+}
+/* inside the white padding, which is the code's quiet zone */
+.poll-qr :deep(.el-box-qr) {
+  inset: 12px;
 }
 .poll-qr-empty {
   width: 100%;

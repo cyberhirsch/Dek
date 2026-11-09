@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Poll QR code in its box
+
+The poll slide's QR code filled the whole screen while presenting instead of its white box beside the results; it now sits in the box with its white margin.
+
 ### Video subtitles off
 
 **Subtitles off by default — Subtitles: off | player**
