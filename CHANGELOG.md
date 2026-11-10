@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Videos play in exported HTML
+
+In a downloaded HTML presentation, clicking a video's play button moved to the next slide instead of playing it. The exported file now swaps the poster for the player (YouTube, Vimeo or a video file) and restores the poster when you leave the slide; clicks inside a playing video no longer advance. Opened straight from disk, YouTube may refuse to play in the page (it needs a web address), so a small "Open on YouTube" link sits in the corner. The ZIP export bundles video files into its assets folder.
+
 ### Poll QR code in its box
 
 The poll slide's QR code filled the whole screen while presenting instead of its white box beside the results; it now fills 95 % of that box.

@@ -62,8 +62,21 @@ const EXPORT_PRES_JS = `
   function fit(){ var s=Math.min(window.innerWidth/1280, window.innerHeight/720); pages.forEach(function(p){ p.style.transform='translate(-50%,-50%) scale('+s+')'; }); }
   var changeFns=[];
   function render(){ pages.forEach(function(p,i){ p.classList.toggle('active', i===cur); }); if(ovOpen) markOv(); if(presOpen) fillPres(); changeFns.forEach(function(f){ f(cur); }); }
-  function go(d){ cur=clampi(cur+d); render(); }
-  function jump(i){ cur=clampi(i); render(); }
+  // Videos: the poster's play button carries the player URL (data-dek-src);
+  // clicking it swaps the poster for the player, leaving the slide restores it.
+  var playing=[];
+  function playIn(btn){ var src=btn.getAttribute('data-dek-src'); if(!src)return; var kind=btn.getAttribute('data-dek-kind'); var box=btn.parentNode; playing.push({box:box,html:box.innerHTML});
+    if(getComputedStyle(box).position==='static') box.style.position='relative';
+    var el=document.createElement(kind==='file'?'video':'iframe'); el.src=src; el.setAttribute('style','position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;');
+    if(kind==='file'){ el.controls=true; el.autoplay=true; } else { el.setAttribute('allow','autoplay; encrypted-media; fullscreen'); el.setAttribute('allowfullscreen',''); }
+    box.innerHTML=''; box.appendChild(el);
+    // YouTube refuses to play inside a file opened from disk (no web address to
+    // report), so offer the video on YouTube itself as well.
+    var watch=btn.getAttribute('data-dek-watch');
+    if(kind==='youtube'&&location.protocol==='file:'&&watch){ var a=document.createElement('a'); a.href=watch; a.target='_blank'; a.rel='noopener'; a.textContent='Open on YouTube \u2197'; a.setAttribute('style','position:absolute;right:10px;bottom:10px;z-index:2;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.7);color:#fff;font:13px "JetBrains Mono",monospace;text-decoration:none;'); box.appendChild(a); } }
+  function stopVideos(){ playing.forEach(function(p){ p.box.innerHTML=p.html; }); playing=[]; }
+  function go(d){ stopVideos(); cur=clampi(cur+d); render(); }
+  function jump(i){ stopVideos(); cur=clampi(i); render(); }
   function fs(){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} }
   function scaledClone(i,w,doc){ doc=doc||document; var wrap=doc.createElement('div'); wrap.className='dek-clone'; wrap.style.width=w+'px'; wrap.style.height=(w*720/1280)+'px'; var c=doc.importNode(pages[i],true); c.classList.add('active'); c.style.position='absolute'; c.style.top='0'; c.style.left='0'; c.style.margin='0'; c.style.boxShadow='none'; c.style.transform='scale('+(w/1280)+')'; c.style.transformOrigin='top left'; wrap.appendChild(c); return wrap; }
   function buildOv(){ ovEl=document.createElement('div'); ovEl.className='dek-ov'; pages.forEach(function(p,i){ var cell=document.createElement('div'); cell.className='dek-ov-cell'; cell.appendChild(scaledClone(i,248)); var n=document.createElement('span'); n.className='dek-ov-num'; n.textContent=String(i+1); cell.appendChild(n); cell.addEventListener('click',function(){ jump(i); toggleOv(false); }); ovEl.appendChild(cell); }); document.body.appendChild(ovEl); }
@@ -92,7 +105,7 @@ const EXPORT_PRES_JS = `
   window.addEventListener('resize',function(){ fit(); if(presOpen)fillPres(); });
   window.addEventListener('wheel',function(e){ if(ovOpen||presOpen)return; go(e.deltaY>0?1:-1); },{passive:true});
   window.addEventListener('beforeunload',function(){ if(presWin&&!presWin.closed)presWin.close(); });
-  show.addEventListener('click',function(){ if(!ovOpen&&!presOpen)go(1); });
+  show.addEventListener('click',function(e){ var t=e.target; if(t&&t.closest){ var b=t.closest('[data-dek-play]'); if(b){ e.stopPropagation(); playIn(b); return; } if(t.closest('video,iframe,a'))return; } if(!ovOpen&&!presOpen)go(1); });
   // For add-ons such as the narration player (export/narrateRuntime.ts).
   window.__dek={ cur:function(){ return cur; }, go:go, jump:jump, count:pages.length, onChange:function(f){ changeFns.push(f); } };
   fit(); render();
@@ -356,6 +369,12 @@ async function downloadZip() {
       if (!m) return
       const r = await toAsset(m[1])
       if (r) el.setAttribute('style', s.replace(m[1], r))
+    }),
+  )
+  await Promise.all(
+    Array.from(clone.querySelectorAll<HTMLElement>('[data-dek-kind="file"][data-dek-src]')).map(async (b) => {
+      const r = await toAsset(b.getAttribute('data-dek-src') ?? '')
+      if (r) b.setAttribute('data-dek-src', r)
     }),
   )
   zip.file('index.html', buildHtmlDoc(clone.innerHTML))

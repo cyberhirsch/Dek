@@ -417,7 +417,18 @@ watch(
             :editable="editable"
             @file="emit('upload', { field: 'poster', file: $event })"
           />
-          <button class="play" data-dek-play :disabled="!pv" :title="pv ? 'Play' : 'Add a video URL first'" @click="playVideo">
+          <!-- data-dek-src/kind/watch let an exported HTML file start the
+               player without Vue (ExportView's runtime) -->
+          <button
+            class="play"
+            data-dek-play
+            :data-dek-src="pv ? (pv.provider === 'file' ? pv.embedUrl : playSrc) : undefined"
+            :data-dek-kind="pv?.provider"
+            :data-dek-watch="slide.video || undefined"
+            :disabled="!pv"
+            :title="pv ? 'Play' : 'Add a video URL first'"
+            @click="playVideo"
+          >
             <span class="tri" />
           </button>
           <div v-if="editable" class="vid-url">

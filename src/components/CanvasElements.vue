@@ -777,7 +777,7 @@ defineExpose({ commitEdit })
         </template>
         <template v-else>
           <FramedImage :src="videoPoster(asVideo(el))" fit="contain" />
-          <button class="vid-play" data-dek-play title="Play" @click.stop="playVideo(i, asVideo(el))" @pointerdown.stop><span class="tri" /></button>
+          <button class="vid-play" data-dek-play :data-dek-src="isFileVideo(asVideo(el)) ? asVideo(el).video : videoSrc(asVideo(el))" :data-dek-kind="parseVideo(asVideo(el).video)?.provider" :data-dek-watch="asVideo(el).video" title="Play" @click.stop="playVideo(i, asVideo(el))" @pointerdown.stop><span class="tri" /></button>
         </template>
       </div>
 
