@@ -108,8 +108,9 @@ function patch(p: Partial<Slide>) {
 }
 // Right-clicking a layout image opens Dek's own image menu (Copy/Paste/Fit/…)
 // instead of the browser's native one — the same actions the freeform canvas
-// offers, wired to the slide's image field. Only in edit mode, and only when an
-// image is present. `target` names the multi-image slots (portraits / gallery);
+// offers, wired to the slide's image field. Only in edit mode. The single image
+// gets the menu even while empty (to paste one in); the multi-image slots only
+// with a picture. `target` names the multi-image slots (portraits / gallery);
 // omit it for the single `image` field. Table cells route through TableGrid.
 function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; index: number }) {
   if (!props.editable) return
@@ -118,7 +119,7 @@ function onImageCtx(e: MouseEvent, target?: { field: 'portraits' | 'gallery'; in
     : target.field === 'portraits'
       ? props.slide.portraits?.[target.index]
       : galleryItems.value[target.index]?.image
-  if (!src) return
+  if (!src && target) return
   e.preventDefault()
   emit('ctxmenu', {
     x: e.clientX, y: e.clientY, sx: 0, sy: 0, index: -1,

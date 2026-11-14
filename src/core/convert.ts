@@ -46,7 +46,7 @@ const SLOT_CANDIDATES: Record<Slot, string[]> = {
   lede: ['text', 'subtitle', 'content', 'table'],
   prose: ['content', 'text', 'subtitle', 'table'],
   caption: ['caption', 'cite', 'byline', 'role'],
-  image: ['image'],
+  image: ['image', 'items', 'table'],
   gallery: ['items', 'image', 'table'],
   video: ['video'],
   diagram: ['code'],
@@ -196,8 +196,16 @@ export function convertLayout(slide: Slide, to: LayoutId, opts?: BakeOptions): S
       // keeps only the text cells, gallery only the images. So it is NOT
       // consumed: it stays in the pool and gets stashed, and switching back
       // restores the whole table. (Consuming it silently dropped every image
-      // cell on a table → text → table round trip.)
-      if (!(cand === 'table' && slot !== 'table')) used.add(cand)
+      // cell on a table → text → table round trip.) The same goes for a
+      // gallery or table seeding a single image: only the first picture shows.
+      const lossy = (cand === 'table' && slot !== 'table') || (cand === 'items' && slot === 'image')
+      if (!lossy) used.add(cand)
+      // That first picture keeps its framing and link.
+      if (slot === 'image' && cand === 'items') {
+        const first = galleryFirst(pool.items)
+        if (first?.focus && pool.focus == null) base.focus = first.focus
+        if (first?.link && pool.imageLink == null && MOD_SUPPORT.imageLink.includes(to)) base.imageLink = first.link
+      }
       break
     }
   }
@@ -224,8 +232,19 @@ export function convertLayout(slide: Slide, to: LayoutId, opts?: BakeOptions): S
   return base
 }
 
+function galleryFirst(items: unknown): GalleryItem | undefined {
+  if (!Array.isArray(items)) return undefined
+  const it = items.find((x) => (typeof x === 'string' ? x : (x as GalleryItem)?.image))
+  return typeof it === 'string' ? { image: it } : (it as GalleryItem | undefined)
+}
+
 /** Coerce a pool value into the shape the target slot's field expects. */
 function adaptValue(slot: Slot, fromField: string, value: unknown): unknown {
+  // A gallery or table seeding the single image: its first picture.
+  if (slot === 'image' && fromField === 'items') return galleryFirst(value)?.image
+  if (slot === 'image' && fromField === 'table') {
+    return tableShape(value as TableData).cells.find((c) => !c.covered && c.image)?.image
+  }
   // A single image seeding a gallery or a table becomes a one-item list / cell.
   if (slot === 'gallery' && fromField === 'image' && typeof value === 'string') return [{ image: value } as GalleryItem]
   if (slot === 'table' && fromField === 'image' && typeof value === 'string') return { rows: [[{ image: value }]] } as TableData

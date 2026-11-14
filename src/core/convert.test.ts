@@ -235,6 +235,30 @@ describe('convertLayout — widgets', () => {
   })
 })
 
+describe('convertLayout — gallery to a single image', () => {
+  const gallery = {
+    layout: 'gallery',
+    title: 'Sign in',
+    items: [{ image: 'a.png', focus: { x: 0.2, y: 0.3, zoom: 1.5 } }, { image: 'b.png' }],
+  } as unknown as Slide
+
+  it('shows the first picture, keeping its framing', () => {
+    const out = convertLayout(gallery, 'text-image')
+    expect(out.image).toBe('a.png')
+    expect(out.focus).toEqual({ x: 0.2, y: 0.3, zoom: 1.5 })
+  })
+
+  it('keeps the whole gallery for switching back', () => {
+    const back = convertLayout(convertLayout(gallery, 'image-full'), 'gallery')
+    expect(back.items).toEqual(gallery.items)
+  })
+
+  it('takes the first picture cell of a table', () => {
+    const t = { layout: 'table', table: { rows: [[{ text: 'x' }, { image: 'c.png' }]] } } as unknown as Slide
+    expect(convertLayout(t, 'image-caption').image).toBe('c.png')
+  })
+})
+
 describe('convertLayout — video subtitles', () => {
   it('keeps player subtitles through freeform and back', () => {
     const src = { layout: 'video-embed', video: 'https://youtu.be/abcdefghijk', subtitles: true } as Slide

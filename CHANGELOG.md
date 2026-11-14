@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Gallery → single-image layouts keep the picture
+
+Switching a gallery (or a table) to Text + Image, Image Full or Image + Caption left the image frame empty: the pictures went to the hidden stash. The first picture now fills the frame, with its framing and link; the whole gallery stays stashed, so switching back restores every picture. An empty image frame's right-click menu now offers **Paste Image** and **Add Image…** (it used to show the slide menu with Paste greyed out).
+
 ### Videos play in exported HTML
 
 In a downloaded HTML presentation, clicking a video's play button moved to the next slide instead of playing it. The exported file now swaps the poster for the player (YouTube, Vimeo or a video file) and restores the poster when you leave the slide; clicks inside a playing video no longer advance. Opened straight from disk, YouTube may refuse to play in the page (it needs a web address), so a small "Open on YouTube" link sits in the corner. The ZIP export bundles video files into its assets folder.

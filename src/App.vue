@@ -1584,7 +1584,14 @@ function layoutImageItems(t: ImageField): CtxEntry[] {
   const src = fieldImageSrc(s, t)
   // An empty table cell still gets a menu — just the one action to fill it —
   // unlike other image fields, which have no "field with no image yet" state.
-  if (!src) return t.field === 'table' ? [{ label: 'Add Image…', action: () => replaceFieldImage(t) }] : []
+  // An empty slot (a table cell, the single image) offers to fill it.
+  if (!src) {
+    if (t.field === 'image') return [
+      { label: 'Paste Image', action: () => pasteFieldImage(t) },
+      { label: 'Add Image…', action: () => replaceFieldImage(t) },
+    ]
+    return t.field === 'table' ? [{ label: 'Add Image…', action: () => replaceFieldImage(t) }] : []
+  }
   const items: CtxEntry[] = [
     { label: 'Copy Image', action: () => void copyImageSrc(src) },
     { label: 'Paste Image', action: () => pasteFieldImage(t) },
